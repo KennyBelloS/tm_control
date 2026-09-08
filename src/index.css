@@ -462,6 +462,8 @@ tbody td button:hover{ background:var(--primary); color:#fff; transform:scale(1.
   border-left:3px solid var(--info);
 }
 .notif-warning{ border-left-color:var(--warning); }
+.notif-almacenamiento{ border-left-color:var(--danger); }
+.notif-icono-almacenamiento{ background:var(--danger); }
 .notif-icono{
   width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center;
   font-size:12px; color:#fff; flex-shrink:0; background:var(--info);
@@ -596,3 +598,12 @@ tbody td button:hover{ background:var(--primary); color:#fff; transform:scale(1.
   .top3-card{ padding:20px 16px; }
   .notif-panel{ width:calc(100vw - 32px); right:-8px; }
 }
+
+/* ===== BARRA DE ALMACENAMIENTO (Auditoría) ===== */
+.almacenamiento-barra-track{ height:18px; background:var(--background); border-radius:20px; overflow:hidden; margin-bottom:8px; }
+.almacenamiento-barra-fill{
+  height:100%; border-radius:20px; background:linear-gradient(90deg,var(--primary),var(--primary-light));
+  transition:width .6s cubic-bezier(.22,1,.36,1);
+}
+.almacenamiento-barra-fill.advertencia{ background:linear-gradient(90deg,#B45309,#D97706); }
+.almacenamiento-barra-fill.critico{ background:linear-gradient(90deg,#A91D3A,#DC2626); }

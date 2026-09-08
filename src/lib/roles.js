@@ -1,59 +1,146 @@
-// roles.js
-// -----------------------------------------------------------------------
-// Sistema de roles y permisos por módulo. Por ahora la "sesión" vive en
-// localStorage (no hay login real todavía — eso se conecta más adelante
-// con Supabase Auth + la tabla de Usuarios). Cada módulo declara qué
-// roles pueden verlo; el Sidebar y las rutas se filtran con esto.
-// -----------------------------------------------------------------------
-
+import { supabase } from './supabaseClient';
 export const ROLES = ['administrador', 'ingeniero', 'supervisor', 'formador'];
-
 export const ROL_LABEL = {
   administrador: 'Administrador',
   ingeniero: 'Ingeniero',
   supervisor: 'Supervisor',
-  formador: 'Formador',
+  formador: 'Formador'
 };
-
-// Módulos marcados como "técnicos" (Usuarios, Auditoría, Configuración):
-// el Ingeniero ve todo MENOS estos. Supervisor y Formador tienen su propio
-// listado explícito más abajo (no se definieron reglas exactas todavía,
-// así que dejé un criterio razonable — ajústalo en este archivo cuando
-// tengas las reglas definitivas).
 export const MODULOS = {
-  dashboard:      { roles: ['administrador', 'ingeniero', 'supervisor', 'formador'] },
-  personas:       { roles: ['administrador', 'ingeniero', 'supervisor'] },
-  rendimientos:   { roles: ['administrador', 'ingeniero', 'supervisor', 'formador'] },
-  reportes:       { roles: ['administrador', 'ingeniero', 'supervisor'] },
-  ranking:        { roles: ['administrador', 'ingeniero', 'supervisor', 'formador'] },
-  lineas:         { roles: ['administrador', 'ingeniero', 'supervisor'] },
-  indirectos:     { roles: ['administrador', 'ingeniero'] },
-  gerencia:       { roles: ['administrador', 'ingeniero'] },
-  configuracion:  { roles: ['administrador'] },       // técnico
-  usuarios:       { roles: ['administrador'] },       // técnico
-  auditoria:      { roles: ['administrador'] },       // técnico
+  dashboard: {
+    roles: ['administrador', 'ingeniero', 'supervisor', 'formador']
+  },
+  personas: {
+    roles: ['administrador', 'ingeniero', 'supervisor']
+  },
+  rendimientos: {
+    roles: ['administrador', 'ingeniero', 'supervisor', 'formador']
+  },
+  reportes: {
+    roles: ['administrador', 'ingeniero', 'supervisor']
+  },
+  ranking: {
+    roles: ['administrador', 'ingeniero', 'supervisor', 'formador']
+  },
+  lineas: {
+    roles: ['administrador', 'ingeniero', 'supervisor']
+  },
+  indirectos: {
+    roles: ['administrador', 'ingeniero']
+  },
+  gerencia: {
+    roles: ['administrador', 'ingeniero']
+  },
+  configuracion: {
+    roles: ['administrador']
+  },
+  usuarios: {
+    roles: ['administrador']
+  },
+  auditoria: {
+    roles: ['administrador']
+  }
 };
-
 export function puedeVer(rol, moduloKey) {
   return MODULOS[moduloKey]?.roles.includes(rol) ?? false;
 }
-
-const KEY_SESION = 'tm_sesion';
-
-export function getSesion() {
-  try {
-    const raw = localStorage.getItem(KEY_SESION);
-    if (raw) return JSON.parse(raw);
-  } catch { /* noop */ }
-  return null;
+export function puedeEditar(rol) {
+  return rol === 'administrador' || rol === 'ingeniero';
 }
-
-export function setSesion(sesion) {
-  localStorage.setItem(KEY_SESION, JSON.stringify(sesion));
-  window.dispatchEvent(new Event('tm-sesion-cambio'));
+function correoDesdeEntrada(entrada) {
+  const valor = String(entrada || '').trim();
+  // Supabase Auth solo maneja correos; a quien no es Administrador se le
+  // arma un correo falso interno a partir de su "usuario" para que el
+  // login funcione igual con usuario+contraseña.
+  return valor.includes('@') ? valor.toLowerCase() : `${valor.toLowerCase()}@torremolinos.local`;
 }
-
-export function cerrarSesion() {
-  localStorage.removeItem(KEY_SESION);
-  window.dispatchEvent(new Event('tm-sesion-cambio'));
+export async function iniciarSesion(usuarioOCorreo, password) {
+  const email = correoDesdeEntrada(usuarioOCorreo);
+  const {
+    error
+  } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+  if (error) throw new Error('Usuario/correo o contraseña incorrectos.');
+}
+export async function cerrarSesion() {
+  await supabase.auth.signOut();
+}
+export async function getPerfilActual() {
+  const {
+    data: {
+      session
+    }
+  } = await supabase.auth.getSession();
+  if (!session) return null;
+  const {
+    data,
+    error
+  } = await supabase.from('perfiles').select('nombre, rol, activo').eq('id', session.user.id).single();
+  if (error || !data || !data.activo) return null;
+  return {
+    nombre: data.nombre,
+    rol: data.rol,
+    email: session.user.email
+  };
+}
+export async function crearUsuario({
+  nombre,
+  rol,
+  esAdmin,
+  usuario,
+  email,
+  password
+}) {
+  const {
+    data: {
+      session
+    }
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error('Debes iniciar sesión.');
+  const resp = await fetch('/api/crear-usuario', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      tokenAdmin: session.access_token,
+      nombre,
+      rol,
+      esAdmin,
+      usuario,
+      email,
+      password
+    })
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || 'No se pudo crear el usuario.');
+  return data;
+}
+export async function listarPerfiles() {
+  const {
+    data,
+    error
+  } = await supabase.from('perfiles').select('id, nombre, rol, activo, creado_en').order('creado_en', {
+    ascending: false
+  });
+  if (error) throw error;
+  return data || [];
+}
+export async function cambiarEstadoPerfil(id, activo) {
+  const {
+    error
+  } = await supabase.from('perfiles').update({
+    activo
+  }).eq('id', id);
+  if (error) throw error;
+}
+export async function cambiarRolPerfil(id, rol) {
+  const {
+    error
+  } = await supabase.from('perfiles').update({
+    rol
+  }).eq('id', id);
+  if (error) throw error;
 }

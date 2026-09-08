@@ -1,39 +1,50 @@
 import { useState } from 'react';
 import logo from '../assets/logo-icon.png';
-import { ROLES, ROL_LABEL, setSesion } from '../lib/roles';
-
+import { iniciarSesion } from '../lib/roles';
 export default function Login() {
-  const [nombre, setNombre] = useState('');
-  const [rol, setRol] = useState('administrador');
-
-  function entrar(e) {
+  const [usuario, setUsuario] = useState('');
+  const [password, setPassword] = useState('');
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState(null);
+  async function entrar(e) {
     e.preventDefault();
-    setSesion({ nombre: nombre.trim() || 'Usuario', rol });
+    setCargando(true);
+    setError(null);
+    try {
+      await iniciarSesion(usuario, password);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCargando(false);
+    }
   }
-
-  return (
-    <div className="login-pantalla">
+  return <div className="login-pantalla">
       <form className="login-card" onSubmit={entrar}>
         <img src={logo} alt="Falcon Farms · Torremolinos" className="login-logo" />
         <h1>TORREMOLINOS</h1>
         <p className="login-subtitulo">TMCONTROL</p>
 
-        <label>Tu nombre</label>
-        <input type="text" placeholder="Ej. Luisa Ortega" value={nombre} onChange={e => setNombre(e.target.value)} />
+        {error && <div className="alert err" style={{
+        fontSize: 12,
+        marginBottom: 6
+      }}><i className="fa-solid fa-circle-exclamation"></i> {error}</div>}
 
-        <label>Rol</label>
-        <select value={rol} onChange={e => setRol(e.target.value)}>
-          {ROLES.map(r => <option key={r} value={r}>{ROL_LABEL[r]}</option>)}
-        </select>
+        <label>Usuario o correo</label>
+        <input type="text" placeholder="tu.usuario o correo@empresa.com" value={usuario} onChange={e => setUsuario(e.target.value)} required />
 
-        <button type="submit" className="btn-primary" style={{ justifyContent: 'center', marginTop: 6 }}>
-          <i className="fa-solid fa-right-to-bracket"></i> Entrar
+        <label>Contraseña</label>
+        <input type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
+
+        <button type="submit" className="btn-primary" disabled={cargando} style={{
+        justifyContent: 'center',
+        marginTop: 10
+      }}>
+          <i className="fa-solid fa-right-to-bracket"></i> {cargando ? 'Entrando...' : 'Entrar'}
         </button>
 
         <p className="login-nota">
-          Selector temporal mientras se conecta el login real (Usuarios). El sistema recuerda tu elección en este navegador.
+          El Administrador entra con su correo. Ingeniero, Supervisor y Formador entran con el usuario y la contraseña que el Administrador les creó en el módulo Usuarios.
         </p>
       </form>
-    </div>
-  );
+    </div>;
 }

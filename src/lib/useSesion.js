@@ -1,19 +1,30 @@
 import { useEffect, useState } from 'react';
-import { getSesion } from './roles';
-
-/** Devuelve la sesión actual y se re-renderiza si cambia (login, logout, cambio de rol). */
+import { supabase } from './supabaseClient';
+import { getPerfilActual } from './roles';
 export function useSesion() {
-  const [sesion, setSesionState] = useState(getSesion());
-
+  const [estado, setEstado] = useState({
+    cargando: true,
+    sesion: null
+  });
   useEffect(() => {
-    function actualizar() { setSesionState(getSesion()); }
-    window.addEventListener('tm-sesion-cambio', actualizar);
-    window.addEventListener('storage', actualizar);
+    let activo = true;
+    async function cargar() {
+      const perfil = await getPerfilActual();
+      if (activo) setEstado({
+        cargando: false,
+        sesion: perfil
+      });
+    }
+    cargar();
+    const {
+      data: sub
+    } = supabase.auth.onAuthStateChange(() => {
+      cargar();
+    });
     return () => {
-      window.removeEventListener('tm-sesion-cambio', actualizar);
-      window.removeEventListener('storage', actualizar);
+      activo = false;
+      sub.subscription.unsubscribe();
     };
   }, []);
-
-  return sesion;
+  return estado;
 }

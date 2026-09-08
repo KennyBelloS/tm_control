@@ -16,23 +16,20 @@ import Gerencia from './pages/Gerencia';
 import Usuarios from './pages/Usuarios';
 import Auditoria from './pages/Auditoria';
 import { useSesion } from './lib/useSesion';
-
 const TIEMPO_MINIMO_SPLASH = 1300;
-
 export default function App() {
   const [mostrarSplash, setMostrarSplash] = useState(true);
-  const sesion = useSesion();
-
+  const {
+    cargando,
+    sesion
+  } = useSesion();
   useEffect(() => {
     const t = setTimeout(() => setMostrarSplash(false), TIEMPO_MINIMO_SPLASH);
     return () => clearTimeout(t);
   }, []);
-
-  if (mostrarSplash) return <SplashScreen />;
+  if (mostrarSplash || cargando) return <SplashScreen />;
   if (!sesion) return <Login />;
-
-  return (
-    <Routes>
+  return <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/personas" element={<ProtectedRoute modulo="personas"><Personas /></ProtectedRoute>} />
@@ -46,6 +43,5 @@ export default function App() {
         <Route path="/usuarios" element={<ProtectedRoute modulo="usuarios"><Usuarios /></ProtectedRoute>} />
         <Route path="/auditoria" element={<ProtectedRoute modulo="auditoria"><Auditoria /></ProtectedRoute>} />
       </Route>
-    </Routes>
-  );
+    </Routes>;
 }

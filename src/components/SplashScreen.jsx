@@ -1,8 +1,8 @@
 import logo from '../assets/logo-icon.png';
-
-export default function SplashScreen({ mensaje }) {
-  return (
-    <div className="splash">
+export default function SplashScreen({
+  mensaje
+}) {
+  return <div className="splash">
       <div className="splash-logo-wrap">
         <img src={logo} alt="Falcon Farms · Torremolinos" className="splash-logo" />
       </div>
@@ -10,6 +10,5 @@ export default function SplashScreen({ mensaje }) {
       <p className="splash-subtitle">TMCONTROL</p>
       <div className="splash-spinner"></div>
       {mensaje && <p className="splash-message">{mensaje}</p>}
-    </div>
-  );
+    </div>;
 }

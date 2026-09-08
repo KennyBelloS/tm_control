@@ -8,8 +8,31 @@ Este manual no asume que sabes programar. Sigue los pasos en orden.
 
 ## 0. Historial de arreglos recientes
 
-**Última entrega (descuento de almuerzo, correcciones de Gerencia):**
-- **Descuento de tiempo de almuerzo — nuevo, desactivado por defecto**: en Configuración → "Descuentos de tiempo (almuerzo)" puedes activar hasta 3 descuentos, cada uno con su "hora de corte" y minutos a restar. Ejemplo: hora de corte 12:00 y 30 minutos → un bloque de 06:00 a 13:00 (7 horas) queda en **6.5 horas** trabajadas. Solo se descuenta si el bloque realmente cruza esa hora — si el bloque termina antes, no se resta nada. Aplica tanto al Turno Actual como al tiempo calculado automáticamente en el Histórico.
+**Última entrega (reportes: Código en vez de Id, rendimiento promedio, respaldo en varias hojas):**
+- **En Excel, PDF, PNG y JPG ya no aparece "Id"** — se cambió a **"Código"** en todos los reportes. Donde ya existía una columna "Código" (Mesa) del Turno Actual, esa se renombró a **"Mesa"** para no repetir el nombre.
+- **Rendimiento promedio de todos, visible en cada reporte**: ahora el encabezado de cada Excel, PDF e imagen muestra el rendimiento promedio general del grupo, junto a la meta y la fecha.
+- **Respaldo completo con varias hojas**: Resumen, Histórico, Turno Actual, Personas, Metas Diarias y Configuración — toda la base de datos en un solo Excel organizado.
+
+**Entrega anterior — LA MÁS IMPORTANTE (autenticación real, roles con permisos reales, Auditoría):**
+
+Este cambio reemplaza el "selector de rol" que tenías (que cualquiera podía cambiar) por un login de verdad. **Sigue la sección 12 completa antes de usar esta versión** — sin esos pasos, nadie va a poder iniciar sesión.
+
+- **Login real con Supabase Auth**: el Administrador entra con su correo real; Ingeniero, Supervisor y Formador entran con un usuario y contraseña que el Administrador les crea desde el módulo **Usuarios**.
+- **Módulo Usuarios funcional**: crear cuentas, cambiar el rol de cualquiera, activar/desactivar el acceso.
+- **Permisos reales por rol** (ya no solo visuales — están protegidos también en la base de datos):
+  - Supervisor: dentro de Rendimientos **solo ve el filtro y los botones de exportar** — nada de tablas, nada de KPIs, nada de subir Excel.
+  - Formador: ve todo lo que le corresponde, pero en **modo solo lectura** (no puede editar, borrar ni subir nada).
+  - Solo Administrador e Ingeniero pueden modificar datos (a nivel de base de datos, no solo de pantalla).
+- **Módulo Auditoría (nuevo, solo Administrador)**: barra de cuánto espacio real llevas usado en Supabase, alerta automática al Administrador cuando llegues al 88-90%, y un botón para generar un **respaldo completo en Excel con 6 hojas**: Resumen, Histórico, Turno Actual, Personas, Metas Diarias y Configuración — toda la base de datos organizada, no solo el Histórico.
+- **Se necesita una función serverless** (`api/crear-usuario.js`) para crear cuentas de forma segura — solo funciona una vez publicado en Vercel con la variable `SUPABASE_SERVICE_ROLE_KEY` configurada (ver sección 12).
+
+**Entrega anterior (media hora de almuerzo activada por defecto, guardado corregido, exportar a imagen):**
+- **Media hora de almuerzo activada por defecto**: ahora viene lista desde el inicio con "12:00, 30 minutos" — si registras de 6am a 1pm, automáticamente son 6.5 horas trabajadas. Los otros 2 espacios de descanso quedan libres para que agregues si necesitas.
+- **Arreglado el bug de "no se guarda"**: el interruptor y los descansos ahora se guardan solos, al instante — ya no dependen del botón "Guardar cambios" de otra sección. Si recargas la página o cambias de módulo, tu configuración se mantiene.
+- **Nueva opción: descargar como imagen (PNG o JPG)**: en Rendimientos, junto a Excel y PDF, hay botones para descargar el ranking como una sola imagen — sin importar cuántas personas tenga, todo queda contenido en una sola foto (se hace tan alta como haga falta, no se corta ni se reparte en varias).
+
+**Entregas anteriores (descuento de almuerzo, correcciones de Gerencia):**
+- **Descuento de tiempo de almuerzo**: en Configuración → "Descuentos de tiempo (almuerzo)" puedes activar hasta 3 descuentos, cada uno con su "hora de corte" y minutos a restar. Solo se descuenta si el bloque realmente cruza esa hora — si el bloque termina antes, no se resta nada. Aplica tanto al Turno Actual como al tiempo calculado automáticamente en el Histórico.
 - **Gerencia: vista previa corregida** — quité el `calc(100vh...)` que dependía del zoom/tamaño de pantalla y dejé una altura fija estable (680px), y quité el efecto de "zoom" al pasar el mouse que hacía ver borroso el contenido. También agregué un botón de recargar y un aviso si la otra app se queda pegada en su pantalla de carga (por bloqueo de almacenamiento de terceros en algunos navegadores).
 
 **Entregas anteriores (meta en Configuración, Gerencia más vistosa, segunda gráfica):**
@@ -328,12 +351,12 @@ Cuando quieras que el sistema tenga una dirección web accesible para tu equipo:
 
 ---
 
-## 10. Seguridad — algo que debes saber
+## 10. Seguridad — ya se resolvió con la autenticación real
 
-Para que la app funcionara de inmediato sin necesidad de que cada persona inicie sesión, el archivo `schema.sql` deja las tablas abiertas a cualquiera que tenga la dirección de tu Supabase y la clave "anon" (la que va en `.env`). Esto es razonable para un sistema interno de un solo equipo, pero:
+Antes, cualquiera que tuviera la dirección de tu Supabase podía leer y escribir todo. **Ya no es así** desde esta entrega: con `migracion_autenticacion.sql` (sección 12), solo quien inició sesión puede leer datos, y solo Administrador/Ingeniero pueden modificarlos.
 
 - **No compartas tu archivo `.env`** ni la clave "anon" fuera de tu equipo de trabajo.
-- Si en el futuro necesitas que cada persona inicie sesión con su propio usuario y permisos distintos (por ejemplo, que un supervisor solo pueda ver su línea), Supabase lo permite mediante **Authentication** + políticas de seguridad (RLS) más estrictas. Puedo ayudarte con eso cuando lo necesites.
+- **La clave `SUPABASE_SERVICE_ROLE_KEY` es aún más sensible** — nunca la pongas en el código de React ni en `.env` del proyecto (esa variable NO lleva el prefijo `VITE_` a propósito, para que nunca llegue al navegador). Solo va en las variables de entorno de Vercel (sección 12).
 
 ---
 
@@ -343,7 +366,67 @@ Para que la app funcionara de inmediato sin necesidad de que cada persona inicie
 - **Reportes**: informes por rango de fechas, exportables en PDF.
 - **Líneas**: consolidado de producción por línea/mesa.
 - **Indirectos**: seguimiento del personal que no produce tallos directamente.
-- **Gerencia**: vista ejecutiva consolidada de toda la operación.
-- Autenticación de usuarios (login) si más de una persona/rol va a usar el sistema.
 
 Cualquier duda sobre un paso específico, dime en qué parte te quedaste y seguimos desde ahí.
+
+---
+
+## 12. Cómo activar la autenticación real (IMPORTANTE — hazlo en este orden)
+
+### 12.1 Correr el SQL en Supabase
+
+Ve a tu proyecto de Supabase → **SQL Editor** → **New query**, pega el contenido completo de `supabase/migracion_autenticacion.sql` y dale **Run**. Esto crea:
+- La tabla `perfiles` (nombre + rol de cada cuenta).
+- Las funciones de seguridad (`es_administrador`, `puede_editar`, `almacenamiento_usado_mb`).
+- Las políticas nuevas que exigen haber iniciado sesión para leer, y ser Administrador/Ingeniero para escribir.
+- La columna `almacenamiento_limite_mb` en Configuración (500 MB por defecto, el límite del plan gratuito).
+
+### 12.2 Desactivar la confirmación de correo (panel de Supabase, no es SQL)
+
+1. En tu proyecto de Supabase, ve a **Authentication** → **Providers** → **Email**.
+2. Busca la opción **"Confirm email"** y **apágala**.
+
+Esto es necesario porque los usuarios que no son Administrador entran con un correo "falso" (`usuario@torremolinos.local`) que nunca va a recibir un correo de confirmación real.
+
+### 12.3 Crear tu primera cuenta de Administrador
+
+Como el módulo Usuarios solo deja crear cuentas a alguien que YA es Administrador, la primera cuenta hay que crearla directo en Supabase:
+
+1. Ve a **Authentication** → **Users** → **Add user** → **Create new user**.
+2. Pon tu correo real y una contraseña.
+3. Marca **"Auto Confirm User"**.
+4. Dale crear.
+5. Ahora ve a **Table Editor** → tabla **perfiles** → **Insert row**:
+   - `id`: copia el ID del usuario que acabas de crear (lo ves en la lista de Authentication → Users).
+   - `nombre`: tu nombre.
+   - `rol`: `administrador`
+   - `activo`: `true`
+6. Guarda.
+
+Ya puedes entrar a la app con ese correo y esa contraseña — desde ahí, crea a todos los demás (Ingeniero, Supervisor, Formador) directamente desde el módulo **Usuarios**, sin volver a tocar Supabase manualmente.
+
+### 12.4 Configurar la función de crear usuarios (necesaria para Vercel)
+
+El módulo Usuarios necesita una función especial (`api/crear-usuario.js`, ya incluida en el proyecto) que usa una clave privada de Supabase. Para que funcione una vez publicado en Vercel:
+
+1. En Supabase, ve a **Project Settings** → **API**.
+2. Copia la clave **`service_role`** (es distinta a la "anon" — ¡nunca la compartas ni la subas a GitHub!).
+3. En Vercel, ve a tu proyecto → **Settings** → **Environment Variables**, y agrega:
+
+   | Name | Value |
+   |---|---|
+   | `SUPABASE_SERVICE_ROLE_KEY` | (la clave `service_role` que copiaste) |
+
+4. Vuelve a desplegar el proyecto en Vercel (Deployments → los tres puntos → Redeploy) para que tome la nueva variable.
+
+> **Nota sobre pruebas locales:** crear usuarios nuevos desde el módulo Usuarios **solo funciona una vez publicado en Vercel** (la función `/api/crear-usuario` no corre con `npm run dev` normal). Mientras pruebas localmente, crea las cuentas directo en Supabase como en el paso 12.3.
+
+### 12.5 Roles y lo que ves cada uno (recordatorio)
+
+| | Administrador | Ingeniero | Supervisor | Formador |
+|---|---|---|---|---|
+| Entra con | Correo real | Usuario y contraseña | Usuario y contraseña | Usuario y contraseña |
+| Ve todos los módulos | ✅ | Todo menos Usuarios/Auditoría/Configuración | Solo visualización | Solo visualización |
+| En Rendimientos | Todo | Todo | **Solo el filtro y exportar** | Todo, pero sin editar/subir/borrar |
+| Puede editar/borrar/subir datos | ✅ | ✅ | ❌ | ❌ |
+

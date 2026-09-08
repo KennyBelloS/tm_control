@@ -39,8 +39,8 @@ create table if not exists configuracion (
   meta_global_dia     integer  not null default 25000,
   hora_inicio_default time     not null default '06:00',
   hora_fin_default    time     not null default '23:00',
-  descansos_activos   boolean  not null default false,   -- descuento de almuerzo, desactivado por defecto
-  descansos           jsonb    not null default '[]'::jsonb, -- ej: [{"horaCorte":"12:00","minutos":30}]
+  descansos_activos   boolean  not null default true,    -- media hora de almuerzo activada por defecto
+  descansos           jsonb    not null default '[{"horaCorte":"12:00","minutos":30}]'::jsonb,
   constraint solo_una_fila check (id = 1)
 );
 insert into configuracion (id) values (1) on conflict (id) do nothing;
