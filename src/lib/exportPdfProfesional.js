@@ -22,25 +22,41 @@ function coloresEstado(css) {
     text: [169, 29, 58]
   };
 }
-function cajaPromedioGeneral(doc, y, promedioGeneral, totalPersonas) {
+function cajaPromedioGeneral(doc, y, promedioGeneral, totalPersonas, tallosTotales) {
   const w = doc.internal.pageSize.getWidth() - 28;
+  const wIzq = w * 0.62;
+  const wDer = w - wIzq - 4;
   doc.setFillColor(...DORADO_CLARO);
   doc.setDrawColor(...DORADO);
   doc.setLineWidth(0.8);
-  doc.roundedRect(14, y, w, 20, 3, 3, 'FD');
+  doc.roundedRect(14, y, wIzq, 22, 3, 3, 'FD');
   doc.setTextColor(15, 61, 34);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.text('⭐ RENDIMIENTO PROMEDIO GENERAL', 20, y + 8);
+  doc.text('RENDIMIENTO PROMEDIO GENERAL', 20, y + 8);
   doc.setTextColor(...DORADO);
-  doc.setFontSize(20);
-  doc.text(`${promedioGeneral}`, 20, y + 17);
+  doc.setFontSize(22);
+  doc.text(`${promedioGeneral}`, 20, y + 18);
+  const anchoNumero = doc.getTextWidth(`${promedioGeneral}`);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(15, 61, 34);
-  doc.text(`tallos/hora   ·   ${totalPersonas} persona(s)`, 20 + doc.getTextWidth(`${promedioGeneral}`) + 4, y + 16.5);
+  doc.text(`tallos/hora   ·   ${totalPersonas} persona(s)`, 20 + anchoNumero + 5, y + 17.5);
+
+  const xDer = 14 + wIzq + 4;
+  doc.setFillColor(233, 242, 237);
+  doc.setDrawColor(...VERDE_MARCA);
+  doc.roundedRect(xDer, y, wDer, 22, 3, 3, 'FD');
+  doc.setTextColor(15, 61, 34);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('TOTAL DE TALLOS', xDer + 6, y + 8);
+  doc.setTextColor(...VERDE_MARCA);
+  doc.setFontSize(18);
+  doc.text(`${tallosTotales.toLocaleString('es-CO')}`, xDer + 6, y + 18);
+
   doc.setTextColor(0, 0, 0);
-  return y + 26;
+  return y + 28;
 }
 function cargarLogoBase64() {
   return fetch(logoUrl).then(r => r.blob()).then(blob => new Promise((resolve, reject) => {
@@ -105,18 +121,24 @@ function dibujarPodio(doc, y, ranking) {
   doc.setTextColor(0, 0, 0);
   return y + 30;
 }
+function colorBarra(css) {
+  if (css === 'success') return VERDE_MARCA;
+  if (css === 'warning') return DORADO;
+  return [169, 29, 58];
+}
 function tablaRanking(doc, startY, ranking, metaHora) {
   const filas = ranking.map((p, i) => {
     const pct = calcularPorcentajeMeta(p.promedioRend, metaHora);
     const estado = clasificarEstado(pct);
     return {
-      cells: [i + 1, p.codigo ?? '—', p.colaborador, p.totalTallos.toLocaleString(), p.promedioRend, `${pct.toFixed(2)}%`, estado.label],
-      estado
+      cells: [i + 1, p.codigo ?? '—', p.colaborador, p.totalTallos.toLocaleString(), p.promedioRend, '', `${pct.toFixed(2)}%`, estado.label],
+      estado,
+      pct
     };
   });
   autoTable(doc, {
     startY,
-    head: [['#', 'Código', 'Colaborador', 'Total Tallos', 'Rendimiento', '% Meta', 'Estado']],
+    head: [['#', 'Código', 'Colaborador', 'Total Tallos', 'Rendimiento', 'Progreso', '% Meta', 'Estado']],
     body: filas.map(f => f.cells),
     theme: 'grid',
     headStyles: {
@@ -132,13 +154,16 @@ function tablaRanking(doc, startY, ranking, metaHora) {
       0: {
         cellWidth: 10,
         fontStyle: 'bold'
+      },
+      5: {
+        cellWidth: 26
       }
     },
     alternateRowStyles: {
       fillColor: [246, 246, 242]
     },
     didParseCell: data => {
-      if (data.section === 'body' && data.column.index === 6) {
+      if (data.section === 'body' && data.column.index === 7) {
         const est = filas[data.row.index]?.estado;
         if (est) {
           const c = coloresEstado(est.css);
@@ -146,6 +171,21 @@ function tablaRanking(doc, startY, ranking, metaHora) {
           data.cell.styles.textColor = c.text;
           data.cell.styles.fontStyle = 'bold';
         }
+      }
+    },
+    didDrawCell: data => {
+      if (data.section === 'body' && data.column.index === 5) {
+        const f = filas[data.row.index];
+        if (!f) return;
+        const { x, y, width, height } = data.cell;
+        const trackX = x + 2;
+        const trackY = y + height / 2 - 1.4;
+        const trackW = width - 4;
+        doc.setFillColor(235, 235, 230);
+        doc.roundedRect(trackX, trackY, trackW, 2.8, 1.4, 1.4, 'F');
+        const anchoBarra = Math.min(trackW, Math.max(2, trackW * Math.min(f.pct, 100) / 100));
+        doc.setFillColor(...colorBarra(f.estado.css));
+        doc.roundedRect(trackX, trackY, anchoBarra, 2.8, 1.4, 1.4, 'F');
       }
     }
   });
@@ -166,11 +206,12 @@ export async function exportarPdfProfesional({
   const generado = new Date().toLocaleString('es-CO');
   const ranking = agregarRankingPorPersona(filas);
   const promedioGeneral = ranking.length > 0 ? Math.round(ranking.reduce((s, p) => s + p.promedioRend, 0) / ranking.length) : 0;
+  const tallosTotales = ranking.reduce((s, p) => s + (p.totalTallos || 0), 0);
   const titulo = tipo === 'historico' ? 'Ranking de Rendimientos — Histórico' : 'Ranking de Rendimientos — Turno Actual';
   encabezadoPagina(doc, logoBase64, titulo, `Generado el ${generado} · Fecha: ${fecha} · Meta: ${metaHora} tallos/h · Ordenado de mayor a menor`);
   let y = 40;
   if (ranking.length > 0) {
-    y = cajaPromedioGeneral(doc, y, promedioGeneral, ranking.length);
+    y = cajaPromedioGeneral(doc, y, promedioGeneral, ranking.length, tallosTotales);
     y = dibujarPodio(doc, y, ranking);
     tablaRanking(doc, y + 4, ranking, metaHora);
   } else {

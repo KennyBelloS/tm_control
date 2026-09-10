@@ -79,7 +79,7 @@ export function clasificarEstado(porcentaje) {
     mensaje: 'Muy cerca de la meta, un poco más'
   };
   return {
-    label: 'Bajo',
+    label: 'Por mejorar',
     css: 'danger',
     mensaje: 'Por debajo de la meta esperada'
   };
@@ -116,12 +116,16 @@ export function agregarRankingPorPersona(filas) {
     acc.totalRamos += r.total_ramos || 0;
     acc.sumaRend += r.rendimiento || 0;
     acc.bloques += 1;
-    if (r.mesa !== null && r.mesa !== undefined) acc.codigos.add(r.mesa);
+    if (r.codigos) {
+      acc.codigosHistorico = r.codigos;
+    } else if (r.mesa !== null && r.mesa !== undefined) {
+      acc.codigos.add(r.mesa);
+    }
   }
   return [...mapa.values()].map(a => ({
     ...a,
     promedioRend: a.bloques > 0 ? Math.round(a.sumaRend / a.bloques) : 0,
-    codigo: a.codigos.size > 0 ? [...a.codigos].sort((x, y) => x - y).join(', ') : null
+    codigo: a.codigosHistorico || (a.codigos.size > 0 ? [...a.codigos].sort((x, y) => x - y).join(', ') : null)
   })).sort((a, b) => b.promedioRend - a.promedioRend);
 }
 export function agregarTurnoActualPorPersona(filas, descansos = []) {

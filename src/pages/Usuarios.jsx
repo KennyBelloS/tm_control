@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
-import { ROLES, ROL_LABEL, listarPerfiles, crearUsuario, cambiarEstadoPerfil, cambiarRolPerfil } from '../lib/roles';
+import { ROLES, ROL_LABEL, listarPerfiles, crearUsuario, cambiarEstadoPerfil, cambiarRolPerfil, eliminarUsuario, cambiarPasswordUsuario, cambiarNombreUsuario } from '../lib/roles';
 export default function Usuarios() {
   const [perfiles, setPerfiles] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -65,6 +65,50 @@ export default function Usuarios() {
   async function cambiarRol(p, nuevoRol) {
     try {
       await cambiarRolPerfil(p.id, nuevoRol);
+      await cargar();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  const [editandoId, setEditandoId] = useState(null);
+  const [nombreEdicion, setNombreEdicion] = useState('');
+  const [passwordEdicion, setPasswordEdicion] = useState('');
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+
+  function iniciarEdicion(p) {
+    setEditandoId(p.id);
+    setNombreEdicion(p.nombre);
+    setPasswordEdicion('');
+    setMensaje(null);
+    setError(null);
+  }
+
+  async function guardarEdicion(p) {
+    setGuardandoEdicion(true);
+    setError(null);
+    try {
+      if (nombreEdicion.trim() && nombreEdicion.trim() !== p.nombre) {
+        await cambiarNombreUsuario(p.id, nombreEdicion.trim());
+      }
+      if (passwordEdicion.trim()) {
+        await cambiarPasswordUsuario(p.id, passwordEdicion.trim());
+      }
+      setMensaje('Cuenta actualizada correctamente.');
+      setEditandoId(null);
+      await cargar();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setGuardandoEdicion(false);
+    }
+  }
+
+  async function eliminar(p) {
+    if (!confirm(`¿Eliminar definitivamente la cuenta de ${p.nombre}? Esta acción no se puede deshacer.`)) return;
+    setError(null);
+    try {
+      await eliminarUsuario(p.id);
+      setMensaje(`Cuenta de ${p.nombre} eliminada.`);
       await cargar();
     } catch (e) {
       setError(e.message);
@@ -145,7 +189,7 @@ export default function Usuarios() {
           <div className="panel-header">
             <div>
               <h2>Cuentas existentes <span className="badge-count">{perfiles.length}</span></h2>
-              <p>Cambia el rol o desactiva el acceso de cualquier cuenta.</p>
+              <p>Cambia el rol, el nombre, la contraseña, o elimina cualquier cuenta — excepto el Super Administrador, que está protegido.</p>
             </div>
           </div>
           <div className="table-scroll">
@@ -154,25 +198,54 @@ export default function Usuarios() {
               <tbody>
                 {cargando && <tr><td colSpan={5}><div className="empty-state">Cargando...</div></td></tr>}
                 {!cargando && perfiles.length === 0 && <tr><td colSpan={5}><div className="empty-state"><i className="fa-solid fa-users"></i>Todavía no hay cuentas creadas.</div></td></tr>}
-                {perfiles.map(p => <tr key={p.id}>
-                    <td>{p.nombre}</td>
-                    <td>
-                      <select value={p.rol} onChange={e => cambiarRol(p, e.target.value)} style={{
-                    padding: '5px 8px',
-                    borderRadius: 8,
-                    border: '1px solid var(--border)'
-                  }}>
-                        {ROLES.map(r => <option key={r} value={r}>{ROL_LABEL[r]}</option>)}
-                      </select>
-                    </td>
-                    <td><span className={`status ${p.activo ? 'success' : 'danger'}`}>{p.activo ? 'Activo' : 'Desactivado'}</span></td>
-                    <td>{new Date(p.creado_en).toLocaleDateString('es-CO')}</td>
-                    <td>
-                      <button title={p.activo ? 'Desactivar' : 'Activar'} onClick={() => toggleActivo(p)}>
-                        <i className={`fa-solid ${p.activo ? 'fa-user-slash' : 'fa-user-check'}`}></i>
-                      </button>
-                    </td>
-                  </tr>)}
+                {perfiles.map(p => {
+                  const protegido = p.es_super_admin;
+                  const editando = editandoId === p.id;
+                  return (
+                    <tr key={p.id}>
+                      <td>
+                        {editando ? (
+                          <input type="text" value={nombreEdicion} onChange={e => setNombreEdicion(e.target.value)} style={{ width: 160 }} />
+                        ) : (
+                          <>{p.nombre} {protegido && <span className="badge-super-admin" title="Super Administrador — protegido"><i className="fa-solid fa-lock"></i> Super Admin</span>}</>
+                        )}
+                        {editando && (
+                          <input type="password" placeholder="Nueva contraseña (opcional)" value={passwordEdicion} onChange={e => setPasswordEdicion(e.target.value)}
+                            style={{ display: 'block', marginTop: 6, width: 180 }} />
+                        )}
+                      </td>
+                      <td>
+                        <select value={p.rol} disabled={protegido} onChange={e => cambiarRol(p, e.target.value)} style={{
+                          padding: '5px 8px',
+                          borderRadius: 8,
+                          border: '1px solid var(--border)'
+                        }}>
+                          {ROLES.map(r => <option key={r} value={r}>{ROL_LABEL[r]}</option>)}
+                        </select>
+                      </td>
+                      <td><span className={`status ${p.activo ? 'success' : 'danger'}`}>{p.activo ? 'Activo' : 'Desactivado'}</span></td>
+                      <td>{new Date(p.creado_en).toLocaleDateString('es-CO')}</td>
+                      <td>
+                        {protegido ? (
+                          <span style={{ color: 'var(--gray)', fontSize: 11 }}><i className="fa-solid fa-lock"></i> Protegido</span>
+                        ) : editando ? (
+                          <>
+                            <button title="Guardar" disabled={guardandoEdicion} onClick={() => guardarEdicion(p)}><i className="fa-solid fa-check"></i></button>
+                            <button title="Cancelar" onClick={() => setEditandoId(null)}><i className="fa-solid fa-xmark"></i></button>
+                          </>
+                        ) : (
+                          <>
+                            <button title="Editar nombre/contraseña" onClick={() => iniciarEdicion(p)}><i className="fa-solid fa-pen"></i></button>
+                            <button title={p.activo ? 'Desactivar' : 'Activar'} onClick={() => toggleActivo(p)}>
+                              <i className={`fa-solid ${p.activo ? 'fa-user-slash' : 'fa-user-check'}`}></i>
+                            </button>
+                            <button title="Eliminar cuenta" onClick={() => eliminar(p)}><i className="fa-solid fa-trash"></i></button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

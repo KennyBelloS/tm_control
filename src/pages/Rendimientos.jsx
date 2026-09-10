@@ -19,20 +19,16 @@ export default function Rendimientos() {
     sesion
   } = useSesion();
   const rol = sesion?.rol;
-  const soloFiltroExportar = rol === 'supervisor';
   const puedeModificar = puedeEditar(rol);
   const [cfg, setCfg] = useState(null);
   const [historico, setHistorico] = useState([]);
   const [actual, setActual] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(false);
-  const [exportando, setExportando] = useState(null);
   const [mensaje, setMensaje] = useState(null);
   const [fFecha, setFFecha] = useState(ayerISO());
   const [fFechaActual, setFFechaActual] = useState('');
   const [busqueda, setBusqueda] = useState('');
-  const [fuenteExportar, setFuenteExportar] = useState('actual');
-  const [fechaExportar, setFechaExportar] = useState(hoyISO());
   const [destino, setDestino] = useState('actual');
   const [fechaCarga, setFechaCarga] = useState(hoyISO());
   const [horaInicioManual, setHoraInicioManual] = useState('');
@@ -91,6 +87,7 @@ export default function Rendimientos() {
         hora_inicio: horaInicioManual,
         hora_fin: horaFinManual
       })) : registros;
+
       if (destino === 'historico') {
         const {
           insertados
@@ -174,85 +171,6 @@ export default function Rendimientos() {
       rendimientoPromedio
     };
   }, [historicoFiltrado, cfg]);
-  async function exportarExcel() {
-    setExportando('excel');
-    try {
-      const {
-        exportarExcelProfesional
-      } = await import('../lib/exportExcelProfesional');
-      const filas = fuenteExportar === 'historico' ? await getHistorico({
-        fecha: fechaExportar
-      }) : await getActual({
-        fecha: fechaExportar
-      });
-      await exportarExcelProfesional({
-        tipo: fuenteExportar,
-        filas,
-        cfg,
-        fecha: fechaExportar
-      });
-    } catch (e) {
-      setMensaje({
-        tipo: 'err',
-        texto: `Error generando el Excel: ${e.message}`
-      });
-    } finally {
-      setExportando(null);
-    }
-  }
-  async function exportarPdf() {
-    setExportando('pdf');
-    try {
-      const {
-        exportarPdfProfesional
-      } = await import('../lib/exportPdfProfesional');
-      const filas = fuenteExportar === 'historico' ? await getHistorico({
-        fecha: fechaExportar
-      }) : await getActual({
-        fecha: fechaExportar
-      });
-      await exportarPdfProfesional({
-        tipo: fuenteExportar,
-        filas,
-        cfg,
-        fecha: fechaExportar
-      });
-    } catch (e) {
-      setMensaje({
-        tipo: 'err',
-        texto: `Error generando el PDF: ${e.message}`
-      });
-    } finally {
-      setExportando(null);
-    }
-  }
-  async function exportarImagen(formato) {
-    setExportando(`imagen-${formato}`);
-    try {
-      const {
-        exportarImagenProfesional
-      } = await import('../lib/exportImagenProfesional');
-      const filas = fuenteExportar === 'historico' ? await getHistorico({
-        fecha: fechaExportar
-      }) : await getActual({
-        fecha: fechaExportar
-      });
-      await exportarImagenProfesional({
-        tipo: fuenteExportar,
-        filas,
-        cfg,
-        fecha: fechaExportar,
-        formato
-      });
-    } catch (e) {
-      setMensaje({
-        tipo: 'err',
-        texto: `Error generando la imagen: ${e.message}`
-      });
-    } finally {
-      setExportando(null);
-    }
-  }
   function irATurnoActual() {
     document.getElementById('turno-actual')?.scrollIntoView({
       behavior: 'smooth',
@@ -284,7 +202,6 @@ export default function Rendimientos() {
             </button>
           </div>}
 
-        {}
         <section className={puedeModificar ? 'two-col-panels' : ''}>
           {puedeModificar && <div className="step-panel">
             <h3><i className="fa-solid fa-upload"></i> 1. Importar Excel</h3>
@@ -380,60 +297,10 @@ export default function Rendimientos() {
                 <i className="fa-solid fa-magnifying-glass"></i> Aplicar consulta
               </button>
             </div>
-
-            <hr style={{
-            border: 'none',
-            borderTop: '1px solid var(--border)',
-            margin: '6px 0'
-          }} />
-
-            <h3><i className="fa-solid fa-file-export"></i> 3. Exportar reporte</h3>
-            <div className="form-row" style={{
-            gridTemplateColumns: '1fr 1fr'
-          }}>
-              <div>
-                <label>¿Qué quieres descargar?</label>
-                <select value={fuenteExportar} onChange={e => setFuenteExportar(e.target.value)}>
-                  <option value="actual">Turno Actual (hora a hora)</option>
-                  <option value="historico">Histórico (día)</option>
-                </select>
-              </div>
-              <div>
-                <label>Fecha del reporte</label>
-                <input type="date" value={fechaExportar} onChange={e => {
-                const nueva = e.target.value;
-                setFechaExportar(nueva);
-                setFuenteExportar(nueva === hoyISO() ? 'actual' : 'historico');
-              }} />
-              </div>
-            </div>
-            <div className="alert-inline">
-              <i className="fa-solid fa-circle-info"></i>
-              El reporte incluye solo lo elegido arriba — Histórico y Turno Actual nunca se mezclan en un mismo archivo.
-            </div>
-            <div style={{
-            display: 'flex',
-            gap: 10,
-            flexWrap: 'wrap'
-          }}>
-              <button className="btn-secondary" disabled={exportando === 'excel'} onClick={exportarExcel}>
-                <i className="fa-solid fa-file-excel"></i> {exportando === 'excel' ? 'Generando...' : 'Descargar Excel'}
-              </button>
-              <button className="btn-secondary" disabled={exportando === 'pdf'} onClick={exportarPdf}>
-                <i className="fa-solid fa-file-pdf"></i> {exportando === 'pdf' ? 'Generando...' : 'Descargar PDF'}
-              </button>
-              <button className="btn-secondary" disabled={exportando === 'imagen-png'} onClick={() => exportarImagen('png')}>
-                <i className="fa-solid fa-file-image"></i> {exportando === 'imagen-png' ? 'Generando...' : 'Descargar PNG'}
-              </button>
-              <button className="btn-secondary" disabled={exportando === 'imagen-jpg'} onClick={() => exportarImagen('jpg')}>
-                <i className="fa-solid fa-file-image"></i> {exportando === 'imagen-jpg' ? 'Generando...' : 'Descargar JPG'}
-              </button>
-            </div>
           </div>
         </section>
 
-        {}
-        {!soloFiltroExportar && <section className="cards">
+        <section className="cards">
           <div className="card"><div className="icon"><i className="fa-solid fa-users"></i></div>
             <div><span>Personas Activas</span><h2>{kpis.personas}</h2><small>{fFecha || 'Todas las fechas'}</small></div></div>
           <div className="card"><div className="icon"><i className="fa-solid fa-seedling"></i></div>
@@ -442,26 +309,24 @@ export default function Rendimientos() {
             <div><span>Rendimiento Promedio</span><h2>{kpis.rendimientoPromedio}</h2><small>tallos/hora real</small></div></div>
           <div className="card acento-azul"><div className="icon"><i className="fa-solid fa-chart-line"></i></div>
             <div><span>Cumplimiento</span><h2>{kpis.cumplimiento}%</h2><small>Meta {(cfg?.metaGlobalDia || 0).toLocaleString()}</small></div></div>
-        </section>}
+        </section>
 
-        {}
-        {!soloFiltroExportar && <TablaHistorico filas={historicoFiltrado} cfg={cfg} onEliminarTabla={() => eliminarTabla('historico')} onGuardarFila={async (id, cambios) => {
+        <TablaHistorico filas={historicoFiltrado} cfg={cfg} onEliminarTabla={() => eliminarTabla('historico')} onGuardarFila={async (id, cambios) => {
         await actualizarRegistroHistorico(id, cambios);
         await cargarTodo();
       }} onEliminarFila={async id => {
         await eliminarRegistroHistorico(id);
         await cargarTodo();
-      }} procesando={procesando} promedioGeneral={kpis.rendimientoPromedio} soloLectura={!puedeModificar} />}
+      }} procesando={procesando} promedioGeneral={kpis.rendimientoPromedio} soloLectura={!puedeModificar} />
 
-        {}
-        {!soloFiltroExportar && <div id="turno-actual" style={{
+        <div id="turno-actual" style={{
         display: 'flex',
         flexDirection: 'column',
         gap: 26
       }}>
           <section className="cards">
             <div className="card"><div className="icon"><i className="fa-solid fa-users"></i></div>
-              <div><span>Personas Activas</span><h2>{personasActual}</h2><small>{fFechaActual || 'Todas las fechas'}</small></div></div>
+              <div><span>Mesas Activas</span><h2>{personasActual}</h2><small>{fFechaActual || 'Todas las fechas'}</small></div></div>
             <div className="card acento-rojo"><div className="icon"><i className="fa-solid fa-seedling"></i></div>
               <div><span>Total Tallos — Turno Actual</span><h2>{totalTallosActual.toLocaleString()}</h2><small>Suma de todos los bloques cargados</small></div></div>
             <div className="card acento-oro"><div className="icon"><i className="fa-solid fa-gauge-high"></i></div>
@@ -515,7 +380,7 @@ export default function Rendimientos() {
           await eliminarRegistroActual(id);
           await cargarTodo();
         }} procesando={procesando} promedioGeneral={promedioActual} soloLectura={!puedeModificar} />
-        </div>}
+        </div>
       </div>
     </>;
 }

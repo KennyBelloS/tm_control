@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { agregarPorPersonaDia } from './excel';
 import { calcularRendimientoReal, calcularRendimientoBloque, agregarTurnoActualPorPersona } from './calculos';
-const SELECT_HISTORICO = 'id,fecha,colaborador_id,total_tallos,total_ramos,tiempo_trabajado_min,tiempo_no_productivo_min,semana,personas(nombre)';
+const SELECT_HISTORICO = 'id,fecha,colaborador_id,total_tallos,total_ramos,tiempo_trabajado_min,tiempo_no_productivo_min,semana,codigos,personas(nombre)';
 const SELECT_ACTUAL = 'id,fecha,colaborador_id,hora_inicio,hora_fin,mesa,total_tallos,total_ramos,rend_tallos,rend_ramos,tiempo_trabajado_min,semana,personas(nombre)';
 function aplanar(fila) {
   const {
@@ -302,10 +302,9 @@ export async function getRankingDia(fecha) {
     rendimientoPromedioGeneral
   };
 }
-export async function getTendenciaHistorico(dias = 14) {
+export async function getTendenciaHistorico() {
   const hoy = new Date();
-  const desde = new Date(hoy);
-  desde.setDate(desde.getDate() - dias);
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
   const fechaInicio = desde.toISOString().slice(0, 10);
   const {
     data,

@@ -6,6 +6,7 @@ import { agregarTurnoActualPorPersona } from '../lib/calculos';
 import { supabaseConfigurado } from '../lib/supabaseClient';
 const TendenciaTallosChart = lazy(() => import('../components/charts/TendenciaTallosChart'));
 const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChart'));
+import DashboardCarrusel from '../components/DashboardCarrusel';
 function hoyISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -13,6 +14,12 @@ function ayerISO() {
   const d = new Date();
   d.setDate(d.getDate() - 1);
   return d.toISOString().slice(0, 10);
+}
+function emojiCumplimiento(pct) {
+  if (pct >= 100) return { icono: '🤩', texto: '¡Meta alcanzada!' };
+  if (pct >= 60) return { icono: '🙂', texto: 'Vamos bien, sigue así' };
+  if (pct >= 30) return { icono: '😐', texto: 'A mitad de camino' };
+  return { icono: '😟', texto: 'Falta bastante para la meta' };
 }
 export default function Dashboard() {
   const [cargando, setCargando] = useState(true);
@@ -25,11 +32,13 @@ export default function Dashboard() {
   const [metaHoy, setMetaHoy] = useState(0);
   const [metaTablaLista, setMetaTablaLista] = useState(true);
   const [personasParaDona, setPersonasParaDona] = useState([]);
+  const [carruselHoy, setCarruselHoy] = useState([]);
+  const [carruselAyer, setCarruselAyer] = useState([]);
   const hoy = hoyISO();
   const ayer = ayerISO();
   useEffect(() => {
     let activo = true;
-    (async () => {
+    async function cargarDashboard() {
       setCargando(true);
       try {
         const cfg = await getConfig();
@@ -41,7 +50,7 @@ export default function Dashboard() {
         const historicoAyer = await getHistorico({
           fecha: ayer
         });
-        getTendenciaHistorico(14).then(r => {
+        getTendenciaHistorico().then(r => {
           if (activo) setTendencia(r);
         }).catch(() => {});
         const totalTallosActual = turnoActual.reduce((s, r) => s + (r.total_tallos || 0), 0);
@@ -61,6 +70,8 @@ export default function Dashboard() {
           colaborador: p.colaborador,
           promedioRend: p.rendimiento
         })));
+        setCarruselHoy(agregarTurnoActualPorPersona(turnoActual, cfg.descansosActivos ? cfg.descansos : []).sort((a, b) => b.rendimiento - a.rendimiento));
+        setCarruselAyer([...historicoAyer].sort((a, b) => (b.rendimiento || 0) - (a.rendimiento || 0)));
         setStats({
           cfg,
           actual: {
@@ -82,7 +93,8 @@ export default function Dashboard() {
       } finally {
         if (activo) setCargando(false);
       }
-    })();
+    }
+    cargarDashboard();
     return () => {
       activo = false;
     };
@@ -113,7 +125,7 @@ export default function Dashboard() {
             <h3 className="dashboard-section-title"><i className="fa-solid fa-bolt"></i> Turno Actual (en vivo, {stats.actual.bloques} bloques cargados)</h3>
             <section className="cards">
               <div className="card"><div className="icon"><i className="fa-solid fa-users"></i></div>
-                <div><span>Personas Activas</span><h2>{stats.actual.personas}</h2><small>{hoy}</small></div></div>
+                <div><span>Mesas Activas</span><h2>{stats.actual.personas}</h2><small>{hoy}</small></div></div>
               <div className="card"><div className="icon"><i className="fa-solid fa-seedling"></i></div>
                 <div><span>Total Tallos</span><h2>{stats.actual.totalTallos.toLocaleString()}</h2><small>Última carga por hora</small></div></div>
               <div className="card acento-oro"><div className="icon"><i className="fa-solid fa-gauge-high"></i></div>
@@ -126,9 +138,12 @@ export default function Dashboard() {
               <div className="summary-left">
                 <h2>Producción del Turno Actual</h2>
                 <p>Se han producido <strong>{stats.actual.totalTallos.toLocaleString()}</strong> tallos de una meta de <strong>{metaHoy.toLocaleString()}</strong> para hoy.</p>
-                <div className="progress"><div style={{
+                <div className="progress-con-emoji">
+                  <span className="progress-emoji" title={emojiCumplimiento(stats.actual.cumplimiento).texto}>{emojiCumplimiento(stats.actual.cumplimiento).icono}</span>
+                  <div className="progress"><div style={{
                 width: `${Math.min(stats.actual.cumplimiento, 100)}%`
               }}></div></div>
+                </div>
                 <p style={{
               fontSize: 11,
               color: 'rgba(255,255,255,.7)',
@@ -175,6 +190,8 @@ export default function Dashboard() {
           }}>Rendimientos</Link> (opción "Histórico").
               </div>}
 
+            <DashboardCarrusel personasHoy={carruselHoy} personasAyer={carruselAyer} metaHora={stats.cfg.metaHora} />
+
             <h3 className="dashboard-section-title"><i className="fa-solid fa-chart-simple"></i> Visualizaciones</h3>
             <div className="dashboard-charts-grid">
               <section className="panel">
@@ -184,7 +201,7 @@ export default function Dashboard() {
                     color: 'var(--primary)',
                     marginRight: 8
                   }}></i>Tendencia de Producción</h2>
-                    <p>Total de tallos por día, últimos 14 días del Histórico.</p>
+                    <p>Total de tallos por día, del mes en curso.</p>
                   </div>
                 </div>
                 <Suspense fallback={<p style={{

@@ -110,12 +110,14 @@ export function agregarPorPersonaDia(registros, descansos = []) {
         total_tallos: 0,
         total_ramos: 0,
         tiempo_trabajado_min: 0,
-        semana: r.semana ?? null
+        semana: r.semana ?? null,
+        codigos: new Set()
       });
     }
     const acc = mapa.get(key);
     acc.total_tallos += r.total_tallos || 0;
     acc.total_ramos += r.total_ramos || 0;
+    if (r.mesa !== null && r.mesa !== undefined) acc.codigos.add(r.mesa);
     const bloqueKey = `${key}_${r.hora_inicio}_${r.hora_fin}`;
     if (!bloquesContados.has(bloqueKey)) {
       bloquesContados.add(bloqueKey);
@@ -124,5 +126,8 @@ export function agregarPorPersonaDia(registros, descansos = []) {
       acc.tiempo_trabajado_min += Math.max(0, minutosBrutos - descuento);
     }
   }
-  return [...mapa.values()];
+  return [...mapa.values()].map(a => ({
+    ...a,
+    codigos: a.codigos.size > 0 ? [...a.codigos].sort((x, y) => x - y).join(', ') : null
+  }));
 }
