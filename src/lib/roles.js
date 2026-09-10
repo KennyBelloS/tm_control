@@ -122,7 +122,7 @@ export async function listarPerfiles() {
   const {
     data,
     error
-  } = await supabase.from('perfiles').select('id, nombre, rol, activo, creado_en').order('creado_en', {
+  } = await supabase.from('perfiles').select('id, nombre, rol, activo, creado_en, es_super_admin').order('creado_en', {
     ascending: false
   });
   if (error) throw error;
@@ -143,4 +143,29 @@ export async function cambiarRolPerfil(id, rol) {
     rol
   }).eq('id', id);
   if (error) throw error;
+}
+
+async function llamarGestionarUsuario(payload) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Debes iniciar sesión.');
+  const resp = await fetch('/api/gestionar-usuario', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tokenAdmin: session.access_token, ...payload }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || 'No se pudo completar la acción.');
+  return data;
+}
+
+export async function eliminarUsuario(idObjetivo) {
+  return llamarGestionarUsuario({ accion: 'eliminar', idObjetivo });
+}
+
+export async function cambiarPasswordUsuario(idObjetivo, nuevaPassword) {
+  return llamarGestionarUsuario({ accion: 'cambiar_password', idObjetivo, nuevaPassword });
+}
+
+export async function cambiarNombreUsuario(idObjetivo, nuevoNombre) {
+  return llamarGestionarUsuario({ accion: 'cambiar_nombre', idObjetivo, nuevoNombre });
 }

@@ -223,6 +223,8 @@ export async function exportarExcelProfesional({
       }]
     });
     ws.columns = [{
+      width: 12
+    }, {
       width: 32
     }, {
       width: 13
@@ -239,31 +241,31 @@ export async function exportarExcelProfesional({
     }];
     const conRend = filas.filter(r => r.rendimiento > 0);
     const promedioGeneral = conRend.length > 0 ? Math.round(conRend.reduce((s, r) => s + r.rendimiento, 0) / conRend.length) : 0;
-    estiloEncabezadoHoja(ws, 'TORREMOLINOS · REPORTE DE RENDIMIENTOS — HISTÓRICO', `Generado el ${generado} · Fecha: ${fecha} · Meta por hora: ${metaHora} tallos`, 'G');
-    const filaHeader = tarjetaPromedioGeneral(ws, 3, 'G', promedioGeneral, filas.length);
+    estiloEncabezadoHoja(ws, 'TORREMOLINOS · REPORTE DE RENDIMIENTOS — HISTÓRICO', `Generado el ${generado} · Fecha: ${fecha} · Meta por hora: ${metaHora} tallos`, 'H');
+    const filaHeader = tarjetaPromedioGeneral(ws, 3, 'H', promedioGeneral, filas.length);
     const header = ws.getRow(filaHeader);
-    header.values = ['Colaborador', 'Fecha', 'Total Tallos', 'Tiempo Trabajado', 'Tiempo Real (h)', 'Rendimiento', 'Estado'];
+    header.values = ['Código', 'Colaborador', 'Fecha', 'Total Tallos', 'Tiempo Trabajado', 'Tiempo Real (h)', 'Rendimiento', 'Estado'];
     estiloFilaEncabezadoTabla(header);
     let fila = filaHeader + 1;
     for (const r of filas) {
       const pct = r.tiempo_trabajado_min ? calcularPorcentajeMeta(r.rendimiento, metaHora) : null;
       const estado = pct !== null ? clasificarEstado(pct) : null;
-      const row = ws.addRow([r.colaborador, r.fecha, r.total_tallos, r.tiempo_trabajado_min ? `${Math.round(r.tiempo_trabajado_min / 60 * 100) / 100} h` : 'Sin registrar', r.tiempo_trabajado_min ? r.tiempo_real_horas : '—', r.tiempo_trabajado_min ? r.rendimiento : '—', estado ? estado.label : 'Falta tiempo']);
+      const row = ws.addRow([r.codigos || '—', r.colaborador, r.fecha, r.total_tallos, r.tiempo_trabajado_min ? `${Math.round(r.tiempo_trabajado_min / 60 * 100) / 100} h` : 'Sin registrar', r.tiempo_trabajado_min ? r.tiempo_real_horas : '—', r.tiempo_trabajado_min ? r.rendimiento : '—', estado ? estado.label : 'Falta tiempo']);
       if (estado) {
-        row.getCell(7).fill = {
+        row.getCell(8).fill = {
           type: 'pattern',
           pattern: 'solid',
           fgColor: {
             argb: estadoColorFill(estado.css)
           }
         };
-        row.getCell(7).font = {
+        row.getCell(8).font = {
           bold: true
         };
       }
       fila++;
     }
-    aplicarZebraYBordes(ws, filaHeader + 1, fila - 1, 1, 7);
+    aplicarZebraYBordes(ws, filaHeader + 1, fila - 1, 1, 8);
   } else {
     const ws = wb.addWorksheet('Turno Actual', {
       views: [{
@@ -350,6 +352,8 @@ export async function exportarRespaldoCompletoExcel({
     }]
   });
   wsHist.columns = [{
+    width: 12
+  }, {
     width: 32
   }, {
     width: 13
@@ -368,31 +372,31 @@ export async function exportarRespaldoCompletoExcel({
   }];
   const conRendHist = historico.filter(r => r.rendimiento > 0);
   const promedioHist = conRendHist.length > 0 ? Math.round(conRendHist.reduce((s, r) => s + r.rendimiento, 0) / conRendHist.length) : 0;
-  estiloEncabezadoHoja(wsHist, 'HISTÓRICO COMPLETO', `${historico.length} registros totales · Meta por hora: ${metaHora} tallos`, 'H');
-  const filaHeaderHist = tarjetaPromedioGeneral(wsHist, 3, 'H', promedioHist, historico.length);
+  estiloEncabezadoHoja(wsHist, 'HISTÓRICO COMPLETO', `${historico.length} registros totales · Meta por hora: ${metaHora} tallos`, 'I');
+  const filaHeaderHist = tarjetaPromedioGeneral(wsHist, 3, 'I', promedioHist, historico.length);
   const headerHist = wsHist.getRow(filaHeaderHist);
-  headerHist.values = ['Colaborador', 'Fecha', 'Total Tallos', 'Tiempo Trabajado (min)', 'Tiempo No Prod. (min)', 'Tiempo Real (h)', 'Rendimiento', 'Estado'];
+  headerHist.values = ['Código', 'Colaborador', 'Fecha', 'Total Tallos', 'Tiempo Trabajado (min)', 'Tiempo No Prod. (min)', 'Tiempo Real (h)', 'Rendimiento', 'Estado'];
   estiloFilaEncabezadoTabla(headerHist);
   let filaHist = filaHeaderHist + 1;
   for (const r of historico) {
     const pct = r.tiempo_trabajado_min ? calcularPorcentajeMeta(r.rendimiento, metaHora) : null;
     const estado = pct !== null ? clasificarEstado(pct) : null;
-    const row = wsHist.addRow([r.colaborador, r.fecha, r.total_tallos, r.tiempo_trabajado_min ?? '—', r.tiempo_no_productivo_min ?? 0, r.tiempo_trabajado_min ? r.tiempo_real_horas : '—', r.tiempo_trabajado_min ? r.rendimiento : '—', estado ? estado.label : 'Falta tiempo']);
+    const row = wsHist.addRow([r.codigos || '—', r.colaborador, r.fecha, r.total_tallos, r.tiempo_trabajado_min ?? '—', r.tiempo_no_productivo_min ?? 0, r.tiempo_trabajado_min ? r.tiempo_real_horas : '—', r.tiempo_trabajado_min ? r.rendimiento : '—', estado ? estado.label : 'Falta tiempo']);
     if (estado) {
-      row.getCell(8).fill = {
+      row.getCell(9).fill = {
         type: 'pattern',
         pattern: 'solid',
         fgColor: {
           argb: estadoColorFill(estado.css)
         }
       };
-      row.getCell(8).font = {
+      row.getCell(9).font = {
         bold: true
       };
     }
     filaHist++;
   }
-  aplicarZebraYBordes(wsHist, filaHeaderHist + 1, filaHist - 1, 1, 8);
+  aplicarZebraYBordes(wsHist, filaHeaderHist + 1, filaHist - 1, 1, 9);
   const wsAct = wb.addWorksheet('Turno Actual', {
     views: [{
       state: 'frozen',
