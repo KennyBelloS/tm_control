@@ -21,6 +21,12 @@ function emojiCumplimiento(pct) {
   if (pct >= 30) return { icono: '😐', texto: 'A mitad de camino' };
   return { icono: '😟', texto: 'Falta bastante para la meta' };
 }
+function colorProgreso(pct) {
+  if (pct >= 100) return '#22C55E';
+  if (pct >= 60) return '#84CC16';
+  if (pct >= 30) return '#F59E0B';
+  return '#EF4444';
+}
 export default function Dashboard() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -136,31 +142,57 @@ export default function Dashboard() {
 
             <section className="performance-summary">
               <div className="summary-left">
+                <div className="summary-badge"><i className="fa-solid fa-chart-line"></i> Producción en vivo</div>
                 <h2>Producción del Turno Actual</h2>
-                <p>Se han producido <strong>{stats.actual.totalTallos.toLocaleString()}</strong> tallos de una meta de <strong>{metaHoy.toLocaleString()}</strong> para hoy.</p>
-                <div className="progress-con-emoji">
-                  <span className="progress-emoji" title={emojiCumplimiento(stats.actual.cumplimiento).texto}>{emojiCumplimiento(stats.actual.cumplimiento).icono}</span>
-                  <div className="progress"><div style={{
-                width: `${Math.min(stats.actual.cumplimiento, 100)}%`
-              }}></div></div>
+                <div className="summary-stat-principal">
+                  <span className="summary-stat-numero">{stats.actual.totalTallos.toLocaleString()}</span>
+                  <span className="summary-stat-de">de</span>
+                  <span className="summary-stat-meta">{metaHoy.toLocaleString()}</span>
+                  <span className="summary-stat-unidad">tallos</span>
                 </div>
-                <p style={{
-              fontSize: 11,
-              color: 'rgba(255,255,255,.7)',
-              marginTop: 10
-            }}>
-                  <i className="fa-solid fa-circle-info"></i> La meta de hoy se define en <Link to="/configuracion" style={{
-                color: '#fff',
-                fontWeight: 700,
-                textDecoration: 'underline'
-              }}>Configuración</Link>.
+
+                <div className="progress-con-emoji">
+                  <div className="progress">
+                    <div style={{ width: `${Math.min(stats.actual.cumplimiento, 100)}%`, background: colorProgreso(stats.actual.cumplimiento) }}></div>
+                    <span
+                      className="progress-emoji-flotante"
+                      title={emojiCumplimiento(stats.actual.cumplimiento).texto}
+                      style={{ left: `${Math.min(Math.max(stats.actual.cumplimiento, 4), 96)}%` }}
+                    >
+                      {emojiCumplimiento(stats.actual.cumplimiento).icono}
+                    </span>
+                  </div>
+                  <div className="progress-pie">
+                    <span className="progress-pct" style={{ color: colorProgreso(stats.actual.cumplimiento) }}>{stats.actual.cumplimiento}%</span>
+                    <span className="progress-faltan">
+                      {stats.actual.cumplimiento >= 100
+                        ? `¡Meta superada por ${(stats.actual.totalTallos - metaHoy).toLocaleString()} tallos!`
+                        : `Faltan ${Math.max(0, metaHoy - stats.actual.totalTallos).toLocaleString()} tallos para la meta`}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="summary-nota">
+                  <i className="fa-solid fa-circle-info"></i> La meta de hoy se define en <Link to="/configuracion">Configuración</Link>.
                 </p>
               </div>
               <div className="summary-right">
-                <div className="mini-card"><span>Meta de Hoy</span><h3>{metaHoy.toLocaleString()}</h3></div>
-                <div className="mini-card"><span>Tallos Promedio / Persona</span><h3>{stats.actual.promedioPersona}</h3></div>
-                <div className="mini-card"><span>Rendimiento Promedio</span><h3>{stats.actual.rendimientoPromedio}</h3></div>
-                <div className="mini-card"><span>Meta Hora</span><h3>{stats.cfg.metaHora}</h3></div>
+                <div className="mini-card">
+                  <div className="mini-card-icono"><i className="fa-solid fa-bullseye"></i></div>
+                  <div><span>Meta de Hoy</span><h3>{metaHoy.toLocaleString()}</h3></div>
+                </div>
+                <div className="mini-card">
+                  <div className="mini-card-icono"><i className="fa-solid fa-user-group"></i></div>
+                  <div><span>Tallos / Persona</span><h3>{stats.actual.promedioPersona.toLocaleString()}</h3></div>
+                </div>
+                <div className="mini-card">
+                  <div className="mini-card-icono"><i className="fa-solid fa-gauge-high"></i></div>
+                  <div><span>Rendimiento Promedio</span><h3>{stats.actual.rendimientoPromedio}</h3></div>
+                </div>
+                <div className="mini-card">
+                  <div className="mini-card-icono"><i className="fa-solid fa-stopwatch"></i></div>
+                  <div><span>Meta / Hora</span><h3>{stats.cfg.metaHora}</h3></div>
+                </div>
               </div>
             </section>
 

@@ -8,7 +8,45 @@ Este manual no asume que sabes programar. Sigue los pasos en orden.
 
 ## 0. Historial de arreglos recientes
 
-**Última entrega — LA MÁS GRANDE (PWA nativa, offline, carrusel, roles, reportes movidos):**
+**Última entrega (Dashboard más visual, semana configurable, optimización de base de datos):**
+
+⚠️ **Corre este SQL nuevo antes de usar esto:**
+```sql
+alter table configuracion add column if not exists dia_fin_semana smallint not null default 6;
+```
+
+- **Emoji integrado a la barra de progreso**: ahora flota justo sobre el punto exacto de avance, y la barra cambia de color según el cumplimiento (rojo → naranja → verde lima → verde intenso al llegar a la meta).
+- **Carrusel del Dashboard con selector manual**: puedes elegir "Turno Actual" o "Histórico" con un clic, sin esperar a que rote solo — con un botón para volver al modo automático.
+- **Semana configurable en Ranking**: en Configuración, elige en qué día termina tu semana (por ejemplo, Sábado) y el Ranking "por semana" arma el rango correcto automáticamente (ej. domingo a sábado, en vez de lunes a domingo).
+- **Gráfica de Tendencia de Producción, mucho más visual**: línea de promedio con su propia etiqueta, marcador dorado en el mejor día, sombra y degradado mejorados.
+- **Optimización automática de la base de datos**: la tabla `historico_bloques` (la que guarda los bloques originales para recalcular el almuerzo) ahora se limpia sola de vez en cuando, borrando el detalle de días de más de 90 días (el tiempo trabajado ya calculado de esos días no se pierde, solo se libera el detalle que ya no hace falta). También hay un botón "Optimizar ahora" en Auditoría para hacerlo cuando quieras.
+
+**Entrega anterior (descanso de almuerzo: corregido a fondo, se recalcula solo):**
+
+⚠️ **Corre la migración nueva antes de usar esto** — agrega una tabla necesaria (ver el bloque de SQL más abajo).
+
+- **Corregido un caso límite**: un bloque que empieza **justo a las 12:00** (u otra hora de corte que definas) ahora sí recibe el descuento — antes solo se aplicaba si el bloque cruzaba estrictamente la hora, no si empezaba exactamente ahí.
+- **El problema de fondo, ya resuelto**: antes, el tiempo trabajado del Histórico se calculaba UNA sola vez al subir el Excel y quedaba fijo — si cambiabas la configuración de descansos después, los días ya guardados no se actualizaban solos. Ahora se guardan los bloques de hora originales de cada carga, y el tiempo trabajado del Histórico se **recalcula en vivo** cada vez que lo consultas, usando la configuración de descansos que tengas en ese momento. Cambias la config → los rendimientos de ese día se actualizan solos, sin subir nada de nuevo.
+- Si editas manualmente el tiempo trabajado de una fila (con el lápiz ✏️), esa edición manual queda firme — no se sobreescribe sola después.
+- **Botón "Guardar descuentos"** agregado en Configuración, además del guardado automático que ya tenías.
+
+```sql
+create table if not exists historico_bloques (
+  id              bigserial primary key,
+  fecha           date not null,
+  colaborador_id  integer not null,
+  hora_inicio     time not null,
+  hora_fin        time not null
+);
+create index if not exists idx_historico_bloques_fecha_persona on historico_bloques (fecha, colaborador_id);
+alter table historico_bloques enable row level security;
+create policy "leer_historico_bloques" on historico_bloques for select using (auth.role() = 'authenticated');
+create policy "escribir_historico_bloques" on historico_bloques for all using (puede_editar()) with check (puede_editar());
+```
+
+> **Nota:** esto solo aplica a partir de las próximas cargas de Excel que hagas — los días que ya tenías guardados ANTES de correr esta migración no tienen bloques guardados todavía, así que no se recalculan solos (se quedan con el valor que ya tenían). Si quieres que un día viejo específico también se beneficie de esto, vuelve a subir el Excel de ese día.
+
+**Entrega anterior — LA MÁS GRANDE (PWA nativa, offline, carrusel, roles, reportes movidos):**
 
 ⚠️ **Corre la sección 12 y 13 completas antes de usar esta versión** — hay migraciones nuevas de base de datos.
 

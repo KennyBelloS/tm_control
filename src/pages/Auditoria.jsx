@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
-import { getConfig, getAlmacenamientoUsadoMB, getHistoricoCompleto, getActualCompleto, getPersonasCompleto, getMetasDiariasCompleto } from '../lib/db';
+import { getConfig, getAlmacenamientoUsadoMB, getHistoricoCompleto, getActualCompleto, getPersonasCompleto, getMetasDiariasCompleto, limpiarBloquesAntiguos } from '../lib/db';
 export default function Auditoria() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -8,6 +8,7 @@ export default function Auditoria() {
   const [limiteMB, setLimiteMB] = useState(500);
   const [cfg, setCfg] = useState(null);
   const [generandoRespaldo, setGenerandoRespaldo] = useState(false);
+  const [optimizando, setOptimizando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   useEffect(() => {
     let activo = true;
@@ -32,6 +33,19 @@ export default function Auditoria() {
   const porcentaje = limiteMB > 0 ? Math.round(usoMB / limiteMB * 1000) / 10 : 0;
   const critico = porcentaje >= 90;
   const advertencia = porcentaje >= 80 && porcentaje < 90;
+
+  async function optimizarBaseDatos() {
+    setOptimizando(true);
+    setMensaje(null);
+    try {
+      const borrados = await limpiarBloquesAntiguos(90);
+      setMensaje({ tipo: 'ok', texto: borrados > 0 ? `Se liberaron ${borrados} bloques de días antiguos.` : 'Ya estaba optimizado — no había bloques viejos por borrar.' });
+    } catch (e) {
+      setMensaje({ tipo: 'err', texto: `Error optimizando: ${e.message}` });
+    } finally {
+      setOptimizando(false);
+    }
+  }
   async function generarRespaldo() {
     setGenerandoRespaldo(true);
     setMensaje(null);
@@ -128,6 +142,20 @@ export default function Auditoria() {
           <div>
             <button className="btn-primary" disabled={generandoRespaldo} onClick={generarRespaldo}>
               <i className="fa-solid fa-file-excel"></i> {generandoRespaldo ? 'Generando respaldo...' : 'Generar respaldo completo (Excel)'}
+            </button>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2><i className="fa-solid fa-broom" style={{ color: 'var(--primary)', marginRight: 8 }}></i>Optimizar base de datos</h2>
+              <p>Borra el detalle de bloques de hora de días de hace más de 90 días — el tiempo trabajado de esos días queda guardado igual, solo se libera el detalle que ya no hace falta recalcular. Esto se hace también solo automáticamente de vez en cuando.</p>
+            </div>
+          </div>
+          <div>
+            <button className="btn-secondary" disabled={optimizando} onClick={optimizarBaseDatos}>
+              <i className="fa-solid fa-broom"></i> {optimizando ? 'Optimizando...' : 'Optimizar ahora'}
             </button>
           </div>
         </section>

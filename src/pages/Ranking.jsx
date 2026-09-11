@@ -4,7 +4,7 @@ import RankingExcelTable from '../components/RankingExcelTable';
 import Top3Podium from '../components/Top3Podium';
 import CarruselLista from '../components/CarruselLista';
 const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChart'));
-import { getRankingDia, getRankingHoraAHora, getRankingRango, getConfig } from '../lib/db';
+import { getRankingDia, getRankingHoraAHora, getRankingRango, getConfig, getMetaTotalPeriodo } from '../lib/db';
 import { calcularPorcentajeMeta, clasificarEstado } from '../lib/calculos';
 
 function hoyISO() {
@@ -20,16 +20,16 @@ function rangoDelMes(mesISO) {
   const fin = `${mesISO}-${String(ultimoDia).padStart(2, '0')}`;
   return { inicio, fin };
 }
-function rangoDeSemana(fechaISO) {
+function rangoDeSemana(fechaISO, diaFinSemana = 6) {
   const d = new Date(fechaISO + 'T00:00:00');
   const dia = d.getDay();
-  const offsetLunes = dia === 0 ? -6 : 1 - dia;
-  const lunes = new Date(d);
-  lunes.setDate(d.getDate() + offsetLunes);
-  const domingo = new Date(lunes);
-  domingo.setDate(lunes.getDate() + 6);
+  const diasHastaFin = (diaFinSemana - dia + 7) % 7;
+  const fin = new Date(d);
+  fin.setDate(d.getDate() + diasHastaFin);
+  const inicio = new Date(fin);
+  inicio.setDate(fin.getDate() - 6);
   const fmt = (x) => x.toISOString().slice(0, 10);
-  return { inicio: fmt(lunes), fin: fmt(domingo) };
+  return { inicio: fmt(inicio), fin: fmt(fin) };
 }
 function formatoCorto(fechaISO) {
   return new Date(fechaISO + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
@@ -43,14 +43,16 @@ export default function Ranking() {
   const [mes, setMes] = useState(mesActualISO());
   const [datos, setDatos] = useState({ lista: [], rendimientoPromedioGeneral: 0 });
   const [metaHora, setMetaHora] = useState(470);
+  const [metaTallosPeriodo, setMetaTallosPeriodo] = useState(0);
+  const [diaFinSemana, setDiaFinSemana] = useState(6);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    getConfig().then(c => setMetaHora(c.metaHora)).catch(() => {});
+    getConfig().then(c => { setMetaHora(c.metaHora); setDiaFinSemana(c.diaFinSemana ?? 6); }).catch(() => {});
   }, []);
 
-  const rangoSemanaActual = useMemo(() => rangoDeSemana(fechaSemana), [fechaSemana]);
+  const rangoSemanaActual = useMemo(() => rangoDeSemana(fechaSemana, diaFinSemana), [fechaSemana, diaFinSemana]);
   const rangoMesActual = useMemo(() => rangoDelMes(mes), [mes]);
 
   useEffect(() => {
@@ -71,6 +73,16 @@ export default function Ranking() {
       .then(r => { if (activo) setDatos(r); })
       .catch(e => { if (activo) setError(e.message); })
       .finally(() => { if (activo) setCargando(false); });
+
+    const [rangoMetaInicio, rangoMetaFin] = periodo === 'semana' && fuente !== 'actual'
+      ? [rangoSemanaActual.inicio, rangoSemanaActual.fin]
+      : periodo === 'mes' && fuente !== 'actual'
+        ? [rangoMesActual.inicio, rangoMesActual.fin]
+        : [fecha, fecha];
+    getMetaTotalPeriodo(rangoMetaInicio, rangoMetaFin)
+      .then(m => { if (activo) setMetaTallosPeriodo(m); })
+      .catch(() => {});
+
     return () => { activo = false; };
   }, [fecha, fechaSemana, mes, fuente, periodo, rangoSemanaActual, rangoMesActual]);
 
@@ -107,8 +119,13 @@ export default function Ranking() {
               <div><span>Cumplimiento de Tallos</span><h2>{resumen.promedioPct}%</h2><small>vs. la meta</small></div></div>
             <div className="card acento-rojo"><div className="icon"><i className="fa-solid fa-trophy"></i></div>
               <div><span>Meta cumplida</span><h2>{resumen.cumplen}</h2><small>operarios</small></div></div>
-            <div className="card"><div className="icon"><i className="fa-solid fa-layer-group"></i></div>
-              <div><span>Tallos Totales</span><h2>{resumen.tallosTotales.toLocaleString()}</h2><small>del período</small></div></div>
+            <div className="card card-real-vs-meta"><div className="icon"><i className="fa-solid fa-layer-group"></i></div>
+              <div>
+                <span>Tallos Totales vs. Meta</span>
+                <h2>{resumen.tallosTotales.toLocaleString()} <span className="card-meta-separador">/</span> <span className="card-meta-numero">{metaTallosPeriodo.toLocaleString()}</span></h2>
+                <small>Real (producido) / Proyectado ({periodo === 'dia' || fuente === 'actual' ? 'del día' : 'del período'})</small>
+              </div>
+            </div>
             <div className="card acento-azul"><div className="icon"><i className="fa-solid fa-chart-simple"></i></div>
               <div><span>Rendimiento Promedio</span><h2>{rendimientoPromedioGeneral}</h2><small>tallos/hora</small></div></div>
           </section>

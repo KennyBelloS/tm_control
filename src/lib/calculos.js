@@ -42,7 +42,7 @@ export function minutosDescansoAplicable(horaInicio, horaFin, descansos = []) {
     let corte = hc * 60 + mc;
     if (corte < ini) corte += 24 * 60;
     // solo se descuenta si el bloque realmente cruza la hora de corte (ej. almuerzo a las 12:00)
-    if (corte > ini && corte < fin) total += Number(d.minutos) || 0;
+    if (corte >= ini && corte < fin) total += Number(d.minutos) || 0;
   }
   return total;
 }

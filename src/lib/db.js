@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient';
 import { agregarPorPersonaDia } from './excel';
-import { calcularRendimientoReal, calcularRendimientoBloque, agregarTurnoActualPorPersona } from './calculos';
+import { calcularRendimientoReal, calcularRendimientoBloque, agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from './calculos';
 const SELECT_HISTORICO = 'id,fecha,colaborador_id,total_tallos,total_ramos,tiempo_trabajado_min,tiempo_no_productivo_min,semana,codigos,personas(nombre)';
 const SELECT_ACTUAL = 'id,fecha,colaborador_id,hora_inicio,hora_fin,mesa,total_tallos,total_ramos,rend_tallos,rend_ramos,tiempo_trabajado_min,semana,personas(nombre)';
 function aplanar(fila) {
@@ -42,7 +42,8 @@ export async function getConfig() {
       horaCorte: '12:00',
       minutos: 30
     }],
-    almacenamientoLimiteMB: data.almacenamiento_limite_mb ?? 500
+    almacenamientoLimiteMB: data.almacenamiento_limite_mb ?? 500,
+    diaFinSemana: data.dia_fin_semana ?? 6
   };
 }
 export async function setConfig(cfg) {
@@ -54,6 +55,7 @@ export async function setConfig(cfg) {
   };
   if (cfg.descansosActivos !== undefined) payload.descansos_activos = cfg.descansosActivos;
   if (cfg.descansos !== undefined) payload.descansos = cfg.descansos;
+  if (cfg.diaFinSemana !== undefined) payload.dia_fin_semana = cfg.diaFinSemana;
   const {
     error
   } = await supabase.from('configuracion').update(payload).eq('id', 1);
@@ -108,6 +110,37 @@ export async function setMetaDia(fecha, metaTallos) {
     throw error;
   }
 }
+
+/**
+ * Suma la meta de tallos de cada día dentro de un rango (usada en Ranking
+ * para "Meta del período" — día, semana o mes). Los días sin meta puntual
+ * usan el valor por defecto de Configuración.
+ */
+export async function getMetaTotalPeriodo(fechaInicio, fechaFin) {
+  const cfg = await getConfig();
+  let metasPorFecha = new Map();
+  try {
+    const { data, error } = await supabase
+      .from('metas_diarias')
+      .select('fecha, meta_tallos')
+      .gte('fecha', fechaInicio)
+      .lte('fecha', fechaFin);
+    if (error) throw error;
+    metasPorFecha = new Map((data || []).map(m => [m.fecha, m.meta_tallos]));
+  } catch {
+    // tabla metas_diarias aún no existe — se usa el valor por defecto para todos los días
+  }
+
+  const inicio = new Date(fechaInicio + 'T00:00:00');
+  const fin = new Date(fechaFin + 'T00:00:00');
+  let total = 0;
+  for (let d = new Date(inicio); d <= fin; d.setDate(d.getDate() + 1)) {
+    const fechaISO = d.toISOString().slice(0, 10);
+    total += metasPorFecha.get(fechaISO) ?? cfg.metaGlobalDia;
+  }
+  return total;
+}
+
 async function asegurarPersonas(registros) {
   const mapa = new Map();
   for (const r of registros) {
@@ -145,6 +178,30 @@ export async function insertarHistorico(registrosPorBloque) {
     count: 'exact'
   });
   if (error) throw error;
+
+  // Guarda los bloques de hora originales (para poder recalcular el tiempo
+  // trabajado en vivo si más adelante cambia la configuración de descansos).
+  try {
+    const fechasAfectadas = [...new Set(agregados.map(a => a.fecha))];
+    const idsAfectados = [...new Set(agregados.map(a => a.colaborador_id))];
+    await supabase.from('historico_bloques').delete().in('fecha', fechasAfectadas).in('colaborador_id', idsAfectados);
+    const bloques = registrosPorBloque
+      .filter(r => r.hora_inicio && r.hora_fin)
+      .map(r => ({ fecha: r.fecha, colaborador_id: r.colaborador_id, hora_inicio: r.hora_inicio, hora_fin: r.hora_fin }));
+    if (bloques.length > 0) {
+      await supabase.from('historico_bloques').insert(bloques);
+    }
+  } catch {
+    // si la tabla historico_bloques aún no existe (falta la migración), no rompe la carga del Excel
+  }
+
+  // Limpieza automática y silenciosa: 1 de cada ~20 cargas, aprovecha para
+  // borrar bloques viejos que ya no necesitan recalcularse (mantiene la
+  // base de datos liviana sin que el usuario tenga que hacer nada).
+  if (Math.random() < 0.05) {
+    limpiarBloquesAntiguos(90).catch(() => {});
+  }
+
   return {
     insertados: count ?? filas.length
   };
@@ -161,7 +218,52 @@ export async function getHistorico({
     error
   } = await query;
   if (error) throw error;
-  return (data || []).map(aplanar).map(conRendimientoReal);
+  const filas = (data || []).map(aplanar).map(conRendimientoReal);
+  if (filas.length === 0) return filas;
+
+  // Recalcula el tiempo trabajado EN VIVO con la config de descansos actual,
+  // usando los bloques de hora originales guardados al subir el Excel. Si un
+  // día/persona no tiene bloques guardados (ej. se editó manualmente antes de
+  // esta función existir), se deja el valor que ya estaba guardado.
+  try {
+    const fechas = [...new Set(filas.map(f => f.fecha))];
+    const { data: bloquesData, error: errorBloques } = await supabase
+      .from('historico_bloques')
+      .select('fecha,colaborador_id,hora_inicio,hora_fin')
+      .in('fecha', fechas);
+    if (errorBloques) throw errorBloques;
+
+    if (bloquesData && bloquesData.length > 0) {
+      const cfg = await getConfig();
+      const descansos = cfg.descansosActivos ? cfg.descansos : [];
+      const mapaBloques = new Map();
+      for (const b of bloquesData) {
+        const key = `${b.fecha}_${b.colaborador_id}`;
+        if (!mapaBloques.has(key)) mapaBloques.set(key, []);
+        mapaBloques.get(key).push(b);
+      }
+      for (const f of filas) {
+        const key = `${f.fecha}_${f.colaborador_id}`;
+        const bloques = mapaBloques.get(key);
+        if (!bloques || bloques.length === 0) continue;
+        let minutos = 0;
+        for (const b of bloques) {
+          const brutos = minutosEntreBloque(b.hora_inicio, b.hora_fin);
+          const descuento = minutosDescansoAplicable(b.hora_inicio, b.hora_fin, descansos);
+          minutos += Math.max(0, brutos - descuento);
+        }
+        f.tiempo_trabajado_min = minutos;
+        const { tiempoRealMin, tiempoRealHoras, rendimiento } = calcularRendimientoReal(f.total_tallos, minutos, f.tiempo_no_productivo_min);
+        f.tiempo_real_min = tiempoRealMin;
+        f.tiempo_real_horas = tiempoRealHoras;
+        f.rendimiento = rendimiento;
+      }
+    }
+  } catch {
+    // si historico_bloques todavía no existe (falta la migración), se usan los valores ya guardados sin romper nada
+  }
+
+  return filas;
 }
 export async function borrarTablaHistorico() {
   const {
@@ -184,6 +286,30 @@ export async function actualizarRegistroHistorico(id, cambios) {
     total_ramos
   }))(cambios);
   Object.keys(permitido).forEach(k => permitido[k] === undefined && delete permitido[k]);
+
+  // Si se está editando manualmente el tiempo trabajado, reemplazamos el
+  // bloque de hora de esa persona/día por el que acaba de escribir (si dio
+  // hora inicio y fin) — así, si más adelante cambia la configuración de
+  // descansos, este registro también se sigue recalculando solo. Si no dio
+  // horas (edición antigua sin horario), simplemente se borran los bloques
+  // para que el valor manual quede firme.
+  if (permitido.tiempo_trabajado_min !== undefined) {
+    try {
+      const { data: filaActual } = await supabase.from('rendimiento_historico').select('fecha,colaborador_id').eq('id', id).single();
+      if (filaActual) {
+        await supabase.from('historico_bloques').delete().eq('fecha', filaActual.fecha).eq('colaborador_id', filaActual.colaborador_id);
+        if (cambios.hora_inicio && cambios.hora_fin) {
+          await supabase.from('historico_bloques').insert({
+            fecha: filaActual.fecha,
+            colaborador_id: filaActual.colaborador_id,
+            hora_inicio: cambios.hora_inicio,
+            hora_fin: cambios.hora_fin,
+          });
+        }
+      }
+    } catch { /* si historico_bloques no existe todavía, no rompe la edición */ }
+  }
+
   const {
     error
   } = await supabase.from('rendimiento_historico').update(permitido).eq('id', id);
@@ -448,15 +574,31 @@ export async function getAlmacenamientoUsadoMB() {
   if (error) throw error;
   return Number(data) || 0;
 }
+
+/**
+ * Borra los bloques de hora del Histórico más viejos que `diasRetencion`
+ * días. El tiempo trabajado ya calculado se queda guardado tal cual en
+ * rendimiento_historico (no se pierde nada visible) — solo se libera el
+ * detalle por bloque, que ya no hace falta recalcular para días tan
+ * antiguos. Esto evita que la tabla historico_bloques crezca sin control.
+ */
+export async function limpiarBloquesAntiguos(diasRetencion = 90) {
+  const limite = new Date();
+  limite.setDate(limite.getDate() - diasRetencion);
+  const fechaLimite = limite.toISOString().slice(0, 10);
+  try {
+    const { error, count } = await supabase
+      .from('historico_bloques')
+      .delete({ count: 'exact' })
+      .lt('fecha', fechaLimite);
+    if (error) throw error;
+    return count || 0;
+  } catch {
+    return 0; // si la tabla no existe todavía, no rompe nada
+  }
+}
 export async function getHistoricoCompleto() {
-  const {
-    data,
-    error
-  } = await supabase.from('rendimiento_historico').select(SELECT_HISTORICO).order('fecha', {
-    ascending: false
-  });
-  if (error) throw error;
-  return (data || []).map(aplanar).map(conRendimientoReal);
+  return getHistorico({});
 }
 export async function getActualCompleto() {
   return getActual({});

@@ -249,6 +249,20 @@ export default function Configuracion() {
               <input type="time" value={cfg.horaInicioDefault} onChange={e => actualizar('horaInicioDefault', e.target.value)} /></div>
             <div><label>Jornada — hora fin por defecto</label>
               <input type="time" value={cfg.horaFinDefault} onChange={e => actualizar('horaFinDefault', e.target.value)} /></div>
+            <div><label>La semana (Ranking) termina el</label>
+              <select value={cfg.diaFinSemana} onChange={e => actualizar('diaFinSemana', Number(e.target.value))}>
+                <option value={0}>Domingo</option>
+                <option value={1}>Lunes</option>
+                <option value={2}>Martes</option>
+                <option value={3}>Miércoles</option>
+                <option value={4}>Jueves</option>
+                <option value={5}>Viernes</option>
+                <option value={6}>Sábado</option>
+              </select>
+              <small style={{ display: 'block', marginTop: 4, color: 'var(--gray)', fontSize: 11 }}>
+                Ej: si eliges "Sábado", cada semana del Ranking corre de domingo a sábado.
+              </small>
+            </div>
           </div>
           <div style={{
           display: 'flex',
@@ -310,11 +324,16 @@ export default function Configuracion() {
           }} onClick={agregarDescanso}>
                   <i className="fa-solid fa-plus"></i> Agregar descanso ({cfg.descansos.length}/3)
                 </button>}
+              <div>
+                <button className="btn-primary" disabled={guardandoDescansos} onClick={guardarDescansosAhora}>
+                  <i className="fa-solid fa-floppy-disk"></i> {guardandoDescansos ? 'Guardando...' : 'Guardar descuentos'}
+                </button>
+              </div>
               <p style={{
             fontSize: 11,
             color: 'var(--gray)'
           }}>
-                Ejemplo: hora de corte 12:00 y 30 minutos → un bloque de 06:00 a 13:00 queda en 6.5 horas trabajadas (7 horas menos 30 min de almuerzo). Los cambios aquí se guardan solos, no hace falta el botón de arriba.
+                Ejemplo: hora de corte 12:00 y 30 minutos → un bloque de 06:00 a 13:00 queda en 6.5 horas trabajadas (7 horas menos 30 min de almuerzo). Un bloque que <strong>empieza justo a las 12:00</strong> también recibe el descuento. Los cambios se guardan solos al salir del campo, pero también puedes usar el botón de arriba para confirmar. Los rendimientos del Histórico que ya tengan sus horas cargadas desde Excel <strong>se recalculan automáticamente</strong> con la nueva configuración — no hace falta volver a subir el archivo.
               </p>
             </div>}
         </section>

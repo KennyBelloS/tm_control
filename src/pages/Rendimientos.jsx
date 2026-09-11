@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
-import { getConfig, getHistorico, getActual, insertarHistorico, reemplazarActual, borrarTablaHistorico, borrarTablaActual, actualizarRegistroHistorico, eliminarRegistroHistorico, actualizarRegistroActual, eliminarRegistroActual, eliminarPersonaDeActual } from '../lib/db';
+import { getConfig, getHistorico, getActual, insertarHistorico, reemplazarActual, borrarTablaHistorico, borrarTablaActual, actualizarRegistroHistorico, eliminarRegistroHistorico, actualizarRegistroActual, eliminarRegistroActual, eliminarPersonaDeActual, getMetaTotalPeriodo } from '../lib/db';
 import { parsearReporteBoncheo } from '../lib/excel';
-import { calcularPorcentajeMeta, clasificarEstado, horasAMinutos, minutosAHoras, agregarTurnoActualPorPersona } from '../lib/calculos';
+import { calcularPorcentajeMeta, clasificarEstado, horasAMinutos, minutosAHoras, agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from '../lib/calculos';
 import { supabaseConfigurado } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
 import { puedeEditar } from '../lib/roles';
@@ -26,6 +26,7 @@ export default function Rendimientos() {
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
+  const [metaHistoricoPeriodo, setMetaHistoricoPeriodo] = useState(0);
   const [fFecha, setFFecha] = useState(ayerISO());
   const [fFechaActual, setFFechaActual] = useState('');
   const [busqueda, setBusqueda] = useState('');
@@ -141,6 +142,18 @@ export default function Rendimientos() {
     const b = busqueda.toLowerCase();
     return historico.filter(r => r.colaborador.toLowerCase().includes(b));
   }, [historico, busqueda]);
+  useEffect(() => {
+    if (historicoFiltrado.length === 0) {
+      setMetaHistoricoPeriodo(0);
+      return;
+    }
+    const fechas = historicoFiltrado.map(r => r.fecha).sort();
+    const desde = fechas[0];
+    const hasta = fechas[fechas.length - 1];
+    let activo = true;
+    getMetaTotalPeriodo(desde, hasta).then(m => { if (activo) setMetaHistoricoPeriodo(m); }).catch(() => {});
+    return () => { activo = false; };
+  }, [historicoFiltrado]);
   const actualFiltrado = useMemo(() => {
     let base = actual;
     if (fFechaActual) base = base.filter(r => r.fecha === fFechaActual);
@@ -160,7 +173,7 @@ export default function Rendimientos() {
   const kpis = useMemo(() => {
     const totalTallos = historicoFiltrado.reduce((s, r) => s + (r.total_tallos || 0), 0);
     const personas = historicoFiltrado.length;
-    const metaGlobal = cfg?.metaGlobalDia || 25000;
+    const metaGlobal = metaHistoricoPeriodo || cfg?.metaGlobalDia || 25000;
     const cumplimiento = metaGlobal > 0 ? Math.round(totalTallos / metaGlobal * 100) : 0;
     const conRendimiento = historicoFiltrado.filter(r => r.rendimiento > 0);
     const rendimientoPromedio = conRendimiento.length > 0 ? Math.round(conRendimiento.reduce((s, r) => s + r.rendimiento, 0) / conRendimiento.length) : 0;
@@ -168,9 +181,10 @@ export default function Rendimientos() {
       totalTallos,
       personas,
       cumplimiento,
-      rendimientoPromedio
+      rendimientoPromedio,
+      metaGlobal
     };
-  }, [historicoFiltrado, cfg]);
+  }, [historicoFiltrado, cfg, metaHistoricoPeriodo]);
   function irATurnoActual() {
     document.getElementById('turno-actual')?.scrollIntoView({
       behavior: 'smooth',
@@ -308,7 +322,9 @@ export default function Rendimientos() {
           <div className="card acento-oro"><div className="icon"><i className="fa-solid fa-gauge-high"></i></div>
             <div><span>Rendimiento Promedio</span><h2>{kpis.rendimientoPromedio}</h2><small>tallos/hora real</small></div></div>
           <div className="card acento-azul"><div className="icon"><i className="fa-solid fa-chart-line"></i></div>
-            <div><span>Cumplimiento</span><h2>{kpis.cumplimiento}%</h2><small>Meta {(cfg?.metaGlobalDia || 0).toLocaleString()}</small></div></div>
+            <div><span>Cumplimiento</span><h2>{kpis.cumplimiento}%</h2><small>vs. la meta</small></div></div>
+          <div className="card acento-rojo"><div className="icon"><i className="fa-solid fa-bullseye"></i></div>
+            <div><span>Meta de Tallos</span><h2>{kpis.metaGlobal.toLocaleString()}</h2><small>{fFecha ? 'del día filtrado' : 'del período mostrado'}</small></div></div>
         </section>
 
         <TablaHistorico filas={historicoFiltrado} cfg={cfg} onEliminarTabla={() => eliminarTabla('historico')} onGuardarFila={async (id, cambios) => {
@@ -386,17 +402,25 @@ export default function Rendimientos() {
 }
 function VistaPreviaTiempo({
   totalTallos,
-  horas,
-  noProductivoMin
+  horaInicio,
+  horaFin,
+  noProductivoMin,
+  cfg
 }) {
-  const trabajadoMin = horasAMinutos(horas) || 0;
+  if (!horaInicio || !horaFin) return null;
+  const descansos = cfg?.descansosActivos ? cfg.descansos : [];
+  const brutos = minutosEntreBloque(horaInicio, horaFin);
+  const descuento = minutosDescansoAplicable(horaInicio, horaFin, descansos);
+  const trabajadoMin = Math.max(0, brutos - descuento);
   const noProd = Number(noProductivoMin) || 0;
   const realMin = Math.max(0, trabajadoMin - noProd);
   const realHoras = minutosAHoras(realMin);
   const rendimiento = realHoras > 0 ? Math.round(totalTallos / realHoras * 100) / 100 : 0;
   return <div className="tiempo-preview">
       <i className="fa-solid fa-calculator"></i>
-      Tiempo real: <strong>{realMin} min</strong> ({realHoras} h) → Rendimiento: <strong>{rendimiento}</strong> tallos/h
+      {horaInicio}–{horaFin} = {minutosAHoras(brutos)} h
+      {descuento > 0 && <> − {descuento} min de almuerzo</>}
+      {' '}→ Tiempo real: <strong>{realMin} min</strong> ({realHoras} h) → Rendimiento: <strong>{rendimiento}</strong> tallos/h
     </div>;
 }
 function TablaHistorico({
@@ -416,17 +440,27 @@ function TablaHistorico({
     setEditandoId(r.id);
     setBorrador({
       fecha: r.fecha,
-      horas: r.tiempo_trabajado_min ? String(minutosAHoras(r.tiempo_trabajado_min)) : '',
+      horaInicio: cfg?.horaInicioDefault || '06:00',
+      horaFin: cfg?.horaFinDefault || '',
       noProductivoMin: r.tiempo_no_productivo_min ?? 0,
       total_tallos: r.total_tallos
     });
   }
   async function guardarEdicion(id) {
+    const descansos = cfg?.descansosActivos ? cfg.descansos : [];
+    let tiempoTrabajadoMin = null;
+    if (borrador.horaInicio && borrador.horaFin) {
+      const brutos = minutosEntreBloque(borrador.horaInicio, borrador.horaFin);
+      const descuento = minutosDescansoAplicable(borrador.horaInicio, borrador.horaFin, descansos);
+      tiempoTrabajadoMin = Math.max(0, brutos - descuento);
+    }
     await onGuardarFila(id, {
       fecha: borrador.fecha,
       total_tallos: Number(borrador.total_tallos),
-      tiempo_trabajado_min: borrador.horas === '' ? null : horasAMinutos(borrador.horas),
-      tiempo_no_productivo_min: Number(borrador.noProductivoMin) || 0
+      tiempo_trabajado_min: tiempoTrabajadoMin,
+      tiempo_no_productivo_min: Number(borrador.noProductivoMin) || 0,
+      hora_inicio: borrador.horaInicio || null,
+      hora_fin: borrador.horaFin || null
     });
     setEditandoId(null);
   }
@@ -479,11 +513,13 @@ function TablaHistorico({
                   }))} /></td>
                       <td colSpan={2}>
                         <div className="edit-row-form">
-                          <input type="number" step="0.5" min="0" placeholder="Horas (ej. 8)" style={{
-                      width: 100
-                    }} value={borrador.horas} onChange={e => setBorrador(b => ({
+                          <input type="time" value={borrador.horaInicio} onChange={e => setBorrador(b => ({
                       ...b,
-                      horas: e.target.value
+                      horaInicio: e.target.value
+                    }))} />
+                          <input type="time" value={borrador.horaFin} onChange={e => setBorrador(b => ({
+                      ...b,
+                      horaFin: e.target.value
                     }))} />
                           <input type="number" min="0" placeholder="No prod. (min)" style={{
                       width: 110
@@ -492,7 +528,7 @@ function TablaHistorico({
                       noProductivoMin: e.target.value
                     }))} />
                         </div>
-                        <VistaPreviaTiempo totalTallos={Number(borrador.total_tallos) || 0} horas={borrador.horas} noProductivoMin={borrador.noProductivoMin} />
+                        <VistaPreviaTiempo totalTallos={Number(borrador.total_tallos) || 0} horaInicio={borrador.horaInicio} horaFin={borrador.horaFin} noProductivoMin={borrador.noProductivoMin} cfg={cfg} />
                       </td>
                       <td colSpan={2} style={{
                   color: 'var(--gray)',

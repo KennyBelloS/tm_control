@@ -121,3 +121,30 @@ alter table rendimiento_historico add column if not exists codigos text;
 --    update perfiles set es_super_admin = true where id = 'TU-ID-AQUI';
 -- ---------------------------------------------------------------------
 alter table perfiles add column if not exists es_super_admin boolean not null default false;
+
+-- ---------------------------------------------------------------------
+-- 7. Guarda los bloques de hora ORIGINALES de cada carga al Histórico,
+--    para poder recalcular el tiempo trabajado en vivo cuando cambies la
+--    configuración de descansos (antes quedaba fijo desde que se subía
+--    el Excel y no se actualizaba con cambios posteriores).
+-- ---------------------------------------------------------------------
+create table if not exists historico_bloques (
+  id              bigserial primary key,
+  fecha           date not null,
+  colaborador_id  integer not null,
+  hora_inicio     time not null,
+  hora_fin        time not null
+);
+create index if not exists idx_historico_bloques_fecha_persona on historico_bloques (fecha, colaborador_id);
+alter table historico_bloques enable row level security;
+drop policy if exists "leer_historico_bloques" on historico_bloques;
+create policy "leer_historico_bloques" on historico_bloques for select using (auth.role() = 'authenticated');
+drop policy if exists "escribir_historico_bloques" on historico_bloques;
+create policy "escribir_historico_bloques" on historico_bloques for all using (puede_editar()) with check (puede_editar());
+
+-- ---------------------------------------------------------------------
+-- 8. Día en que termina la semana para el Ranking "por semana"
+--    (0=domingo, 1=lunes ... 6=sábado). Por defecto: sábado, así la
+--    semana corre de domingo a sábado.
+-- ---------------------------------------------------------------------
+alter table configuracion add column if not exists dia_fin_semana smallint not null default 6;

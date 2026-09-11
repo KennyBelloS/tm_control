@@ -50,14 +50,15 @@ export default function DashboardCarrusel({ personasHoy, personasAyer, metaHora 
 
   const [grupoIndex, setGrupoIndex] = useState(0);
   const [vuelta, setVuelta] = useState(0);
+  const [manual, setManual] = useState(false);
 
-  useEffect(() => { setGrupoIndex(0); setVuelta(0); }, [grupos.length]);
+  useEffect(() => { setGrupoIndex(0); setVuelta(0); setManual(false); }, [grupos.length]);
 
   const grupoActual = grupos[grupoIndex];
   const duracion = grupoActual ? grupoActual.personas.length * SEGUNDOS_POR_PERSONA : 0;
 
   useEffect(() => {
-    if (!grupoActual || duracion === 0) return;
+    if (!grupoActual || duracion === 0 || manual) return;
     const t = setTimeout(() => {
       if (vuelta + 1 < VUELTAS_ANTES_DE_CAMBIAR) {
         setVuelta(v => v + 1);
@@ -67,14 +68,36 @@ export default function DashboardCarrusel({ personasHoy, personasAyer, metaHora 
       }
     }, duracion * 1000);
     return () => clearTimeout(t);
-  }, [grupoIndex, vuelta, duracion, grupos.length]);
+  }, [grupoIndex, vuelta, duracion, grupos.length, manual]);
 
   if (!grupoActual) return null;
+
+  function elegirGrupo(indice) {
+    setManual(true);
+    setGrupoIndex(indice);
+    setVuelta(0);
+  }
 
   return (
     <section className="carrusel-panel">
       <div className="carrusel-header">
         <span className="carrusel-etiqueta"><i className={`fa-solid ${grupoActual.icono}`}></i> {grupoActual.etiqueta}</span>
+        <div className="carrusel-selector">
+          {grupos.map((g, gi) => (
+            <button
+              key={gi}
+              className={gi === grupoIndex ? 'activo' : ''}
+              onClick={() => elegirGrupo(gi)}
+            >
+              {g.etiqueta.split('·')[0].trim()}
+            </button>
+          ))}
+          {manual && (
+            <button className="carrusel-auto-btn" onClick={() => setManual(false)} title="Volver a la rotación automática">
+              <i className="fa-solid fa-rotate"></i>
+            </button>
+          )}
+        </div>
         <span className="carrusel-contador">{grupoActual.personas.length} personas</span>
       </div>
 

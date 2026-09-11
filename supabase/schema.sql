@@ -63,6 +63,17 @@ create table if not exists rendimiento_historico (
 
 create index if not exists idx_historico_fecha on rendimiento_historico (fecha);
 
+-- Bloques de hora originales de cada carga al Histórico (permite recalcular
+-- el tiempo trabajado en vivo si cambia la configuración de descansos).
+create table if not exists historico_bloques (
+  id              bigserial primary key,
+  fecha           date not null,
+  colaborador_id  integer not null,
+  hora_inicio     time not null,
+  hora_fin        time not null
+);
+create index if not exists idx_historico_bloques_fecha_persona on historico_bloques (fecha, colaborador_id);
+
 -- ---------------------------------------------------------------------
 -- 4. RENDIMIENTO ACTUAL (snapshot temporal — solo la ÚLTIMA carga, por bloque)
 -- ---------------------------------------------------------------------
@@ -100,6 +111,7 @@ create table if not exists metas_diarias (
 alter table personas               enable row level security;
 alter table configuracion          enable row level security;
 alter table rendimiento_historico  enable row level security;
+alter table historico_bloques      enable row level security;
 alter table rendimiento_actual     enable row level security;
 alter table metas_diarias          enable row level security;
 
@@ -108,3 +120,4 @@ create policy "acceso_total_config"       on configuracion          for all usin
 create policy "acceso_total_historico"    on rendimiento_historico  for all using (true) with check (true);
 create policy "acceso_total_actual"       on rendimiento_actual     for all using (true) with check (true);
 create policy "acceso_total_metas_dia"    on metas_diarias          for all using (true) with check (true);
+create policy "acceso_total_historico_bloques" on historico_bloques  for all using (true) with check (true);
