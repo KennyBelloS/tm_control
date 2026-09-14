@@ -148,3 +148,23 @@ create policy "escribir_historico_bloques" on historico_bloques for all using (p
 --    semana corre de domingo a sábado.
 -- ---------------------------------------------------------------------
 alter table configuracion add column if not exists dia_fin_semana smallint not null default 6;
+
+-- ---------------------------------------------------------------------
+-- 9. Activa Supabase Realtime en las tablas principales — esto es lo que
+--    permite que la app se actualice sola en todas las pantallas cuando
+--    alguien sube o edita algo, sin que nadie tenga que recargar la página.
+-- ---------------------------------------------------------------------
+do $$
+declare
+  tabla text;
+begin
+  foreach tabla in array array['rendimiento_historico', 'rendimiento_actual', 'metas_diarias', 'configuracion']
+  loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and tablename = tabla
+    ) then
+      execute format('alter publication supabase_realtime add table %I', tabla);
+    end if;
+  end loop;
+end $$;

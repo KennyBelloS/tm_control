@@ -774,3 +774,19 @@ tbody td button:hover{ background:var(--primary); color:#fff; transform:scale(1.
 .card-real-vs-meta h2{ font-size:22px; }
 .card-meta-separador{ color:var(--gray); font-weight:400; margin:0 4px; }
 .card-meta-numero{ color:var(--gold); }
+
+.aviso-historico-flotante{
+  position:fixed; top:16px; right:16px; z-index:200; max-width:400px;
+  background:#B45309; color:#fff; padding:14px 16px; border-radius:12px;
+  box-shadow:0 15px 35px -10px rgba(0,0,0,.35); display:flex; align-items:flex-start; gap:10px;
+  font-size:12.5px; line-height:1.4; animation:modal-fade-in .25s ease;
+}
+.aviso-historico-flotante i.fa-triangle-exclamation{ font-size:16px; margin-top:1px; flex-shrink:0; }
+.aviso-historico-flotante button{
+  background:rgba(255,255,255,.18); color:#fff; width:22px; height:22px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0;
+}
+.aviso-historico-flotante button:hover{ background:rgba(255,255,255,.3); }
+@media (max-width:640px){
+  .aviso-historico-flotante{ left:12px; right:12px; max-width:none; top:12px; }
+}

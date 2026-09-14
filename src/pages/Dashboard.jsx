@@ -1,19 +1,15 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
-import { getConfig, getHistorico, getActual, getMetaDia, getTendenciaHistorico } from '../lib/db';
+import { getConfig, getHistorico, getActual, getMetaDia, getTendenciaHistorico, getUltimaFechaHistorico } from '../lib/db';
 import { agregarTurnoActualPorPersona } from '../lib/calculos';
 import { supabaseConfigurado } from '../lib/supabaseClient';
 const TendenciaTallosChart = lazy(() => import('../components/charts/TendenciaTallosChart'));
 const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChart'));
 import DashboardCarrusel from '../components/DashboardCarrusel';
+import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 function hoyISO() {
   return new Date().toISOString().slice(0, 10);
-}
-function ayerISO() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
 }
 function emojiCumplimiento(pct) {
   if (pct >= 100) return { icono: '🤩', texto: '¡Meta alcanzada!' };
@@ -40,8 +36,10 @@ export default function Dashboard() {
   const [personasParaDona, setPersonasParaDona] = useState([]);
   const [carruselHoy, setCarruselHoy] = useState([]);
   const [carruselAyer, setCarruselAyer] = useState([]);
+  const [fechaHistoricoMostrado, setFechaHistoricoMostrado] = useState(null);
+  const [tickTiempoReal, setTickTiempoReal] = useState(0);
+  useRealtimeRefresco(['rendimiento_historico', 'rendimiento_actual', 'metas_diarias', 'configuracion'], () => setTickTiempoReal(t => t + 1));
   const hoy = hoyISO();
-  const ayer = ayerISO();
   useEffect(() => {
     let activo = true;
     async function cargarDashboard() {
@@ -53,9 +51,13 @@ export default function Dashboard() {
           tablaLista
         } = await getMetaDia(hoy);
         const turnoActual = await getActual({});
-        const historicoAyer = await getHistorico({
-          fecha: ayer
-        });
+        // Muestra el último día registrado en el Histórico, no "ayer" fijo —
+        // si el domingo no se trabaja, el pendiente por revisar sigue siendo el sábado.
+        const ultimaFecha = await getUltimaFechaHistorico();
+        if (activo) setFechaHistoricoMostrado(ultimaFecha);
+        const historicoAyer = ultimaFecha ? await getHistorico({
+          fecha: ultimaFecha
+        }) : [];
         getTendenciaHistorico().then(r => {
           if (activo) setTendencia(r);
         }).catch(() => {});
@@ -104,7 +106,7 @@ export default function Dashboard() {
     return () => {
       activo = false;
     };
-  }, [hoy, ayer]);
+  }, [hoy, tickTiempoReal]);
   return <>
       <PageHeader title="Dashboard Ejecutivo" subtitle="Resumen general de producción, en tiempo real desde el Turno Actual.">
         <Link to="/rendimientos" className="btn-primary">
@@ -204,10 +206,10 @@ export default function Dashboard() {
           }}>Rendimientos</Link> y sube el Reporte Consolidado Boncheo (opción "Turno actual").
               </div>}
 
-            <h3 className="dashboard-section-title"><i className="fa-solid fa-calendar-days"></i> Histórico de Ayer ({ayer})</h3>
+            <h3 className="dashboard-section-title"><i className="fa-solid fa-calendar-days"></i> Último Histórico registrado {fechaHistoricoMostrado ? `(${fechaHistoricoMostrado})` : ''}</h3>
             <section className="cards">
               <div className="card"><div className="icon"><i className="fa-solid fa-users"></i></div>
-                <div><span>Personas con Registro</span><h2>{stats.ayer.personas}</h2><small>{ayer}</small></div></div>
+                <div><span>Personas con Registro</span><h2>{stats.ayer.personas}</h2><small>{fechaHistoricoMostrado || 'Sin datos'}</small></div></div>
               <div className="card"><div className="icon"><i className="fa-solid fa-seedling"></i></div>
                 <div><span>Total Tallos</span><h2>{stats.ayer.totalTallos.toLocaleString()}</h2><small>Día cerrado</small></div></div>
               <div className="card acento-oro"><div className="icon"><i className="fa-solid fa-gauge-high"></i></div>
@@ -216,13 +218,13 @@ export default function Dashboard() {
 
             {stats.ayer.personas === 0 && <div className="alert warn">
                 <i className="fa-solid fa-triangle-exclamation"></i>
-                No hay Histórico guardado para ayer ({ayer}). Sube el Excel del día anterior en <Link to="/rendimientos" style={{
+                Todavía no hay ningún día guardado en el Histórico. Sube un Excel en <Link to="/rendimientos" style={{
             fontWeight: 700,
             textDecoration: 'underline'
           }}>Rendimientos</Link> (opción "Histórico").
               </div>}
 
-            <DashboardCarrusel personasHoy={carruselHoy} personasAyer={carruselAyer} metaHora={stats.cfg.metaHora} />
+            <DashboardCarrusel personasHoy={carruselHoy} personasAyer={carruselAyer} metaHora={stats.cfg.metaHora} fechaHistorico={fechaHistoricoMostrado} />
 
             <h3 className="dashboard-section-title"><i className="fa-solid fa-chart-simple"></i> Visualizaciones</h3>
             <div className="dashboard-charts-grid">

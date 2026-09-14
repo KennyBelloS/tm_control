@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
-import { getConfig, getHistorico, getActual, insertarHistorico, reemplazarActual, borrarTablaHistorico, borrarTablaActual, actualizarRegistroHistorico, eliminarRegistroHistorico, actualizarRegistroActual, eliminarRegistroActual, eliminarPersonaDeActual, getMetaTotalPeriodo } from '../lib/db';
+import { getConfig, getHistorico, getActual, insertarHistorico, reemplazarActual, borrarTablaHistorico, borrarTablaActual, actualizarRegistroHistorico, eliminarRegistroHistorico, actualizarRegistroActual, eliminarRegistroActual, eliminarPersonaDeActual, getMetaTotalPeriodo, getUltimaFechaHistorico } from '../lib/db';
+import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { parsearReporteBoncheo } from '../lib/excel';
 import { calcularPorcentajeMeta, clasificarEstado, horasAMinutos, minutosAHoras, agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from '../lib/calculos';
 import { supabaseConfigurado } from '../lib/supabaseClient';
@@ -27,7 +28,8 @@ export default function Rendimientos() {
   const [procesando, setProcesando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [metaHistoricoPeriodo, setMetaHistoricoPeriodo] = useState(0);
-  const [fFecha, setFFecha] = useState(ayerISO());
+  const [fFecha, setFFecha] = useState('');
+  const [fFechaLista, setFFechaLista] = useState(false);
   const [fFechaActual, setFFechaActual] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [destino, setDestino] = useState('actual');
@@ -54,9 +56,41 @@ export default function Rendimientos() {
       setCargando(false);
     }
   }
+  const [editandoHistorico, setEditandoHistorico] = useState(false);
+  const [editandoActual, setEditandoActual] = useState(false);
+  const [refrescoPendiente, setRefrescoPendiente] = useState(false);
+  const hayEdicionActiva = editandoHistorico || editandoActual;
+  useRealtimeRefresco(['rendimiento_historico', 'rendimiento_actual'], () => {
+    // Si alguien está editando una fila ahora mismo, no la interrumpimos con
+    // un refresco automático — lo dejamos pendiente y se aplica solo apenas
+    // termine de editar (guarda o cancela), para no arriesgar perder lo que
+    // esté escribiendo.
+    if (hayEdicionActiva) {
+      setRefrescoPendiente(true);
+    } else {
+      cargarTodo();
+    }
+  });
   useEffect(() => {
+    if (!hayEdicionActiva && refrescoPendiente) {
+      setRefrescoPendiente(false);
+      cargarTodo();
+    }
+  }, [hayEdicionActiva, refrescoPendiente]);
+  useEffect(() => {
+    // Abre el Histórico mostrando el último día registrado (no "ayer" fijo):
+    // si el domingo no se trabaja, el pendiente por revisar sigue siendo el sábado.
+    let activo = true;
+    getUltimaFechaHistorico()
+      .then(fecha => { if (activo) setFFecha(fecha || ayerISO()); })
+      .catch(() => { if (activo) setFFecha(ayerISO()); })
+      .finally(() => { if (activo) setFFechaLista(true); });
+    return () => { activo = false; };
+  }, []);
+  useEffect(() => {
+    if (!fFechaLista) return;
     cargarTodo();
-  }, [fFecha]);
+  }, [fFecha, fFechaLista]);
   async function manejarArchivo(file) {
     if (!file) return;
     if (!fechaCarga) {
@@ -204,6 +238,11 @@ export default function Rendimientos() {
             Supabase no está configurado todavía. Copia <code>.env.example</code> a <code>.env</code> y reinicia <code>npm run dev</code>.
           </div>}
 
+        {refrescoPendiente && <div className="alert warn">
+            <i className="fa-solid fa-clock"></i>
+            Alguien más actualizó datos mientras editabas una fila — se van a mostrar apenas termines (guarda o cancela tu edición).
+          </div>}
+
         {mensaje && <div className={`alert ${mensaje.tipo === 'ok' ? 'ok' : 'err'}`}>
             <i className={`fa-solid ${mensaje.tipo === 'ok' ? 'fa-circle-check' : 'fa-circle-exclamation'}`}></i>
             {mensaje.texto}
@@ -333,7 +372,7 @@ export default function Rendimientos() {
       }} onEliminarFila={async id => {
         await eliminarRegistroHistorico(id);
         await cargarTodo();
-      }} procesando={procesando} promedioGeneral={kpis.rendimientoPromedio} soloLectura={!puedeModificar} />
+      }} procesando={procesando} promedioGeneral={kpis.rendimientoPromedio} soloLectura={!puedeModificar} onEditandoCambio={setEditandoHistorico} />
 
         <div id="turno-actual" style={{
         display: 'flex',
@@ -395,7 +434,7 @@ export default function Rendimientos() {
         }} onEliminarFila={async id => {
           await eliminarRegistroActual(id);
           await cargarTodo();
-        }} procesando={procesando} promedioGeneral={promedioActual} soloLectura={!puedeModificar} />
+        }} procesando={procesando} promedioGeneral={promedioActual} soloLectura={!puedeModificar} onEditandoCambio={setEditandoActual} />
         </div>
       </div>
     </>;
@@ -431,13 +470,15 @@ function TablaHistorico({
   onEliminarFila,
   procesando,
   promedioGeneral,
-  soloLectura
+  soloLectura,
+  onEditandoCambio
 }) {
   const metaHora = cfg?.metaHora || 470;
   const [editandoId, setEditandoId] = useState(null);
   const [borrador, setBorrador] = useState({});
   function iniciarEdicion(r) {
     setEditandoId(r.id);
+    onEditandoCambio?.(true);
     setBorrador({
       fecha: r.fecha,
       horaInicio: cfg?.horaInicioDefault || '06:00',
@@ -463,6 +504,7 @@ function TablaHistorico({
       hora_fin: borrador.horaFin || null
     });
     setEditandoId(null);
+    onEditandoCambio?.(false);
   }
   return <section className="table-panel">
       <div className="panel-header">
@@ -549,7 +591,7 @@ function TablaHistorico({
                   {!soloLectura && <td>
                       {editando ? <>
                           <button className="icon-btn-save" title="Guardar" onClick={() => guardarEdicion(r.id)}><i className="fa-solid fa-check"></i></button>
-                          <button className="icon-btn-cancel" title="Cancelar" onClick={() => setEditandoId(null)}><i className="fa-solid fa-xmark"></i></button>
+                          <button className="icon-btn-cancel" title="Cancelar" onClick={() => { setEditandoId(null); onEditandoCambio?.(false); }}><i className="fa-solid fa-xmark"></i></button>
                         </> : <>
                           <button title="Editar tiempo trabajado" onClick={() => iniciarEdicion(r)}><i className="fa-solid fa-pen"></i></button>
                           <button title="Eliminar" onClick={() => {
@@ -574,13 +616,15 @@ function TablaActual({
   onEliminarFila,
   procesando,
   promedioGeneral,
-  soloLectura
+  soloLectura,
+  onEditandoCambio
 }) {
   const metaHora = cfg?.metaHora || 470;
   const [editandoId, setEditandoId] = useState(null);
   const [borrador, setBorrador] = useState({});
   function iniciarEdicion(r) {
     setEditandoId(r.id);
+    onEditandoCambio?.(true);
     setBorrador({
       fecha: r.fecha,
       hora_inicio: r.hora_inicio,
@@ -594,6 +638,7 @@ function TablaActual({
       hora_fin: borrador.hora_fin
     });
     setEditandoId(null);
+    onEditandoCambio?.(false);
   }
   return <section className="table-panel">
       <div className="panel-header">
@@ -661,7 +706,7 @@ function TablaActual({
                   {!soloLectura && <td>
                       {editando ? <>
                           <button className="icon-btn-save" title="Guardar" onClick={() => guardarEdicion(r.id)}><i className="fa-solid fa-check"></i></button>
-                          <button className="icon-btn-cancel" title="Cancelar" onClick={() => setEditandoId(null)}><i className="fa-solid fa-xmark"></i></button>
+                          <button className="icon-btn-cancel" title="Cancelar" onClick={() => { setEditandoId(null); onEditandoCambio?.(false); }}><i className="fa-solid fa-xmark"></i></button>
                         </> : <>
                           <button title="Editar" onClick={() => iniciarEdicion(r)}><i className="fa-solid fa-pen"></i></button>
                           <button title="Eliminar" onClick={() => {

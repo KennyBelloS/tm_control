@@ -1,0 +1,11 @@
+{
+  "remoteName": "origin",
+  "projects": [
+    {
+      "id": "prj_TpvVsF4Dhd4uZKOhAoNs92tgzANZ",
+      "name": "tm-control",
+      "directory": ".",
+      "orgId": "team_OJCyxkCl8DmXAEhRlvgvhKcB"
+    }
+  ]
+}

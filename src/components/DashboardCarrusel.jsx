@@ -42,11 +42,11 @@ function Fila({ persona, metaHora }) {
   );
 }
 
-export default function DashboardCarrusel({ personasHoy, personasAyer, metaHora }) {
+export default function DashboardCarrusel({ personasHoy, personasAyer, metaHora, fechaHistorico }) {
   const grupos = useMemo(() => [
     { etiqueta: 'Turno Actual · Hoy', icono: 'fa-bolt', personas: personasHoy },
-    { etiqueta: 'Histórico · Ayer', icono: 'fa-calendar-days', personas: personasAyer },
-  ].filter(g => g.personas.length > 0), [personasHoy, personasAyer]);
+    { etiqueta: fechaHistorico ? `Histórico · ${fechaHistorico}` : 'Histórico', icono: 'fa-calendar-days', personas: personasAyer },
+  ].filter(g => g.personas.length > 0), [personasHoy, personasAyer, fechaHistorico]);
 
   const [grupoIndex, setGrupoIndex] = useState(0);
   const [vuelta, setVuelta] = useState(0);

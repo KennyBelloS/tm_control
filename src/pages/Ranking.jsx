@@ -5,6 +5,7 @@ import Top3Podium from '../components/Top3Podium';
 import CarruselLista from '../components/CarruselLista';
 const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChart'));
 import { getRankingDia, getRankingHoraAHora, getRankingRango, getConfig, getMetaTotalPeriodo } from '../lib/db';
+import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { calcularPorcentajeMeta, clasificarEstado } from '../lib/calculos';
 
 function hoyISO() {
@@ -44,6 +45,8 @@ export default function Ranking() {
   const [datos, setDatos] = useState({ lista: [], rendimientoPromedioGeneral: 0 });
   const [metaHora, setMetaHora] = useState(470);
   const [metaTallosPeriodo, setMetaTallosPeriodo] = useState(0);
+  const [tickTiempoReal, setTickTiempoReal] = useState(0);
+  useRealtimeRefresco(['rendimiento_historico', 'rendimiento_actual', 'metas_diarias'], () => setTickTiempoReal(t => t + 1));
   const [diaFinSemana, setDiaFinSemana] = useState(6);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -84,7 +87,7 @@ export default function Ranking() {
       .catch(() => {});
 
     return () => { activo = false; };
-  }, [fecha, fechaSemana, mes, fuente, periodo, rangoSemanaActual, rangoMesActual]);
+  }, [fecha, fechaSemana, mes, fuente, periodo, rangoSemanaActual, rangoMesActual, tickTiempoReal]);
 
   const { lista, rendimientoPromedioGeneral } = datos;
 

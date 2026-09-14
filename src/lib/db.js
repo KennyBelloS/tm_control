@@ -206,6 +206,25 @@ export async function insertarHistorico(registrosPorBloque) {
     insertados: count ?? filas.length
   };
 }
+
+/**
+ * Fecha del registro más reciente guardado en el Histórico (no
+ * necesariamente "ayer" — por ejemplo, si el domingo no se trabaja, el
+ * último registro puede ser del sábado). Se usa para que la pestaña de
+ * Rendimientos abra mostrando el día pendiente de revisar, no un día
+ * vacío.
+ */
+export async function getUltimaFechaHistorico() {
+  const { data, error } = await supabase
+    .from('rendimiento_historico')
+    .select('fecha')
+    .order('fecha', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data?.fecha || null;
+}
+
 export async function getHistorico({
   fecha
 } = {}) {

@@ -8,7 +8,32 @@ Este manual no asume que sabes programar. Sigue los pasos en orden.
 
 ## 0. Historial de arreglos recientes
 
-**Última entrega (Dashboard más visual, semana configurable, optimización de base de datos):**
+**Última entrega (actualización en tiempo real, Histórico abre en el último día, alerta automática):**
+
+⚠️ **Corre este SQL nuevo antes de usar esto** (activa la sincronización en vivo):
+```sql
+do $$
+declare
+  tabla text;
+begin
+  foreach tabla in array array['rendimiento_historico', 'rendimiento_actual', 'metas_diarias', 'configuracion']
+  loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and tablename = tabla
+    ) then
+      execute format('alter publication supabase_realtime add table %I', tabla);
+    end if;
+  end loop;
+end $$;
+```
+
+- **Toda la app se actualiza sola, en tiempo real**: cuando cualquiera sube un Excel, edita un registro, o cambia la configuración, todas las pantallas abiertas (Dashboard, Rendimientos, Ranking, Reportes) se refrescan solas — sin que nadie tenga que recargar la página. Funciona incluso entre distintos dispositivos/usuarios conectados al mismo tiempo.
+- **Protegido mientras editas**: si estás editando una fila (tiempo trabajado, tiempos muertos, etc.) justo cuando alguien más sube o cambia algo, la actualización automática **espera** — no se pierde lo que estás escribiendo. Verás un aviso ("alguien más actualizó datos...") y en cuanto guardes o canceles tu edición, se aplica sola.
+- **El Histórico ahora abre en el último día registrado**, no en "ayer" fijo — si el domingo no se trabaja, al entrar verás directamente el sábado listo para ajustar tiempos muertos.
+- **Alerta automática flotante**: si el último Histórico lleva más de 1 día sin actualizarse, aparece un aviso solo (sin abrir notificaciones), visible 20 segundos, que puedes cerrar antes si quieres.
+
+**Entrega anterior (Dashboard más visual, semana configurable, optimización de base de datos):**
 
 ⚠️ **Corre este SQL nuevo antes de usar esto:**
 ```sql

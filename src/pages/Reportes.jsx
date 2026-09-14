@@ -3,6 +3,7 @@ import PageHeader from '../components/PageHeader';
 import RankingExcelTable from '../components/RankingExcelTable';
 import CarruselLista from '../components/CarruselLista';
 import { getConfig, getHistorico, getActual } from '../lib/db';
+import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { agregarRankingPorPersona } from '../lib/calculos';
 
 function hoyISO() {
@@ -17,6 +18,8 @@ export default function Reportes() {
   const [cargando, setCargando] = useState(true);
   const [exportando, setExportando] = useState(null);
   const [mensaje, setMensaje] = useState(null);
+  const [tickTiempoReal, setTickTiempoReal] = useState(0);
+  useRealtimeRefresco(['rendimiento_historico', 'rendimiento_actual'], () => setTickTiempoReal(t => t + 1));
 
   useEffect(() => { getConfig().then(setCfg).catch(() => {}); }, []);
 
@@ -34,7 +37,7 @@ export default function Reportes() {
     }
     cargarFilas();
     return () => { activo = false; };
-  }, [fuenteExportar, fechaExportar]);
+  }, [fuenteExportar, fechaExportar, tickTiempoReal]);
 
   const ranking = useMemo(() => agregarRankingPorPersona(filas), [filas]);
   const metaHora = cfg?.metaHora || 470;
