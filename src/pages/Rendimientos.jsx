@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
-import { getConfig, getHistorico, getActual, insertarHistorico, reemplazarActual, borrarTablaHistorico, borrarTablaActual, actualizarRegistroHistorico, eliminarRegistroHistorico, actualizarRegistroActual, eliminarRegistroActual, eliminarPersonaDeActual, getMetaTotalPeriodo, getUltimaFechaHistorico } from '../lib/db';
+import { getConfig, getHistorico, getActual, insertarHistorico, reemplazarActual, borrarTablaHistorico, borrarTablaActual, actualizarRegistroHistorico, eliminarRegistroHistorico, actualizarRegistroActual, eliminarRegistroActual, eliminarPersonaDeActual, getMetaTotalPeriodo, getUltimaFechaHistorico, getRangoHorarioHistorico, getResumenHistoricoCompleto, getDescansosDiariosRango } from '../lib/db';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { parsearReporteBoncheo } from '../lib/excel';
 import { calcularPorcentajeMeta, clasificarEstado, horasAMinutos, minutosAHoras, agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from '../lib/calculos';
@@ -28,6 +28,7 @@ export default function Rendimientos() {
   const [procesando, setProcesando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [metaHistoricoPeriodo, setMetaHistoricoPeriodo] = useState(0);
+  const [resumenHistoricoTotal, setResumenHistoricoTotal] = useState(null);
   const [fFecha, setFFecha] = useState('');
   const [fFechaLista, setFFechaLista] = useState(false);
   const [fFechaActual, setFFechaActual] = useState('');
@@ -77,6 +78,11 @@ export default function Rendimientos() {
       cargarTodo();
     }
   }, [hayEdicionActiva, refrescoPendiente]);
+  function cargarResumenHistoricoTotal() {
+    getResumenHistoricoCompleto().then(setResumenHistoricoTotal).catch(() => {});
+  }
+  useEffect(() => { cargarResumenHistoricoTotal(); }, []);
+  useRealtimeRefresco(['rendimiento_historico'], cargarResumenHistoricoTotal);
   useEffect(() => {
     // Abre el Histórico mostrando el último día registrado (no "ayer" fijo):
     // si el domingo no se trabaja, el pendiente por revisar sigue siendo el sábado.
@@ -197,13 +203,21 @@ export default function Rendimientos() {
     }
     return base;
   }, [actual, fFechaActual, busqueda]);
+  const [descansosPorFechaActual, setDescansosPorFechaActual] = useState(new Map());
+  useEffect(() => {
+    const fechas = [...new Set(actualFiltrado.map(r => r.fecha))];
+    if (fechas.length === 0) return;
+    let activo = true;
+    getDescansosDiariosRango(fechas, 'actual').then(m => { if (activo) setDescansosPorFechaActual(m); }).catch(() => {});
+    return () => { activo = false; };
+  }, [actualFiltrado]);
   const promedioActual = useMemo(() => {
     if (actualFiltrado.length === 0) return 0;
     return Math.round(actualFiltrado.reduce((s, r) => s + (r.rendimiento || 0), 0) / actualFiltrado.length);
   }, [actualFiltrado]);
   const totalTallosActual = useMemo(() => actualFiltrado.reduce((s, r) => s + (r.total_tallos || 0), 0), [actualFiltrado]);
   const personasActual = useMemo(() => new Set(actualFiltrado.map(r => r.colaborador_id)).size, [actualFiltrado]);
-  const totalPorPersonaActual = useMemo(() => agregarTurnoActualPorPersona(actualFiltrado, cfg?.descansosActivos ? cfg.descansos : []), [actualFiltrado, cfg]);
+  const totalPorPersonaActual = useMemo(() => agregarTurnoActualPorPersona(actualFiltrado, cfg?.descansosActivosActual ? cfg.descansosActual : [], descansosPorFechaActual), [actualFiltrado, cfg, descansosPorFechaActual]);
   const kpis = useMemo(() => {
     const totalTallos = historicoFiltrado.reduce((s, r) => s + (r.total_tallos || 0), 0);
     const personas = historicoFiltrado.length;
@@ -317,6 +331,12 @@ export default function Rendimientos() {
 
           <div className="step-panel">
             <h3><i className="fa-solid fa-filter"></i> 2. Filtros de búsqueda</h3>
+            {resumenHistoricoTotal && (
+              <div className="alert-inline" style={{ marginBottom: 12 }}>
+                <i className="fa-solid fa-database"></i>
+                Nada se pierde: hay <strong>{resumenHistoricoTotal.totalDias} días</strong> guardados en el Histórico completo ({resumenHistoricoTotal.primeraFecha} → {resumenHistoricoTotal.ultimaFecha}), aunque abajo solo se muestre uno a la vez. Usa "Limpiar parámetros" para ver todos, o revisa Ranking → Por semana/mes.
+              </div>
+            )}
             <div className="form-row" style={{
             gridTemplateColumns: '1fr 1fr'
           }}>
@@ -398,7 +418,7 @@ export default function Rendimientos() {
               <div className="table-scroll">
                 <table>
                   <thead>
-                    <tr><th>Id</th><th>Colaborador</th><th>Código</th><th>Total Tallos</th><th>Rendimiento</th><th>% Meta</th><th>Estado</th>{puedeModificar && <th>Acciones</th>}</tr>
+                    <tr><th>Código</th><th>Colaborador</th><th>Mesa</th><th>Total Tallos</th><th>Rendimiento</th><th>% Meta</th><th>Estado</th>{puedeModificar && <th>Acciones</th>}</tr>
                   </thead>
                   <tbody>
                     {totalPorPersonaActual.map(p => {
@@ -447,7 +467,7 @@ function VistaPreviaTiempo({
   cfg
 }) {
   if (!horaInicio || !horaFin) return null;
-  const descansos = cfg?.descansosActivos ? cfg.descansos : [];
+  const descansos = cfg?.descansosActivosHistorico ? cfg.descansosHistorico : [];
   const brutos = minutosEntreBloque(horaInicio, horaFin);
   const descuento = minutosDescansoAplicable(horaInicio, horaFin, descansos);
   const trabajadoMin = Math.max(0, brutos - descuento);
@@ -475,9 +495,11 @@ function TablaHistorico({
 }) {
   const metaHora = cfg?.metaHora || 470;
   const [editandoId, setEditandoId] = useState(null);
+  const editandoIdRef = useRef(null);
   const [borrador, setBorrador] = useState({});
   function iniciarEdicion(r) {
     setEditandoId(r.id);
+    editandoIdRef.current = r.id;
     onEditandoCambio?.(true);
     setBorrador({
       fecha: r.fecha,
@@ -486,9 +508,15 @@ function TablaHistorico({
       noProductivoMin: r.tiempo_no_productivo_min ?? 0,
       total_tallos: r.total_tallos
     });
+    // Trae el horario real que se cargó ese día para esta persona (si existe),
+    // y reemplaza el genérico de arriba en cuanto llega — solo si sigues
+    // editando esta misma fila (por si cambiaste de fila mientras cargaba).
+    getRangoHorarioHistorico(r.fecha, r.colaborador_id).then(rango => {
+      if (rango && editandoIdRef.current === r.id) setBorrador(b => ({ ...b, horaInicio: rango.horaInicio, horaFin: rango.horaFin }));
+    });
   }
   async function guardarEdicion(id) {
-    const descansos = cfg?.descansosActivos ? cfg.descansos : [];
+    const descansos = cfg?.descansosActivosHistorico ? cfg.descansosHistorico : [];
     let tiempoTrabajadoMin = null;
     if (borrador.horaInicio && borrador.horaFin) {
       const brutos = minutosEntreBloque(borrador.horaInicio, borrador.horaFin);
@@ -528,7 +556,7 @@ function TablaHistorico({
         <table>
           <thead>
             <tr>
-              <th>Id</th><th>Colaborador</th><th>Fecha</th><th>Total Tallos</th>
+              <th>Código</th><th>Colaborador</th><th>Fecha</th><th>Total Tallos</th>
               <th>Tiempo Trabajado</th><th>Tiempo No Prod.</th><th>Tiempo Real</th>
               <th>Rendimiento</th><th>% Meta</th><th>Estado</th>{!soloLectura && <th>Acciones</th>}
             </tr>
@@ -662,7 +690,7 @@ function TablaActual({
         <table>
           <thead>
             <tr>
-              <th>Id</th><th>Colaborador</th><th>Fecha</th><th>Código</th><th>Bloque</th>
+              <th>Código</th><th>Colaborador</th><th>Fecha</th><th>Mesa</th><th>Bloque</th>
               <th>Tiempo Trabajado</th><th>Tallos</th><th>Rendimiento</th><th>% Meta</th><th>Estado</th>{!soloLectura && <th>Acciones</th>}
             </tr>
           </thead>

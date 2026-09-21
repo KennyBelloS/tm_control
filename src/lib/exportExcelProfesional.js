@@ -482,7 +482,7 @@ export async function exportarRespaldoCompletoExcel({
   }];
   estiloEncabezadoHoja(wsCfg, 'CONFIGURACIÓN ACTUAL DEL SISTEMA', `Vigente al momento de este respaldo`, 'B');
   estiloFilaEncabezadoTabla(wsCfg.addRow(['Parámetro', 'Valor']));
-  const filasCfg = [['Meta de tallos por hora', cfg?.metaHora ?? '—'], ['Meta global del día (por defecto)', cfg?.metaGlobalDia ?? '—'], ['Hora inicio jornada (por defecto)', cfg?.horaInicioDefault ?? '—'], ['Hora fin jornada (por defecto)', cfg?.horaFinDefault ?? '—'], ['Descuentos de tiempo activos', cfg?.descansosActivos ? 'Sí' : 'No'], ['Descansos configurados', (cfg?.descansos || []).map(d => `${d.horaCorte} (${d.minutos} min)`).join(', ') || '—'], ['Límite de almacenamiento (MB)', cfg?.almacenamientoLimiteMB ?? '—']];
+  const filasCfg = [['Meta de tallos por hora', cfg?.metaHora ?? '—'], ['Meta global del día (por defecto)', cfg?.metaGlobalDia ?? '—'], ['Hora inicio jornada (por defecto)', cfg?.horaInicioDefault ?? '—'], ['Hora fin jornada (por defecto)', cfg?.horaFinDefault ?? '—'], ['Descuentos de tiempo — Histórico, activos', cfg?.descansosActivosHistorico ? 'Sí' : 'No'], ['Descansos configurados — Histórico', (cfg?.descansosHistorico || []).map(d => `${d.horaCorte} (${d.minutos} min)`).join(', ') || '—'], ['Descuentos de tiempo — Turno Actual, activos', cfg?.descansosActivosActual ? 'Sí' : 'No'], ['Descansos configurados — Turno Actual', (cfg?.descansosActual || []).map(d => `${d.horaCorte} (${d.minutos} min)`).join(', ') || '—'], ['Límite de almacenamiento (MB)', cfg?.almacenamientoLimiteMB ?? '—']];
   filasCfg.forEach(f => wsCfg.addRow(f));
   aplicarZebraYBordes(wsCfg, 5, 4 + filasCfg.length, 1, 2);
   const fechaArchivo = new Date().toISOString().slice(0, 10);

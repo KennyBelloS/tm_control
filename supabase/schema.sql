@@ -26,8 +26,11 @@
 -- 1. PERSONAS
 -- ---------------------------------------------------------------------
 create table if not exists personas (
-  id      integer primary key,
-  nombre  text not null
+  id                integer primary key,
+  nombre            text not null,
+  codigo_empleado   text,
+  rol               text,
+  activo            boolean not null default true
 );
 
 -- ---------------------------------------------------------------------
@@ -41,6 +44,10 @@ create table if not exists configuracion (
   hora_fin_default    time     not null default '23:00',
   descansos_activos   boolean  not null default true,    -- media hora de almuerzo activada por defecto
   descansos           jsonb    not null default '[{"horaCorte":"12:00","minutos":30}]'::jsonb,
+  descansos_activos_historico boolean not null default true,
+  descansos_historico jsonb    not null default '[{"horaCorte":"12:00","minutos":30}]'::jsonb,
+  descansos_activos_actual    boolean not null default true,
+  descansos_actual    jsonb    not null default '[{"horaCorte":"12:00","minutos":30}]'::jsonb,
   constraint solo_una_fila check (id = 1)
 );
 insert into configuracion (id) values (1) on conflict (id) do nothing;
@@ -121,3 +128,38 @@ create policy "acceso_total_historico"    on rendimiento_historico  for all usin
 create policy "acceso_total_actual"       on rendimiento_actual     for all using (true) with check (true);
 create policy "acceso_total_metas_dia"    on metas_diarias          for all using (true) with check (true);
 create policy "acceso_total_historico_bloques" on historico_bloques  for all using (true) with check (true);
+
+-- Módulo Líneas: líneas de producción, formadoras, asignación diaria
+create table if not exists lineas (
+  id          bigserial primary key,
+  nombre      text not null unique,
+  supervisor  text,
+  activa      boolean not null default true,
+  creado_en   timestamptz not null default now()
+);
+create table if not exists formadoras (
+  id          bigserial primary key,
+  nombre      text not null unique,
+  activa      boolean not null default true,
+  creado_en   timestamptz not null default now()
+);
+create table if not exists asignaciones_diarias (
+  id              bigserial primary key,
+  fecha           date not null,
+  linea_id        bigint not null references lineas(id) on delete cascade,
+  formadora_id    bigint not null references formadoras(id) on delete cascade,
+  colaborador_id  integer not null references personas(id) on delete cascade,
+  creado_en       timestamptz not null default now(),
+  constraint asignacion_persona_dia_unica unique (fecha, colaborador_id)
+);
+create index if not exists idx_asignaciones_fecha on asignaciones_diarias (fecha);
+create index if not exists idx_asignaciones_linea on asignaciones_diarias (linea_id);
+alter table lineas enable row level security;
+alter table formadoras enable row level security;
+alter table asignaciones_diarias enable row level security;
+create policy "acceso_total_lineas" on lineas for all using (true) with check (true);
+create policy "acceso_total_formadoras" on formadoras for all using (true) with check (true);
+create policy "acceso_total_asignaciones" on asignaciones_diarias for all using (true) with check (true);
+insert into lineas (nombre, activa) values
+  ('Línea 1', true), ('Línea 2', true), ('Línea 3', true), ('Línea 4', true)
+on conflict (nombre) do nothing;

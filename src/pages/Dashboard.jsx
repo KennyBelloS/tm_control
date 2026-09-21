@@ -1,12 +1,14 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
-import { getConfig, getHistorico, getActual, getMetaDia, getTendenciaHistorico, getUltimaFechaHistorico } from '../lib/db';
+import { getConfig, getHistorico, getActual, getMetaDia, getTendenciaHistorico, getUltimaFechaHistorico, getDescansosDiariosRango } from '../lib/db';
 import { agregarTurnoActualPorPersona } from '../lib/calculos';
 import { supabaseConfigurado } from '../lib/supabaseClient';
 const TendenciaTallosChart = lazy(() => import('../components/charts/TendenciaTallosChart'));
 const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChart'));
 import DashboardCarrusel from '../components/DashboardCarrusel';
+import ModoPresentacion from '../components/ModoPresentacion';
+import { getRendimientoPorLinea, getRendimientoPorFormadora } from '../lib/lineas';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 function hoyISO() {
   return new Date().toISOString().slice(0, 10);
@@ -37,6 +39,9 @@ export default function Dashboard() {
   const [carruselHoy, setCarruselHoy] = useState([]);
   const [carruselAyer, setCarruselAyer] = useState([]);
   const [fechaHistoricoMostrado, setFechaHistoricoMostrado] = useState(null);
+  const [presentando, setPresentando] = useState(false);
+  const [resumenPorLinea, setResumenPorLinea] = useState([]);
+  const [resumenPorFormadora, setResumenPorFormadora] = useState([]);
   const [tickTiempoReal, setTickTiempoReal] = useState(0);
   useRealtimeRefresco(['rendimiento_historico', 'rendimiento_actual', 'metas_diarias', 'configuracion'], () => setTickTiempoReal(t => t + 1));
   const hoy = hoyISO();
@@ -51,6 +56,7 @@ export default function Dashboard() {
           tablaLista
         } = await getMetaDia(hoy);
         const turnoActual = await getActual({});
+        const descansosPorFechaHoy = await getDescansosDiariosRango([hoy], 'actual');
         // Muestra el último día registrado en el Histórico, no "ayer" fijo —
         // si el domingo no se trabaja, el pendiente por revisar sigue siendo el sábado.
         const ultimaFecha = await getUltimaFechaHistorico();
@@ -73,12 +79,12 @@ export default function Dashboard() {
         if (!activo) return;
         setMetaHoy(meta);
         setMetaTablaLista(tablaLista);
-        setPersonasParaDona(agregarTurnoActualPorPersona(turnoActual, cfg.descansosActivos ? cfg.descansos : []).map(p => ({
+        setPersonasParaDona(agregarTurnoActualPorPersona(turnoActual, cfg.descansosActivosActual ? cfg.descansosActual : [], descansosPorFechaHoy).map(p => ({
           colaborador_id: p.colaborador_id,
           colaborador: p.colaborador,
           promedioRend: p.rendimiento
         })));
-        setCarruselHoy(agregarTurnoActualPorPersona(turnoActual, cfg.descansosActivos ? cfg.descansos : []).sort((a, b) => b.rendimiento - a.rendimiento));
+        setCarruselHoy(agregarTurnoActualPorPersona(turnoActual, cfg.descansosActivosActual ? cfg.descansosActual : [], descansosPorFechaHoy).sort((a, b) => b.rendimiento - a.rendimiento));
         setCarruselAyer([...historicoAyer].sort((a, b) => (b.rendimiento || 0) - (a.rendimiento || 0)));
         setStats({
           cfg,
@@ -109,6 +115,14 @@ export default function Dashboard() {
   }, [hoy, tickTiempoReal]);
   return <>
       <PageHeader title="Dashboard Ejecutivo" subtitle="Resumen general de producción, en tiempo real desde el Turno Actual.">
+        <button className="btn-secondary" onClick={() => {
+          setPresentando(true);
+          Promise.all([getRendimientoPorLinea(hoy, hoy), getRendimientoPorFormadora(hoy, hoy)])
+            .then(([l, f]) => { setResumenPorLinea(l); setResumenPorFormadora(f); })
+            .catch(() => {});
+        }}>
+          <i className="fa-solid fa-expand"></i> Presentar
+        </button>
         <Link to="/rendimientos" className="btn-primary">
           <i className="fa-solid fa-upload"></i> Subir Reporte Boncheo
         </Link>
@@ -266,5 +280,17 @@ export default function Dashboard() {
             </div>
           </>}
       </div>
+      {presentando && stats && (
+        <ModoPresentacion
+          ranking={carruselHoy}
+          metaHora={stats.cfg.metaHora}
+          totalTallos={stats.actual.totalTallos}
+          metaHoy={metaHoy}
+          cumplimiento={stats.actual.cumplimiento}
+          resumenPorLinea={resumenPorLinea}
+          resumenPorFormadora={resumenPorFormadora}
+          onCerrar={() => setPresentando(false)}
+        />
+      )}
     </>;
 }

@@ -31,10 +31,10 @@ export default function PageHeader({
             <span className="topbar-usuario">{sesion.nombre} · {ROL_LABEL[sesion.rol] || sesion.rol}</span>
           </div>}
         <NotificationBell />
-        <button className="btn-secondary" onClick={() => {
+        <button className="btn-secondary btn-cerrar-sesion" onClick={() => {
         if (confirm('¿Cerrar sesión?')) cerrarSesion();
       }}>
-          <i className="fa-solid fa-right-from-bracket"></i> Cerrar sesión
+          <i className="fa-solid fa-right-from-bracket"></i> <span className="btn-texto">Cerrar sesión</span>
         </button>
       </div>
     </header>;

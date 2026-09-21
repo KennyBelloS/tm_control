@@ -64,7 +64,7 @@ export default function RankingExcelTable({
             const estado = clasificarEstado(pct);
             const colores = COLOR_ESTADO[estado.css];
             const anchoBarra = Math.max(4, Math.min(100, Math.round(p.promedioRend / maxRend * 100)));
-            return <tr key={p.colaborador_id} className="ranking-row-anim" style={{
+            return <tr key={p.colaborador_id} className={`ranking-row-anim ${p.pocoTiempo ? 'ranking-fila-poco-tiempo' : ''}`} style={{
               animationDelay: `${Math.min(i, 12) * 30}ms`
             }}>
                   <td>
@@ -74,11 +74,18 @@ export default function RankingExcelTable({
                     <span className="ranking-avatar">{iniciales(p.colaborador)}</span>
                     <div>
                       <div className="ranking-nombre">{p.colaborador}</div>
-                      <div className="ranking-id">Id {p.colaborador_id}</div>
+                      <div className="ranking-id">Código {p.colaborador_id}</div>
                     </div>
                   </td>
                   <td>{(p.totalTallos || 0).toLocaleString()}</td>
-                  <td><strong>{p.promedioRend}</strong> <span className="ranking-unidad">/h</span></td>
+                  <td>
+                    <strong>{p.promedioRend}</strong> <span className="ranking-unidad">/h</span>
+                    {p.pocoTiempo && (
+                      <div className="ranking-poco-tiempo" title={`Solo ${p.horasTrabajadas} h trabajadas (el promedio del grupo es ${p.promedioHorasGrupo} h) — este rendimiento no es representativo`}>
+                        <i className="fa-solid fa-triangle-exclamation"></i> Solo {p.horasTrabajadas} h — no confiable
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <div className="ranking-progreso">
                       <div style={{

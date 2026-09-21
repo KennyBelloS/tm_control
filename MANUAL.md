@@ -8,7 +8,99 @@ Este manual no asume que sabes programar. Sigue los pasos en orden.
 
 ## 0. Historial de arreglos recientes
 
-**Última entrega (actualización en tiempo real, Histórico abre en el último día, alerta automática):**
+**Última entrega (descuento de almuerzo por día puntual):**
+
+⚠️ **Corre este SQL nuevo antes de usar esto:**
+```sql
+create table if not exists descansos_diarios (
+  fecha       date not null,
+  tipo        text not null check (tipo in ('historico', 'actual')),
+  activos     boolean not null default true,
+  descansos   jsonb not null default '[]'::jsonb,
+  primary key (fecha, tipo)
+);
+alter table descansos_diarios enable row level security;
+drop policy if exists "acceso_total_descansos_diarios" on descansos_diarios;
+create policy "acceso_total_descansos_diarios" on descansos_diarios for all using (true) with check (true);
+```
+
+- **Descuento de almuerzo solo para un día puntual**: en Configuración, dentro de cada sección (Histórico y Turno Actual), hay un nuevo recuadro punteado "Descuento solo para hoy" — cambias la hora y los minutos, le das "Guardar descuento de hoy", y esa excepción **solo aplica a ese día**, sin tocar la configuración general de los demás días.
+- Si el día ya tiene una excepción guardada, aparece un aviso "Excepción activa hoy" y un botón para "Volver a usar la config general hoy" (borra la excepción de ese día).
+- Revisé y corregí **los 7 lugares del código** donde se calcula el descuento (subir Excel, ver en vivo el Histórico y el Turno Actual, y el ranking hora a hora) para que primero revisen si ese día específico tiene una excepción, y si no, usen la configuración general — igual que ya funciona la "Meta del día".
+
+**Entrega anterior (descuentos separados Histórico/Turno Actual, Modo Presentación mejorado):**
+
+⚠️ **Corre este SQL nuevo antes de usar esto:**
+```sql
+alter table configuracion add column if not exists descansos_activos_historico boolean;
+alter table configuracion add column if not exists descansos_historico jsonb;
+alter table configuracion add column if not exists descansos_activos_actual boolean;
+alter table configuracion add column if not exists descansos_actual jsonb;
+
+update configuracion
+set descansos_activos_historico = coalesce(descansos_activos_historico, descansos_activos),
+    descansos_historico = coalesce(descansos_historico, descansos),
+    descansos_activos_actual = coalesce(descansos_activos_actual, descansos_activos),
+    descansos_actual = coalesce(descansos_actual, descansos)
+where id = 1;
+
+alter table configuracion alter column descansos_activos_historico set default true;
+alter table configuracion alter column descansos_historico set default '[{"horaCorte":"12:00","minutos":30}]'::jsonb;
+alter table configuracion alter column descansos_activos_actual set default true;
+alter table configuracion alter column descansos_actual set default '[{"horaCorte":"12:00","minutos":30}]'::jsonb;
+```
+
+- **Descuentos de tiempo (almuerzo) separados**: en Configuración ahora hay **dos secciones independientes** — una para el Histórico y otra para el Turno Actual. Puedes tener reglas distintas en cada una (por ejemplo, un corte distinto si el turno actual trabaja diferente al histórico ese día). Al correr el SQL, tu configuración actual se copia a ambas, así que no pierdes nada.
+- **Modo Presentación mejorado**: ahora tiene el logo y los colores de la marca en la parte de arriba (gradiente verde igual al resto de la app), y debajo del Top 3 se agregó el **carrusel de nombres movibles** con el resto del equipo (scroll continuo con barra de progreso), igual al que ya tenías en Reportes y Ranking.
+
+**Entrega anterior (Módulo Líneas completo):**
+
+⚠️ **Corre este SQL nuevo antes de usar esto:**
+```sql
+create table if not exists lineas (
+  id          bigserial primary key,
+  nombre      text not null unique,
+  supervisor  text,
+  activa      boolean not null default true,
+  creado_en   timestamptz not null default now()
+);
+create table if not exists formadoras (
+  id          bigserial primary key,
+  nombre      text not null unique,
+  activa      boolean not null default true,
+  creado_en   timestamptz not null default now()
+);
+create table if not exists asignaciones_diarias (
+  id              bigserial primary key,
+  fecha           date not null,
+  linea_id        bigint not null references lineas(id) on delete cascade,
+  formadora_id    bigint not null references formadoras(id) on delete cascade,
+  colaborador_id  integer not null references personas(id) on delete cascade,
+  creado_en       timestamptz not null default now(),
+  constraint asignacion_persona_dia_unica unique (fecha, colaborador_id)
+);
+create index if not exists idx_asignaciones_fecha on asignaciones_diarias (fecha);
+create index if not exists idx_asignaciones_linea on asignaciones_diarias (linea_id);
+alter table lineas enable row level security;
+alter table formadoras enable row level security;
+alter table asignaciones_diarias enable row level security;
+drop policy if exists "acceso_total_lineas" on lineas;
+create policy "acceso_total_lineas" on lineas for all using (true) with check (true);
+drop policy if exists "acceso_total_formadoras" on formadoras;
+create policy "acceso_total_formadoras" on formadoras for all using (true) with check (true);
+drop policy if exists "acceso_total_asignaciones" on asignaciones_diarias;
+create policy "acceso_total_asignaciones" on asignaciones_diarias for all using (true) with check (true);
+insert into lineas (nombre, activa) values
+  ('Línea 1', true), ('Línea 2', true), ('Línea 3', true), ('Línea 4', true)
+on conflict (nombre) do nothing;
+```
+
+- **Módulo Líneas nuevo**: gestiona líneas de producción (crear, activar/desactivar), formadoras (crear, activar/desactivar), y una **asignación diaria** que vincula cada persona (traída del módulo Personas) a una formadora y una línea — se reinicia cada día automáticamente.
+- **Distribución de Operarios por Línea**: barras visuales con cuántos operarios tiene cada línea hoy.
+- **Top Líneas por Rendimiento**: ranking tipo podio con el rendimiento promedio de cada línea, usando los datos reales del Histórico de ese día.
+- Solo se pueden asignar personas a **líneas activas** y **formadoras activas**.
+
+**Entrega anterior (actualización en tiempo real, Histórico abre en el último día, alerta automática):**
 
 ⚠️ **Corre este SQL nuevo antes de usar esto** (activa la sincronización en vivo):
 ```sql

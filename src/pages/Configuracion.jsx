@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
-import { getConfig, setConfig, getHistorico, getActual, borrarTablaHistorico, borrarTablaActual, getMetaDia, setMetaDia } from '../lib/db';
+import { getConfig, setConfig, getHistorico, getActual, borrarTablaHistorico, borrarTablaActual, getMetaDia, setMetaDia, getDescansosDia, setDescansosDia, quitarDescansosDia } from '../lib/db';
 import { supabaseConfigurado } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
 import { ROL_LABEL, cerrarSesion } from '../lib/roles';
@@ -23,12 +23,22 @@ export default function Configuracion() {
   const [metaHoy, setMetaHoy] = useState('');
   const [metaTablaLista, setMetaTablaLista] = useState(true);
   const [guardandoMetaHoy, setGuardandoMetaHoy] = useState(false);
+  const [descansoHoy, setDescansoHoy] = useState({
+    Historico: { activo: false, tieneExcepcion: false, horaCorte: '12:00', minutos: 30 },
+    Actual: { activo: false, tieneExcepcion: false, horaCorte: '12:00', minutos: 30 }
+  });
+  const [guardandoDescansoHoy, setGuardandoDescansoHoy] = useState({ Historico: false, Actual: false });
+  const [descansoHoyGuardado, setDescansoHoyGuardado] = useState({ Historico: false, Actual: false });
+  const [fechaDescuento, setFechaDescuento] = useState({ Historico: '', Actual: '' });
+  const [cargandoDescuentoFecha, setCargandoDescuentoFecha] = useState({ Historico: false, Actual: false });
   const [metaHoyGuardada, setMetaHoyGuardada] = useState(false);
   const hoy = hoyISO();
   async function cargar() {
     setCargando(true);
     try {
-      const [c, h, a, m] = await Promise.all([getConfig(), getHistorico({}), getActual({}), getMetaDia(hoy)]);
+      const [c, h, a, m] = await Promise.all([
+        getConfig(), getHistorico({}), getActual({}), getMetaDia(hoy)
+      ]);
       setCfg(c);
       setConteos({
         historico: h.length,
@@ -36,11 +46,43 @@ export default function Configuracion() {
       });
       setMetaHoy(String(m.meta));
       setMetaTablaLista(m.tablaLista);
+      setFechaDescuento({ Historico: hoy, Actual: hoy });
+      await Promise.all([
+        cargarDescuentoDeFecha('Historico', hoy, c),
+        cargarDescuentoDeFecha('Actual', hoy, c)
+      ]);
     } catch (e) {
       setError(e.message);
     } finally {
       setCargando(false);
     }
+  }
+  async function cargarDescuentoDeFecha(tipo, fecha, cfgActual) {
+    setCargandoDescuentoFecha(g => ({ ...g, [tipo]: true }));
+    try {
+      const tipoBd = tipo === 'Historico' ? 'historico' : 'actual';
+      const c = cfgActual || cfg;
+      const dFecha = await getDescansosDia(fecha, tipoBd);
+      setDescansoHoy(prev => ({
+        ...prev,
+        [tipo]: dFecha
+          ? { activo: dFecha.activos, tieneExcepcion: true, horaCorte: dFecha.descansos[0]?.horaCorte || '12:00', minutos: dFecha.descansos[0]?.minutos ?? 30 }
+          : {
+              activo: tipo === 'Historico' ? c.descansosActivosHistorico : c.descansosActivosActual,
+              tieneExcepcion: false,
+              horaCorte: (tipo === 'Historico' ? c.descansosHistorico : c.descansosActual)[0]?.horaCorte || '12:00',
+              minutos: (tipo === 'Historico' ? c.descansosHistorico : c.descansosActual)[0]?.minutos ?? 30
+            }
+      }));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setCargandoDescuentoFecha(g => ({ ...g, [tipo]: false }));
+    }
+  }
+  function cambiarFechaDescuento(tipo, fecha) {
+    setFechaDescuento(f => ({ ...f, [tipo]: fecha }));
+    cargarDescuentoDeFecha(tipo, fecha);
   }
   useEffect(() => {
     cargar();
@@ -57,6 +99,45 @@ export default function Configuracion() {
       setGuardandoMetaHoy(false);
     }
   }
+  function actualizarDescansoHoy(tipo, campo, valor) {
+    setDescansoHoy(d => ({
+      ...d,
+      [tipo]: { ...d[tipo], [campo]: valor }
+    }));
+  }
+  async function guardarDescansoHoy(tipo) {
+    setGuardandoDescansoHoy(g => ({ ...g, [tipo]: true }));
+    setError(null);
+    try {
+      const d = descansoHoy[tipo];
+      const fecha = fechaDescuento[tipo];
+      await setDescansosDia(fecha, tipo === 'Historico' ? 'historico' : 'actual', d.activo, [{ horaCorte: d.horaCorte, minutos: d.minutos }]);
+      setDescansoHoy(prev => ({ ...prev, [tipo]: { ...prev[tipo], tieneExcepcion: true } }));
+      setDescansoHoyGuardado(g => ({ ...g, [tipo]: true }));
+      setTimeout(() => setDescansoHoyGuardado(g => ({ ...g, [tipo]: false })), 2500);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setGuardandoDescansoHoy(g => ({ ...g, [tipo]: false }));
+    }
+  }
+  async function quitarExcepcionHoy(tipo) {
+    try {
+      const fecha = fechaDescuento[tipo];
+      await quitarDescansosDia(fecha, tipo === 'Historico' ? 'historico' : 'actual');
+      setDescansoHoy(prev => ({
+        ...prev,
+        [tipo]: {
+          activo: tipo === 'Historico' ? cfg.descansosActivosHistorico : cfg.descansosActivosActual,
+          tieneExcepcion: false,
+          horaCorte: (tipo === 'Historico' ? cfg.descansosHistorico : cfg.descansosActual)[0]?.horaCorte || '12:00',
+          minutos: (tipo === 'Historico' ? cfg.descansosHistorico : cfg.descansosActual)[0]?.minutos ?? 30
+        }
+      }));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
   function actualizar(campo, valor) {
     setCfg(c => ({
       ...c,
@@ -64,66 +145,69 @@ export default function Configuracion() {
     }));
     setGuardado(false);
   }
-  const [guardandoDescansos, setGuardandoDescansos] = useState(false);
-  const [descansosGuardados, setDescansosGuardados] = useState(false);
-  async function persistirDescansos(nuevoCfg) {
-    setGuardandoDescansos(true);
+  const [guardandoDescansos, setGuardandoDescansos] = useState({ Historico: false, Actual: false });
+  const [descansosGuardados, setDescansosGuardados] = useState({ Historico: false, Actual: false });
+  async function persistirDescansos(nuevoCfg, tipo) {
+    setGuardandoDescansos(g => ({ ...g, [tipo]: true }));
     setError(null);
     try {
       await setConfig(nuevoCfg);
-      setDescansosGuardados(true);
-      setTimeout(() => setDescansosGuardados(false), 2000);
+      setDescansosGuardados(d => ({ ...d, [tipo]: true }));
+      setTimeout(() => setDescansosGuardados(d => ({ ...d, [tipo]: false })), 2000);
     } catch (e) {
       setError(e.message);
     } finally {
-      setGuardandoDescansos(false);
+      setGuardandoDescansos(g => ({ ...g, [tipo]: false }));
     }
   }
-  function actualizarActivarDescansos(valor) {
+  function actualizarActivarDescansos(tipo, valor) {
     setCfg(c => {
       const nuevo = {
         ...c,
-        descansosActivos: valor
+        [`descansosActivos${tipo}`]: valor
       };
-      persistirDescansos(nuevo);
+      persistirDescansos(nuevo, tipo);
       return nuevo;
     });
   }
-  function actualizarDescanso(indice, campo, valor) {
+  function actualizarDescanso(tipo, indice, campo, valor) {
     setCfg(c => {
-      const descansos = c.descansos.map((d, i) => i === indice ? {
+      const clave = `descansos${tipo}`;
+      const descansos = c[clave].map((d, i) => i === indice ? {
         ...d,
         [campo]: valor
       } : d);
       return {
         ...c,
-        descansos
+        [clave]: descansos
       };
     });
   }
-  function guardarDescansosAhora() {
-    persistirDescansos(cfg);
+  function guardarDescansosAhora(tipo) {
+    persistirDescansos(cfg, tipo);
   }
-  function agregarDescanso() {
+  function agregarDescanso(tipo) {
     setCfg(c => {
+      const clave = `descansos${tipo}`;
       const nuevo = {
         ...c,
-        descansos: [...c.descansos, {
+        [clave]: [...c[clave], {
           horaCorte: '12:00',
           minutos: 30
         }]
       };
-      persistirDescansos(nuevo);
+      persistirDescansos(nuevo, tipo);
       return nuevo;
     });
   }
-  function quitarDescanso(indice) {
+  function quitarDescanso(tipo, indice) {
     setCfg(c => {
+      const clave = `descansos${tipo}`;
       const nuevo = {
         ...c,
-        descansos: c.descansos.filter((_, i) => i !== indice)
+        [clave]: c[clave].filter((_, i) => i !== indice)
       };
-      persistirDescansos(nuevo);
+      persistirDescansos(nuevo, tipo);
       return nuevo;
     });
   }
@@ -279,62 +363,206 @@ export default function Configuracion() {
         <section className="panel">
           <div className="panel-header">
             <div>
-              <h2><i className="fa-solid fa-utensils" style={{
-                color: 'var(--accent)',
+              <h2><i className="fa-solid fa-calendar-days" style={{
+                color: 'var(--primary)',
                 marginRight: 8
-              }}></i>Descuentos de tiempo (almuerzo)</h2>
-              <p>Si un bloque de horas cruza la hora de corte que definas, se le resta el tiempo automáticamente.</p>
+              }}></i>Descuentos de tiempo — Histórico</h2>
+              <p>Aplica a los rendimientos que quedan guardados día a día en el Histórico. Si un bloque de horas cruza la hora de corte, se le resta el tiempo automáticamente.</p>
             </div>
-            {(guardandoDescansos || descansosGuardados) && <span className="alert ok" style={{
+            {(guardandoDescansos.Historico || descansosGuardados.Historico) && <span className="alert ok" style={{
             fontSize: 11
           }}>
-                <i className={`fa-solid ${guardandoDescansos ? 'fa-spinner fa-spin' : 'fa-check'}`}></i>
-                {guardandoDescansos ? 'Guardando...' : 'Guardado'}
+                <i className={`fa-solid ${guardandoDescansos.Historico ? 'fa-spinner fa-spin' : 'fa-check'}`}></i>
+                {guardandoDescansos.Historico ? 'Guardando...' : 'Guardado'}
               </span>}
           </div>
 
           <label className="switch-row">
-            <input type="checkbox" checked={cfg.descansosActivos} onChange={e => actualizarActivarDescansos(e.target.checked)} />
+            <input type="checkbox" checked={cfg.descansosActivosHistorico} onChange={e => actualizarActivarDescansos('Historico', e.target.checked)} />
             <span className="switch-visual"></span>
-            <span>Activar descuentos automáticos de tiempo (media hora de almuerzo activada por defecto)</span>
+            <span>Activar descuentos automáticos en el Histórico</span>
           </label>
 
-          {cfg.descansosActivos && <div style={{
+          {cfg.descansosActivosHistorico && <div style={{
           display: 'flex',
           flexDirection: 'column',
           gap: 10
         }}>
-              {cfg.descansos.map((d, i) => <div key={i} className="descanso-row">
+              {cfg.descansosHistorico.map((d, i) => <div key={i} className="descanso-row">
                   <div>
                     <label>Hora de corte</label>
-                    <input type="time" value={d.horaCorte} onChange={e => actualizarDescanso(i, 'horaCorte', e.target.value)} onBlur={guardarDescansosAhora} />
+                    <input type="time" value={d.horaCorte} onChange={e => actualizarDescanso('Historico', i, 'horaCorte', e.target.value)} onBlur={() => guardarDescansosAhora('Historico')} />
                   </div>
                   <div>
                     <label>Minutos a descontar</label>
-                    <input type="number" min="0" value={d.minutos} onChange={e => actualizarDescanso(i, 'minutos', Number(e.target.value))} onBlur={guardarDescansosAhora} />
+                    <input type="number" min="0" value={d.minutos} onChange={e => actualizarDescanso('Historico', i, 'minutos', Number(e.target.value))} onBlur={() => guardarDescansosAhora('Historico')} />
                   </div>
                   <button className="btn-danger-outline" style={{
               marginTop: 18
-            }} onClick={() => quitarDescanso(i)}>
+            }} onClick={() => quitarDescanso('Historico', i)}>
                     <i className="fa-solid fa-trash"></i>
                   </button>
                 </div>)}
-              {cfg.descansos.length < 3 && <button className="btn-secondary" style={{
+              {cfg.descansosHistorico.length < 3 && <button className="btn-secondary" style={{
             alignSelf: 'flex-start'
-          }} onClick={agregarDescanso}>
-                  <i className="fa-solid fa-plus"></i> Agregar descanso ({cfg.descansos.length}/3)
+          }} onClick={() => agregarDescanso('Historico')}>
+                  <i className="fa-solid fa-plus"></i> Agregar descanso ({cfg.descansosHistorico.length}/3)
                 </button>}
               <div>
-                <button className="btn-primary" disabled={guardandoDescansos} onClick={guardarDescansosAhora}>
-                  <i className="fa-solid fa-floppy-disk"></i> {guardandoDescansos ? 'Guardando...' : 'Guardar descuentos'}
+                <button className="btn-primary" disabled={guardandoDescansos.Historico} onClick={() => guardarDescansosAhora('Historico')}>
+                  <i className="fa-solid fa-floppy-disk"></i> {guardandoDescansos.Historico ? 'Guardando...' : 'Guardar descuentos del Histórico'}
                 </button>
               </div>
               <p style={{
             fontSize: 11,
             color: 'var(--gray)'
           }}>
-                Ejemplo: hora de corte 12:00 y 30 minutos → un bloque de 06:00 a 13:00 queda en 6.5 horas trabajadas (7 horas menos 30 min de almuerzo). Un bloque que <strong>empieza justo a las 12:00</strong> también recibe el descuento. Los cambios se guardan solos al salir del campo, pero también puedes usar el botón de arriba para confirmar. Los rendimientos del Histórico que ya tengan sus horas cargadas desde Excel <strong>se recalculan automáticamente</strong> con la nueva configuración — no hace falta volver a subir el archivo.
+                Ejemplo: hora de corte 12:00 y 30 minutos → un bloque de 06:00 a 13:00 queda en 6.5 horas trabajadas. Un bloque que <strong>empieza justo a las 12:00</strong> también recibe el descuento. Se guarda solo al salir del campo, y los rendimientos del Histórico ya cargados <strong>se recalculan automáticamente</strong> — no hace falta volver a subir el Excel.
               </p>
+
+              <div className="descuento-hoy-panel">
+                <div className="descuento-hoy-header">
+                  <span><i className="fa-solid fa-calendar-day"></i> Descuento de un día puntual</span>
+                  {descansoHoy.Historico.tieneExcepcion && <span className="status warning" style={{ fontSize: 10 }}>Excepción activa ese día</span>}
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--gray)', marginBottom: 10 }}>
+                  Elige cualquier fecha (hoy o un día anterior) para corregir su almuerzo <strong>sin tocar la configuración general</strong> ni afectar los demás días. Si ese día ya tiene rendimientos en el Histórico, se recalculan solos al guardar.
+                </p>
+                <div style={{ marginBottom: 12 }}>
+                  <label>Fecha a corregir</label>
+                  <input type="date" value={fechaDescuento.Historico} max={hoy} onChange={e => cambiarFechaDescuento('Historico', e.target.value)} style={{ maxWidth: 200 }} />
+                  {cargandoDescuentoFecha.Historico && <span style={{ fontSize: 11, color: 'var(--gray)', marginLeft: 10 }}>Cargando...</span>}
+                </div>
+                <label className="switch-row" style={{ marginBottom: 10 }}>
+                  <input type="checkbox" checked={descansoHoy.Historico.activo} onChange={e => actualizarDescansoHoy('Historico', 'activo', e.target.checked)} />
+                  <span className="switch-visual"></span>
+                  <span>Descontar tiempo hoy {!descansoHoy.Historico.activo && <strong>(desactivado — hoy no se resta nada)</strong>}</span>
+                </label>
+                <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', opacity: descansoHoy.Historico.activo ? 1 : 0.45 }}>
+                  <div>
+                    <label>Hora de corte (hoy)</label>
+                    <input type="time" disabled={!descansoHoy.Historico.activo} value={descansoHoy.Historico.horaCorte} onChange={e => actualizarDescansoHoy('Historico', 'horaCorte', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>Minutos a descontar (hoy)</label>
+                    <input type="number" min="0" disabled={!descansoHoy.Historico.activo} value={descansoHoy.Historico.minutos} onChange={e => actualizarDescansoHoy('Historico', 'minutos', Number(e.target.value))} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                  <button className="btn-primary" disabled={guardandoDescansoHoy.Historico} onClick={() => guardarDescansoHoy('Historico')}>
+                    <i className="fa-solid fa-floppy-disk"></i> {guardandoDescansoHoy.Historico ? 'Guardando...' : `Guardar descuento de ${fechaDescuento.Historico}`}
+                  </button>
+                  {descansoHoy.Historico.tieneExcepcion && (
+                    <button className="btn-secondary" onClick={() => quitarExcepcionHoy('Historico')}>
+                      <i className="fa-solid fa-rotate-left"></i> Quitar excepción de ese día
+                    </button>
+                  )}
+                  {descansoHoyGuardado.Historico && <span className="alert ok" style={{ fontSize: 11 }}><i className="fa-solid fa-check"></i> Guardado para esa fecha</span>}
+                </div>
+              </div>
+            </div>}
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2><i className="fa-solid fa-stopwatch" style={{
+                color: 'var(--accent)',
+                marginRight: 8
+              }}></i>Descuentos de tiempo — Turno Actual</h2>
+              <p>Aplica a los bloques del Turno Actual (hora a hora, en vivo). Puede tener una configuración distinta a la del Histórico si lo necesitas.</p>
+            </div>
+            {(guardandoDescansos.Actual || descansosGuardados.Actual) && <span className="alert ok" style={{
+            fontSize: 11
+          }}>
+                <i className={`fa-solid ${guardandoDescansos.Actual ? 'fa-spinner fa-spin' : 'fa-check'}`}></i>
+                {guardandoDescansos.Actual ? 'Guardando...' : 'Guardado'}
+              </span>}
+          </div>
+
+          <label className="switch-row">
+            <input type="checkbox" checked={cfg.descansosActivosActual} onChange={e => actualizarActivarDescansos('Actual', e.target.checked)} />
+            <span className="switch-visual"></span>
+            <span>Activar descuentos automáticos en el Turno Actual</span>
+          </label>
+
+          {cfg.descansosActivosActual && <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10
+        }}>
+              {cfg.descansosActual.map((d, i) => <div key={i} className="descanso-row">
+                  <div>
+                    <label>Hora de corte</label>
+                    <input type="time" value={d.horaCorte} onChange={e => actualizarDescanso('Actual', i, 'horaCorte', e.target.value)} onBlur={() => guardarDescansosAhora('Actual')} />
+                  </div>
+                  <div>
+                    <label>Minutos a descontar</label>
+                    <input type="number" min="0" value={d.minutos} onChange={e => actualizarDescanso('Actual', i, 'minutos', Number(e.target.value))} onBlur={() => guardarDescansosAhora('Actual')} />
+                  </div>
+                  <button className="btn-danger-outline" style={{
+              marginTop: 18
+            }} onClick={() => quitarDescanso('Actual', i)}>
+                    <i className="fa-solid fa-trash"></i>
+                  </button>
+                </div>)}
+              {cfg.descansosActual.length < 3 && <button className="btn-secondary" style={{
+            alignSelf: 'flex-start'
+          }} onClick={() => agregarDescanso('Actual')}>
+                  <i className="fa-solid fa-plus"></i> Agregar descanso ({cfg.descansosActual.length}/3)
+                </button>}
+              <div>
+                <button className="btn-primary" disabled={guardandoDescansos.Actual} onClick={() => guardarDescansosAhora('Actual')}>
+                  <i className="fa-solid fa-floppy-disk"></i> {guardandoDescansos.Actual ? 'Guardando...' : 'Guardar descuentos del Turno Actual'}
+                </button>
+              </div>
+              <p style={{
+            fontSize: 11,
+            color: 'var(--gray)'
+          }}>
+                Se aplica en vivo a los bloques de hoy — cambia solo si tu Turno Actual necesita una regla distinta a la del Histórico.
+              </p>
+
+              <div className="descuento-hoy-panel">
+                <div className="descuento-hoy-header">
+                  <span><i className="fa-solid fa-calendar-day"></i> Descuento de un día puntual</span>
+                  {descansoHoy.Actual.tieneExcepcion && <span className="status warning" style={{ fontSize: 10 }}>Excepción activa ese día</span>}
+                </div>
+                <p style={{ fontSize: 11, color: 'var(--gray)', marginBottom: 10 }}>
+                  El Turno Actual normalmente solo tiene datos de <strong>hoy</strong> (se reemplaza cada día), pero puedes elegir otra fecha si aún tienes datos guardados ahí.
+                </p>
+                <div style={{ marginBottom: 12 }}>
+                  <label>Fecha a corregir</label>
+                  <input type="date" value={fechaDescuento.Actual} max={hoy} onChange={e => cambiarFechaDescuento('Actual', e.target.value)} style={{ maxWidth: 200 }} />
+                  {cargandoDescuentoFecha.Actual && <span style={{ fontSize: 11, color: 'var(--gray)', marginLeft: 10 }}>Cargando...</span>}
+                </div>
+                <label className="switch-row" style={{ marginBottom: 10 }}>
+                  <input type="checkbox" checked={descansoHoy.Actual.activo} onChange={e => actualizarDescansoHoy('Actual', 'activo', e.target.checked)} />
+                  <span className="switch-visual"></span>
+                  <span>Descontar tiempo hoy {!descansoHoy.Actual.activo && <strong>(desactivado — hoy no se resta nada)</strong>}</span>
+                </label>
+                <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', opacity: descansoHoy.Actual.activo ? 1 : 0.45 }}>
+                  <div>
+                    <label>Hora de corte (hoy)</label>
+                    <input type="time" disabled={!descansoHoy.Actual.activo} value={descansoHoy.Actual.horaCorte} onChange={e => actualizarDescansoHoy('Actual', 'horaCorte', e.target.value)} />
+                  </div>
+                  <div>
+                    <label>Minutos a descontar (hoy)</label>
+                    <input type="number" min="0" disabled={!descansoHoy.Actual.activo} value={descansoHoy.Actual.minutos} onChange={e => actualizarDescansoHoy('Actual', 'minutos', Number(e.target.value))} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                  <button className="btn-primary" disabled={guardandoDescansoHoy.Actual} onClick={() => guardarDescansoHoy('Actual')}>
+                    <i className="fa-solid fa-floppy-disk"></i> {guardandoDescansoHoy.Actual ? 'Guardando...' : `Guardar descuento de ${fechaDescuento.Actual}`}
+                  </button>
+                  {descansoHoy.Actual.tieneExcepcion && (
+                    <button className="btn-secondary" onClick={() => quitarExcepcionHoy('Actual')}>
+                      <i className="fa-solid fa-rotate-left"></i> Quitar excepción de ese día
+                    </button>
+                  )}
+                  {descansoHoyGuardado.Actual && <span className="alert ok" style={{ fontSize: 11 }}><i className="fa-solid fa-check"></i> Guardado para esa fecha</span>}
+                </div>
+              </div>
             </div>}
         </section>
 

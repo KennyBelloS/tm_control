@@ -42,6 +42,16 @@ export async function getConfig() {
       horaCorte: '12:00',
       minutos: 30
     }],
+    descansosActivosHistorico: data.descansos_activos_historico ?? data.descansos_activos ?? true,
+    descansosHistorico: Array.isArray(data.descansos_historico) ? data.descansos_historico : (Array.isArray(data.descansos) ? data.descansos : [{
+      horaCorte: '12:00',
+      minutos: 30
+    }]),
+    descansosActivosActual: data.descansos_activos_actual ?? data.descansos_activos ?? true,
+    descansosActual: Array.isArray(data.descansos_actual) ? data.descansos_actual : (Array.isArray(data.descansos) ? data.descansos : [{
+      horaCorte: '12:00',
+      minutos: 30
+    }]),
     almacenamientoLimiteMB: data.almacenamiento_limite_mb ?? 500,
     diaFinSemana: data.dia_fin_semana ?? 6
   };
@@ -55,6 +65,10 @@ export async function setConfig(cfg) {
   };
   if (cfg.descansosActivos !== undefined) payload.descansos_activos = cfg.descansosActivos;
   if (cfg.descansos !== undefined) payload.descansos = cfg.descansos;
+  if (cfg.descansosActivosHistorico !== undefined) payload.descansos_activos_historico = cfg.descansosActivosHistorico;
+  if (cfg.descansosHistorico !== undefined) payload.descansos_historico = cfg.descansosHistorico;
+  if (cfg.descansosActivosActual !== undefined) payload.descansos_activos_actual = cfg.descansosActivosActual;
+  if (cfg.descansosActual !== undefined) payload.descansos_actual = cfg.descansosActual;
   if (cfg.diaFinSemana !== undefined) payload.dia_fin_semana = cfg.diaFinSemana;
   const {
     error
@@ -158,10 +172,83 @@ async function asegurarPersonas(registros) {
   });
   if (error) throw error;
 }
+
+/** Lista completa de personas para el módulo Personas (con código, rol, activo). */
+export async function listarPersonasModulo() {
+  const { data, error } = await supabase
+    .from('personas')
+    .select('id, nombre, codigo_empleado, rol, activo')
+    .order('nombre', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * Total de horas trabajadas (histórico completo) de cada persona — para
+ * identificar a quién le conviene desactivar por poca actividad. Ojo:
+ * desactivar NO borra sus registros del Histórico, así que los tallos que
+ * ya procesó siguen contando en los totales semanales/mensuales de siempre.
+ */
+export async function getHorasTotalesPorPersona() {
+  const { data, error } = await supabase
+    .from('rendimiento_historico')
+    .select('colaborador_id, tiempo_trabajado_min, tiempo_no_productivo_min');
+  if (error) throw error;
+  const mapa = new Map();
+  for (const r of data || []) {
+    const min = Math.max(0, (r.tiempo_trabajado_min || 0) - (r.tiempo_no_productivo_min || 0));
+    mapa.set(r.colaborador_id, (mapa.get(r.colaborador_id) || 0) + min);
+  }
+  const resultado = new Map();
+  for (const [id, min] of mapa) resultado.set(id, Math.round(min / 60 * 10) / 10);
+  return resultado;
+}
+
+/** Sube (o actualiza) muchas personas de una vez desde el Excel de Activos Boncheo. */
+export async function insertarPersonasDesdeExcel(personas) {
+  if (!personas || personas.length === 0) return { insertados: 0 };
+  const { error, count } = await supabase.from('personas').upsert(personas, {
+    onConflict: 'id',
+    count: 'exact'
+  });
+  if (error) throw error;
+  return { insertados: count ?? personas.length };
+}
+
+/** Agrega una sola persona manualmente (opcional, además de la carga por Excel). */
+export async function agregarPersonaManual({ id, nombre, codigo_empleado, rol }) {
+  const { error } = await supabase.from('personas').insert({
+    id,
+    nombre,
+    codigo_empleado: codigo_empleado || null,
+    rol: rol || null,
+    activo: true
+  });
+  if (error) {
+    if (error.code === '23505') throw new Error(`Ya existe una persona con el código ${id}.`);
+    throw error;
+  }
+}
+
+/** Edita nombre/código/rol de una persona existente. */
+export async function actualizarPersonaModulo(id, cambios) {
+  const permitido = (({ nombre, codigo_empleado, rol }) => ({ nombre, codigo_empleado, rol }))(cambios);
+  Object.keys(permitido).forEach(k => permitido[k] === undefined && delete permitido[k]);
+  const { error } = await supabase.from('personas').update(permitido).eq('id', id);
+  if (error) throw error;
+}
+
+/** Activa/desactiva una persona (no se borra, para no romper el histórico ya guardado). */
+export async function cambiarActivoPersona(id, activo) {
+  const { error } = await supabase.from('personas').update({ activo }).eq('id', id);
+  if (error) throw error;
+}
 export async function insertarHistorico(registrosPorBloque) {
   const cfg = await getConfig();
-  const descansos = cfg.descansosActivos ? cfg.descansos : [];
-  const agregados = agregarPorPersonaDia(registrosPorBloque, descansos);
+  const descansos = cfg.descansosActivosHistorico ? cfg.descansosHistorico : [];
+  const fechasEnCarga = [...new Set(registrosPorBloque.map(r => r.fecha))];
+  const descansosPorFecha = await getDescansosDiariosRango(fechasEnCarga, 'historico');
+  const agregados = agregarPorPersonaDia(registrosPorBloque, descansos, descansosPorFecha);
   if (agregados.length === 0) return {
     insertados: 0
   };
@@ -225,13 +312,111 @@ export async function getUltimaFechaHistorico() {
   return data?.fecha || null;
 }
 
+/**
+ * Cuántos días distintos hay guardados en el Histórico en total (sin
+ * filtro) — para que se vea con claridad que nada se está perdiendo,
+ * aunque la vista por defecto solo muestre el último día.
+ */
+export async function getResumenHistoricoCompleto() {
+  const { data, error } = await supabase.from('rendimiento_historico').select('fecha');
+  if (error) throw error;
+  const fechas = [...new Set((data || []).map(r => r.fecha))];
+  return {
+    totalDias: fechas.length,
+    totalRegistros: (data || []).length,
+    primeraFecha: fechas.sort()[0] || null,
+    ultimaFecha: fechas.sort().reverse()[0] || null
+  };
+}
+
+/**
+ * Descuento de tiempo (almuerzo) para UN día específico, si existe. Si ese
+ * día no tiene su propia fila, devuelve null y hay que usar la config
+ * general (cfg.descansosActivosHistorico/Actual). "tipo" es 'historico' o 'actual'.
+ */
+export async function getDescansosDia(fecha, tipo) {
+  try {
+    const { data, error } = await supabase
+      .from('descansos_diarios')
+      .select('activos, descansos')
+      .eq('fecha', fecha)
+      .eq('tipo', tipo)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return { activos: data.activos, descansos: data.descansos || [] };
+  } catch {
+    return null; // si la tabla todavía no existe, se usa la config general sin romper nada
+  }
+}
+
+/** Descuentos por día de un RANGO de fechas, ya como mapa "fecha_tipo" -> {activos, descansos}. */
+export async function getDescansosDiariosRango(fechas, tipo) {
+  if (!fechas || fechas.length === 0) return new Map();
+  try {
+    const { data, error } = await supabase
+      .from('descansos_diarios')
+      .select('fecha, activos, descansos')
+      .eq('tipo', tipo)
+      .in('fecha', fechas);
+    if (error) throw error;
+    return new Map((data || []).map(d => [d.fecha, { activos: d.activos, descansos: d.descansos || [] }]));
+  } catch {
+    return new Map();
+  }
+}
+
+/** Guarda (o reemplaza) el descuento de un día puntual — solo afecta esa fecha. */
+export async function setDescansosDia(fecha, tipo, activos, descansos) {
+  const { error } = await supabase.from('descansos_diarios').upsert({
+    fecha,
+    tipo,
+    activos,
+    descansos
+  }, { onConflict: 'fecha,tipo' });
+  if (error) throw error;
+}
+
+/** Quita el descuento puntual de un día — vuelve a usar la config general. */
+export async function quitarDescansosDia(fecha, tipo) {
+  const { error } = await supabase.from('descansos_diarios').delete().eq('fecha', fecha).eq('tipo', tipo);
+  if (error) throw error;
+}
+
+/**
+ * Trae el horario real (hora de entrada más temprana y hora de salida más
+ * tardía) que se registró para una persona en un día específico — para que
+ * al editar el tiempo trabajado, el formulario ya venga con el horario que
+ * de verdad se cargó ese día, no un horario genérico fijo.
+ */
+export async function getRangoHorarioHistorico(fecha, colaboradorId) {
+  try {
+    const { data, error } = await supabase
+      .from('historico_bloques')
+      .select('hora_inicio, hora_fin')
+      .eq('fecha', fecha)
+      .eq('colaborador_id', colaboradorId);
+    if (error) throw error;
+    if (!data || data.length === 0) return null;
+    const horaInicio = data.map(b => b.hora_inicio).sort()[0];
+    const horaFin = data.map(b => b.hora_fin).sort()[data.length - 1];
+    return { horaInicio: horaInicio.slice(0, 5), horaFin: horaFin.slice(0, 5) };
+  } catch {
+    return null;
+  }
+}
+
 export async function getHistorico({
-  fecha
+  fecha,
+  desde,
+  hasta
 } = {}) {
   let query = supabase.from('rendimiento_historico').select(SELECT_HISTORICO).order('fecha', {
     ascending: false
   });
   if (fecha) query = query.eq('fecha', fecha);
+  if (desde) query = query.gte('fecha', desde);
+  if (hasta) query = query.lte('fecha', hasta);
   const {
     data,
     error
@@ -254,7 +439,8 @@ export async function getHistorico({
 
     if (bloquesData && bloquesData.length > 0) {
       const cfg = await getConfig();
-      const descansos = cfg.descansosActivos ? cfg.descansos : [];
+      const descansos = cfg.descansosActivosHistorico ? cfg.descansosHistorico : [];
+      const descansosPorFecha = await getDescansosDiariosRango(fechas, 'historico');
       const mapaBloques = new Map();
       for (const b of bloquesData) {
         const key = `${b.fecha}_${b.colaborador_id}`;
@@ -265,10 +451,13 @@ export async function getHistorico({
         const key = `${f.fecha}_${f.colaborador_id}`;
         const bloques = mapaBloques.get(key);
         if (!bloques || bloques.length === 0) continue;
+        const descansosDelDia = descansosPorFecha.has(f.fecha)
+          ? (descansosPorFecha.get(f.fecha).activos ? descansosPorFecha.get(f.fecha).descansos : [])
+          : descansos;
         let minutos = 0;
         for (const b of bloques) {
           const brutos = minutosEntreBloque(b.hora_inicio, b.hora_fin);
-          const descuento = minutosDescansoAplicable(b.hora_inicio, b.hora_fin, descansos);
+          const descuento = minutosDescansoAplicable(b.hora_inicio, b.hora_fin, descansosDelDia);
           minutos += Math.max(0, brutos - descuento);
         }
         f.tiempo_trabajado_min = minutos;
@@ -375,9 +564,14 @@ export async function getActual({
   } = await query;
   if (error) throw error;
   const cfg = await getConfig();
-  const descansos = cfg.descansosActivos ? cfg.descansos : [];
+  const descansos = cfg.descansosActivosActual ? cfg.descansosActual : [];
+  const fechasEnActual = [...new Set((data || []).map(r => r.fecha))];
+  const descansosPorFecha = await getDescansosDiariosRango(fechasEnActual, 'actual');
   return (data || []).map(aplanar).map(r => {
-    const bloque = calcularRendimientoBloque(r.total_tallos, r.hora_inicio, r.hora_fin, descansos);
+    const descansosDelDia = descansosPorFecha.has(r.fecha)
+      ? (descansosPorFecha.get(r.fecha).activos ? descansosPorFecha.get(r.fecha).descansos : [])
+      : descansos;
+    const bloque = calcularRendimientoBloque(r.total_tallos, r.hora_inicio, r.hora_fin, descansosDelDia);
     return {
       ...r,
       tiempo_trabajado_min: bloque.minutos,
@@ -513,8 +707,9 @@ export async function getRankingHoraAHora(fecha) {
     fecha
   });
   const cfg = await getConfig();
-  const descansos = cfg.descansosActivos ? cfg.descansos : [];
-  const agregado = agregarTurnoActualPorPersona(filas, descansos);
+  const descansos = cfg.descansosActivosActual ? cfg.descansosActual : [];
+  const descansosPorFecha = await getDescansosDiariosRango([fecha], 'actual');
+  const agregado = agregarTurnoActualPorPersona(filas, descansos, descansosPorFecha);
   const lista = agregado.map(a => ({
     colaborador_id: a.colaborador_id,
     colaborador: a.colaborador,

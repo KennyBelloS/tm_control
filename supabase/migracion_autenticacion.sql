@@ -168,3 +168,117 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- 10. Módulo Personas: información adicional de cada colaborador
+--     (código de empleado, rol, si está activo o no).
+-- ---------------------------------------------------------------------
+alter table personas add column if not exists codigo_empleado text;
+alter table personas add column if not exists rol text;
+alter table personas add column if not exists activo boolean not null default true;
+
+-- ---------------------------------------------------------------------
+-- 11. Módulo Líneas: líneas de producción, formadoras, y la asignación
+--     diaria de cada persona a una formadora dentro de una línea.
+-- ---------------------------------------------------------------------
+create table if not exists lineas (
+  id          bigserial primary key,
+  nombre      text not null unique,
+  supervisor  text,
+  activa      boolean not null default true,
+  creado_en   timestamptz not null default now()
+);
+
+create table if not exists formadoras (
+  id          bigserial primary key,
+  nombre      text not null unique,
+  activa      boolean not null default true,
+  creado_en   timestamptz not null default now()
+);
+
+create table if not exists asignaciones_diarias (
+  id              bigserial primary key,
+  fecha           date not null,
+  linea_id        bigint not null references lineas(id) on delete cascade,
+  formadora_id    bigint not null references formadoras(id) on delete cascade,
+  colaborador_id  integer not null references personas(id) on delete cascade,
+  creado_en       timestamptz not null default now(),
+  constraint asignacion_persona_dia_unica unique (fecha, colaborador_id)
+);
+create index if not exists idx_asignaciones_fecha on asignaciones_diarias (fecha);
+create index if not exists idx_asignaciones_linea on asignaciones_diarias (linea_id);
+
+alter table lineas enable row level security;
+alter table formadoras enable row level security;
+alter table asignaciones_diarias enable row level security;
+
+drop policy if exists "acceso_total_lineas" on lineas;
+create policy "acceso_total_lineas" on lineas for all using (true) with check (true);
+drop policy if exists "acceso_total_formadoras" on formadoras;
+create policy "acceso_total_formadoras" on formadoras for all using (true) with check (true);
+drop policy if exists "acceso_total_asignaciones" on asignaciones_diarias;
+create policy "acceso_total_asignaciones" on asignaciones_diarias for all using (true) with check (true);
+
+-- 4 líneas predefinidas de ejemplo (puedes editarlas o agregar más desde la app)
+insert into lineas (nombre, activa) values
+  ('Línea 1', true), ('Línea 2', true), ('Línea 3', true), ('Línea 4', true)
+on conflict (nombre) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 12. Descuentos de tiempo (almuerzo) SEPARADOS: uno para el Histórico y
+--     otro para el Turno Actual, en vez de compartir la misma config.
+--     Se copia lo que ya tenías configurado a ambos, para no perder nada.
+-- ---------------------------------------------------------------------
+alter table configuracion add column if not exists descansos_activos_historico boolean;
+alter table configuracion add column if not exists descansos_historico jsonb;
+alter table configuracion add column if not exists descansos_activos_actual boolean;
+alter table configuracion add column if not exists descansos_actual jsonb;
+
+update configuracion
+set descansos_activos_historico = coalesce(descansos_activos_historico, descansos_activos),
+    descansos_historico = coalesce(descansos_historico, descansos),
+    descansos_activos_actual = coalesce(descansos_activos_actual, descansos_activos),
+    descansos_actual = coalesce(descansos_actual, descansos)
+where id = 1;
+
+alter table configuracion alter column descansos_activos_historico set default true;
+alter table configuracion alter column descansos_historico set default '[{"horaCorte":"12:00","minutos":30}]'::jsonb;
+alter table configuracion alter column descansos_activos_actual set default true;
+alter table configuracion alter column descansos_actual set default '[{"horaCorte":"12:00","minutos":30}]'::jsonb;
+
+-- ---------------------------------------------------------------------
+-- 13. Descuentos de tiempo por día puntual — permite cambiar el almuerzo
+--     solo para un día específico (ej. hoy), sin afectar la configuración
+--     general de los demás días. Si un día no tiene fila aquí, se usa la
+--     configuración general de Configuración.
+-- ---------------------------------------------------------------------
+create table if not exists descansos_diarios (
+  fecha       date not null,
+  tipo        text not null check (tipo in ('historico', 'actual')),
+  activos     boolean not null default true,
+  descansos   jsonb not null default '[]'::jsonb,
+  primary key (fecha, tipo)
+);
+alter table descansos_diarios enable row level security;
+drop policy if exists "acceso_total_descansos_diarios" on descansos_diarios;
+create policy "acceso_total_descansos_diarios" on descansos_diarios for all using (true) with check (true);
+
+-- ---------------------------------------------------------------------
+-- 14. Tablero Integrado de Formadoras — una fila por formadora/día.
+--     Formadora, fecha y rendimiento promedio se llenan solos; el resto
+--     (meta, resultado de clasificación, devoluciones) se llena a mano.
+-- ---------------------------------------------------------------------
+create table if not exists tablero_formadoras (
+  id                       bigserial primary key,
+  fecha                    date not null,
+  formadora_id             bigint not null references formadoras(id) on delete cascade,
+  semana                   text,
+  meta_clasificacion       numeric,
+  resultado_clasificacion  numeric,
+  devoluciones             integer,
+  constraint tablero_formadora_dia_unico unique (fecha, formadora_id)
+);
+create index if not exists idx_tablero_formadoras_fecha on tablero_formadoras (fecha);
+alter table tablero_formadoras enable row level security;
+drop policy if exists "acceso_total_tablero_formadoras" on tablero_formadoras;
+create policy "acceso_total_tablero_formadoras" on tablero_formadoras for all using (true) with check (true);

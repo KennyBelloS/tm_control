@@ -91,13 +91,73 @@ export function parsearReporteBoncheo(arrayBuffer, {
     hojaUsada: nombreHoja
   };
 }
+/**
+ * Lee el reporte de "Activos Boncheo" (o similar): columnas Mesa, Nombre,
+ * Emp.Cod, Rol — para cargar el catálogo de Personas de una sola vez.
+ */
+export function parsearReportePersonas(arrayBuffer) {
+  const workbook = leerLibro(arrayBuffer);
+  const nombreHoja = workbook.SheetNames[0];
+  const hoja = workbook.Sheets[nombreHoja];
+  const matriz = XLSX.utils.sheet_to_json(hoja, {
+    header: 1,
+    raw: true,
+    defval: null
+  });
+  let filaHeader = -1;
+  const columnas = {};
+  for (let r = 0; r < matriz.length; r++) {
+    const fila = matriz[r] || [];
+    const idx = fila.findIndex(c => normalizar(c) === 'mesa');
+    if (idx !== -1) {
+      filaHeader = r;
+      fila.forEach((c, i) => {
+        const t = normalizar(c);
+        if (t) columnas[t] = i;
+      });
+      break;
+    }
+  }
+  if (filaHeader === -1) {
+    throw new Error('No se encontró la columna "Mesa" en el archivo. Verifica que sea el reporte de Activos Boncheo.');
+  }
+  const idxMesa = columnas['mesa'];
+  const idxNombre = columnas['nombre'];
+  const idxEmpCod = columnas['emp.cod'] ?? columnas['emp cod'] ?? columnas['empcod'];
+  const idxRol = columnas['rol'];
+  if (idxNombre === undefined) {
+    throw new Error('No se encontró la columna "Nombre" en el archivo.');
+  }
+
+  const personas = [];
+  for (let r = filaHeader + 1; r < matriz.length; r++) {
+    const fila = matriz[r] || [];
+    const mesa = fila[idxMesa];
+    const nombre = fila[idxNombre];
+    if (mesa === null || mesa === undefined || !nombre) continue;
+    const id = Number(mesa);
+    if (!Number.isFinite(id) || id === 0) continue;
+    personas.push({
+      id,
+      nombre: String(nombre).trim(),
+      codigo_empleado: idxEmpCod !== undefined && fila[idxEmpCod] !== null ? String(fila[idxEmpCod]).trim() : null,
+      rol: idxRol !== undefined && fila[idxRol] ? String(fila[idxRol]).trim() : null,
+      activo: true
+    });
+  }
+  if (personas.length === 0) {
+    throw new Error('No se encontraron personas válidas en el archivo.');
+  }
+  return personas;
+}
+
 export function exportarAExcel(filas, nombreArchivo, nombreHoja = 'Datos') {
   const ws = XLSX.utils.json_to_sheet(filas);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, nombreHoja);
   XLSX.writeFile(wb, nombreArchivo);
 }
-export function agregarPorPersonaDia(registros, descansos = []) {
+export function agregarPorPersonaDia(registros, descansos = [], descansosPorFecha = null) {
   const mapa = new Map();
   const bloquesContados = new Set();
   for (const r of registros) {
@@ -122,7 +182,12 @@ export function agregarPorPersonaDia(registros, descansos = []) {
     if (!bloquesContados.has(bloqueKey)) {
       bloquesContados.add(bloqueKey);
       const minutosBrutos = minutosEntreBloque(r.hora_inicio, r.hora_fin);
-      const descuento = minutosDescansoAplicable(r.hora_inicio, r.hora_fin, descansos);
+      // Si ese día en concreto tiene un descuento propio configurado, se usa
+      // ese en vez del general (permite cambiar el almuerzo solo un día).
+      const descansosDelDia = descansosPorFecha?.has(r.fecha)
+        ? (descansosPorFecha.get(r.fecha).activos ? descansosPorFecha.get(r.fecha).descansos : [])
+        : descansos;
+      const descuento = minutosDescansoAplicable(r.hora_inicio, r.hora_fin, descansosDelDia);
       acc.tiempo_trabajado_min += Math.max(0, minutosBrutos - descuento);
     }
   }

@@ -107,6 +107,7 @@ export function agregarRankingPorPersona(filas) {
         totalTallos: 0,
         totalRamos: 0,
         sumaRend: 0,
+        totalHoras: 0,
         bloques: 0,
         codigos: new Set()
       });
@@ -115,6 +116,7 @@ export function agregarRankingPorPersona(filas) {
     acc.totalTallos += r.total_tallos || 0;
     acc.totalRamos += r.total_ramos || 0;
     acc.sumaRend += r.rendimiento || 0;
+    acc.totalHoras += r.tiempo_real_horas || 0;
     acc.bloques += 1;
     if (r.codigos) {
       acc.codigosHistorico = r.codigos;
@@ -125,10 +127,35 @@ export function agregarRankingPorPersona(filas) {
   return [...mapa.values()].map(a => ({
     ...a,
     promedioRend: a.bloques > 0 ? Math.round(a.sumaRend / a.bloques) : 0,
+    // Rendimiento "ponderado": tallos totales entre horas totales reales —
+    // no se deja engañar por alguien que trabajó poquito tiempo pero le fue
+    // muy bien esas pocas horas (a diferencia del promedio simple de arriba).
+    rendimientoPonderado: a.totalHoras > 0 ? Math.round(a.totalTallos / a.totalHoras) : 0,
+    horasTrabajadas: Math.round(a.totalHoras * 10) / 10,
     codigo: a.codigosHistorico || (a.codigos.size > 0 ? [...a.codigos].sort((x, y) => x - y).join(', ') : null)
   })).sort((a, b) => b.promedioRend - a.promedioRend);
 }
-export function agregarTurnoActualPorPersona(filas, descansos = []) {
+
+/**
+ * Marca (agrega .pocoTiempo = true) a quien trabajó muy poco tiempo
+ * COMPARADO con el promedio real del propio grupo en ese mismo período —
+ * así funciona igual de bien para un reporte de un día que de una semana o
+ * un mes, sin un número de horas fijo que no tendría sentido en todos los
+ * casos (3 horas es gravísimo en una semana, pero normal en un día que
+ * apenas empieza).
+ */
+export function marcarPocoTiempo(ranking, factorUmbral = 0.35) {
+  const conHoras = ranking.filter(p => p.horasTrabajadas > 0);
+  if (conHoras.length === 0) return ranking.map(p => ({ ...p, pocoTiempo: false }));
+  const promedioHoras = conHoras.reduce((s, p) => s + p.horasTrabajadas, 0) / conHoras.length;
+  const umbral = promedioHoras * factorUmbral;
+  return ranking.map(p => ({
+    ...p,
+    pocoTiempo: p.horasTrabajadas > 0 && p.horasTrabajadas < umbral,
+    promedioHorasGrupo: Math.round(promedioHoras * 10) / 10
+  }));
+}
+export function agregarTurnoActualPorPersona(filas, descansos = [], descansosPorFecha = null) {
   const mapa = new Map();
   const bloquesContados = new Set();
   for (const r of filas) {
@@ -152,7 +179,10 @@ export function agregarTurnoActualPorPersona(filas, descansos = []) {
     if (!bloquesContados.has(bloqueKey)) {
       bloquesContados.add(bloqueKey);
       const minutosBrutos = minutosEntreBloque(r.hora_inicio, r.hora_fin);
-      const descuento = minutosDescansoAplicable(r.hora_inicio, r.hora_fin, descansos);
+      const descansosDelDia = descansosPorFecha?.has(r.fecha)
+        ? (descansosPorFecha.get(r.fecha).activos ? descansosPorFecha.get(r.fecha).descansos : [])
+        : descansos;
+      const descuento = minutosDescansoAplicable(r.hora_inicio, r.hora_fin, descansosDelDia);
       acc.tiempo_trabajado_min += Math.max(0, minutosBrutos - descuento);
     }
   }
