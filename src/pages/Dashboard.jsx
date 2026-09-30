@@ -8,7 +8,7 @@ const TendenciaTallosChart = lazy(() => import('../components/charts/TendenciaTa
 const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChart'));
 import DashboardCarrusel from '../components/DashboardCarrusel';
 import ModoPresentacion from '../components/ModoPresentacion';
-import { getRendimientoPorLinea, getRendimientoPorFormadora } from '../lib/lineas';
+import { getRendimientoPorLinea } from '../lib/lineas';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 function hoyISO() {
   return new Date().toISOString().slice(0, 10);
@@ -41,7 +41,7 @@ export default function Dashboard() {
   const [fechaHistoricoMostrado, setFechaHistoricoMostrado] = useState(null);
   const [presentando, setPresentando] = useState(false);
   const [resumenPorLinea, setResumenPorLinea] = useState([]);
-  const [resumenPorFormadora, setResumenPorFormadora] = useState([]);
+
   const [tickTiempoReal, setTickTiempoReal] = useState(0);
   useRealtimeRefresco(['rendimiento_historico', 'rendimiento_actual', 'metas_diarias', 'configuracion'], () => setTickTiempoReal(t => t + 1));
   const hoy = hoyISO();
@@ -117,9 +117,7 @@ export default function Dashboard() {
       <PageHeader title="Dashboard Ejecutivo" subtitle="Resumen general de producción, en tiempo real desde el Turno Actual.">
         <button className="btn-secondary" onClick={() => {
           setPresentando(true);
-          Promise.all([getRendimientoPorLinea(hoy, hoy), getRendimientoPorFormadora(hoy, hoy)])
-            .then(([l, f]) => { setResumenPorLinea(l); setResumenPorFormadora(f); })
-            .catch(() => {});
+          getRendimientoPorLinea(hoy, hoy).then(setResumenPorLinea).catch(() => {});
         }}>
           <i className="fa-solid fa-expand"></i> Presentar
         </button>
@@ -288,7 +286,6 @@ export default function Dashboard() {
           metaHoy={metaHoy}
           cumplimiento={stats.actual.cumplimiento}
           resumenPorLinea={resumenPorLinea}
-          resumenPorFormadora={resumenPorFormadora}
           onCerrar={() => setPresentando(false)}
         />
       )}

@@ -1,43 +1,46 @@
 import { supabase } from './supabaseClient';
-export const ROLES = ['administrador', 'ingeniero', 'supervisor', 'formador'];
+export const ROLES = ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador'];
 export const ROL_LABEL = {
   administrador: 'Administrador',
   ingeniero: 'Ingeniero',
+  profesional: 'Profesional',
+  digitador: 'Digitador',
   supervisor: 'Supervisor',
   formador: 'Formador'
 };
 export const MODULOS = {
   dashboard: {
-    roles: ['administrador', 'ingeniero', 'supervisor', 'formador']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   personas: {
-    roles: ['administrador', 'ingeniero', 'supervisor']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor']
   },
   rendimientos: {
-    roles: ['administrador', 'ingeniero', 'supervisor', 'formador']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   reportes: {
-    roles: ['administrador', 'ingeniero', 'supervisor']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor']
   },
   ranking: {
-    roles: ['administrador', 'ingeniero', 'supervisor', 'formador']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   lineas: {
-    roles: ['administrador', 'ingeniero', 'supervisor']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor']
   },
   indirectos: {
-    roles: ['administrador', 'ingeniero']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador']
   },
   gerencia: {
-    roles: ['administrador', 'ingeniero']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador']
   },
   configuracion: {
-    roles: ['administrador']
+    roles: ['administrador', 'digitador']
   },
   usuarios: {
-    roles: ['administrador']
+    roles: ['administrador', 'digitador']
   },
   auditoria: {
+    // Auditoría = base de datos, respaldo, optimización — nunca para Digitador.
     roles: ['administrador']
   }
 };
@@ -45,7 +48,7 @@ export function puedeVer(rol, moduloKey) {
   return MODULOS[moduloKey]?.roles.includes(rol) ?? false;
 }
 export function puedeEditar(rol) {
-  return rol === 'administrador' || rol === 'ingeniero';
+  return rol === 'administrador' || rol === 'ingeniero' || rol === 'profesional' || rol === 'digitador';
 }
 function correoDesdeEntrada(entrada) {
   const valor = String(entrada || '').trim();
@@ -114,9 +117,25 @@ export async function crearUsuario({
       password
     })
   });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error(data.error || 'No se pudo crear el usuario.');
+  const data = await leerRespuestaSegura(resp);
+  if (!resp.ok) throw new Error(data.error || `No se pudo crear el usuario (código ${resp.status}).`);
   return data;
+}
+
+/**
+ * Lee la respuesta de una función serverless de forma segura: si por algún
+ * error inesperado del servidor la respuesta viene vacía o no es JSON
+ * válido, esto evita el "JSON.parse: unexpected end of data" y en su lugar
+ * da un mensaje de error entendible con el código de estado real.
+ */
+async function leerRespuestaSegura(resp) {
+  const texto = await resp.text();
+  if (!texto) return { error: `El servidor respondió vacío (código ${resp.status}). Intenta de nuevo en un momento.` };
+  try {
+    return JSON.parse(texto);
+  } catch {
+    return { error: `Respuesta inesperada del servidor (código ${resp.status}): ${texto.slice(0, 200)}` };
+  }
 }
 export async function listarPerfiles() {
   const {
@@ -153,8 +172,8 @@ async function llamarGestionarUsuario(payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tokenAdmin: session.access_token, ...payload }),
   });
-  const data = await resp.json();
-  if (!resp.ok) throw new Error(data.error || 'No se pudo completar la acción.');
+  const data = await leerRespuestaSegura(resp);
+  if (!resp.ok) throw new Error(data.error || `No se pudo completar la acción (código ${resp.status}).`);
   return data;
 }
 

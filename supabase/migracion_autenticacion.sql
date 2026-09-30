@@ -282,3 +282,11 @@ create index if not exists idx_tablero_formadoras_fecha on tablero_formadoras (f
 alter table tablero_formadoras enable row level security;
 drop policy if exists "acceso_total_tablero_formadoras" on tablero_formadoras;
 create policy "acceso_total_tablero_formadoras" on tablero_formadoras for all using (true) with check (true);
+
+-- ---------------------------------------------------------------------
+-- 15. Dos roles nuevos: "profesional" (mismos permisos que Ingeniero) y
+--     "digitador" (todo lo del Administrador, excepto Auditoría).
+-- ---------------------------------------------------------------------
+alter table perfiles drop constraint if exists perfiles_rol_check;
+alter table perfiles add constraint perfiles_rol_check
+  check (rol in ('administrador','ingeniero','profesional','digitador','supervisor','formador'));
