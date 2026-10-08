@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import RankingExcelTable from '../components/RankingExcelTable';
-import CarruselLista from '../components/CarruselLista';
+import ClasificacionPanel from '../components/ClasificacionPanel';
+import { fechaLocalISO } from '../lib/clasificacionCalculos';
 import { useSesion } from '../lib/useSesion';
 import { getConfig, getHistorico, getActual } from '../lib/db';
 import { getRendimientoPorLinea, getRendimientoPorFormadora } from '../lib/lineas';
@@ -9,7 +10,7 @@ import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { agregarRankingPorPersona, marcarPocoTiempo } from '../lib/calculos';
 
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalISO(); // hora local, no UTC
 }
 function rangoDelMes(mesISO) {
   const [anio, mes] = mesISO.split('-').map(Number);
@@ -43,6 +44,7 @@ export default function Reportes() {
   const [fechaSemana, setFechaSemana] = useState(hoyISO());
   const [mes, setMes] = useState(hoyISO().slice(0, 7));
   const [modoRendimiento, setModoRendimiento] = useState('simple');
+  const [fechaClasif, setFechaClasif] = useState(hoyISO());
   const [filas, setFilas] = useState([]);
   const [resumenPorLinea, setResumenPorLinea] = useState([]);
   const [resumenPorFormadora, setResumenPorFormadora] = useState([]);
@@ -304,15 +306,6 @@ export default function Reportes() {
           </>
         )}
 
-        {!cargando && rankingParaMostrar.length > 0 && (
-          <CarruselLista
-            personas={rankingParaMostrar}
-            metaHora={metaHora}
-            titulo={fuenteExportar === 'historico' ? `Vista en vivo — ${rango.etiqueta}` : 'Vista en vivo — Turno Actual'}
-            icono="fa-file-export"
-          />
-        )}
-
         {(resumenPorLinea.length > 0 || resumenPorFormadora.length > 0) && (
           <div className="two-col-panels">
             <section className="table-panel">
@@ -409,6 +402,17 @@ export default function Reportes() {
               topInicial={10}
             />
           )}
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <h2><i className="fa-solid fa-boxes-stacked" style={{ color: 'var(--primary)', marginRight: 8 }}></i>Clasificación hora a hora</h2>
+              <p>Tallos movidos por línea, hora a hora, contra el día anterior. Descárgalo en imagen o PDF.</p>
+            </div>
+            <input type="date" value={fechaClasif} max={hoyISO()} onChange={e => setFechaClasif(e.target.value)} style={{ maxWidth: 170 }} />
+          </div>
+          <ClasificacionPanel fecha={fechaClasif} />
         </section>
       </div>
     </>

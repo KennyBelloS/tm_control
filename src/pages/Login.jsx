@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import logo from '../assets/logo-icon.png';
+import PieLegal from '../components/PieLegal';
 import { iniciarSesion } from '../lib/roles';
 export default function Login() {
   const [usuario, setUsuario] = useState('');
@@ -46,5 +47,6 @@ export default function Login() {
           El Administrador entra con su correo. Ingeniero, Supervisor y Formador entran con el usuario y la contraseña que el Administrador les creó en el módulo Usuarios.
         </p>
       </form>
+      <PieLegal />
     </div>;
 }

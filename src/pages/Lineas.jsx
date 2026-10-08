@@ -1,17 +1,26 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import logo from '../assets/logo-icon.png';
+import { exportarElemento } from '../lib/exportarElemento';
+import { fechaLocalISO, formatoFecha } from '../lib/clasificacionCalculos';
+import { esFilaMesaLegada, coincidePersona } from '../lib/personasUtil';
 import PageHeader from '../components/PageHeader';
 import { useSesion } from '../lib/useSesion';
 import { puedeEditar } from '../lib/roles';
 import { listarPersonasModulo, getConfig } from '../lib/db';
 import {
-  listarLineas, crearLinea, cambiarActivaLinea,
+  listarLineas, crearLinea, actualizarLinea, cambiarActivaLinea,
   listarFormadoras, crearFormadora, cambiarActivaFormadora,
   getAsignacionesDia, asignarPersona, quitarAsignacion,
-  getRendimientoPorLinea, getTableroFormadoras, guardarFilaTablero
+  getRendimientoPorLinea, getTableroFormadoras, guardarFilaTablero,
+  getMetasMes, guardarMetaMes, mesDe, mesAnterior, getFormadoraLinea, setFormadoraLinea
 } from '../lib/lineas';
 
+const nombreMes = mes => {
+  const [y, m] = mes.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('es-CO', { month: 'long', year: 'numeric' });
+};
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalISO(); // hora local: toISOString() usa UTC y después de las 7 p.m. marcaría mañana
 }
 
 const MEDALLAS = ['🥇', '🥈', '🥉'];
@@ -20,6 +29,7 @@ export default function Lineas() {
   const { sesion } = useSesion();
   const puedeModificar = puedeEditar(sesion?.rol);
   const hoy = hoyISO();
+  const [fechaAsignacion, setFechaAsignacion] = useState(hoyISO());
 
   const [lineas, setLineas] = useState([]);
   const [formadoras, setFormadoras] = useState([]);
@@ -30,12 +40,16 @@ export default function Lineas() {
   const [tableroDesde, setTableroDesde] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 13);
-    return d.toISOString().slice(0, 10);
+    return fechaLocalISO(d);
   });
   const [tableroHasta, setTableroHasta] = useState(hoyISO());
   const [cargandoTablero, setCargandoTablero] = useState(false);
   const [guardandoFilaTablero, setGuardandoFilaTablero] = useState(null);
   const [metaHora, setMetaHora] = useState(470);
+  const mesActual = mesDe(hoy);
+  const [metasMes, setMetasMes] = useState(undefined);        // undefined = cargando, null = aún sin el SQL (meta fija anterior)
+  const [metasMesPrevio, setMetasMesPrevio] = useState(null);
+  const [formadoraDeLinea, setFormadoraDeLinea] = useState(new Map());
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState(null);
 
@@ -50,14 +64,18 @@ export default function Lineas() {
   async function cargarTodo() {
     setCargando(true);
     try {
-      const [l, f, p, a, r, cfg] = await Promise.all([
+      const [l, f, p, a, r, cfg, mm, mp, fl] = await Promise.all([
         listarLineas(),
         listarFormadoras(),
         listarPersonasModulo(),
-        getAsignacionesDia(hoy),
-        getRendimientoPorLinea(hoy, hoy),
-        getConfig()
+        getAsignacionesDia(fechaAsignacion),
+        getRendimientoPorLinea(fechaAsignacion, fechaAsignacion),
+        getConfig(),
+        getMetasMes(mesActual),
+        getMetasMes(mesAnterior(mesActual)),
+        getFormadoraLinea(fechaAsignacion)
       ]);
+      setMetasMes(mm); setMetasMesPrevio(mp); setFormadoraDeLinea(fl);
       setLineas(l);
       setFormadoras(f);
       setPersonas(p);
@@ -70,7 +88,7 @@ export default function Lineas() {
       setCargando(false);
     }
   }
-  useEffect(() => { cargarTodo(); }, []);
+  useEffect(() => { cargarTodo(); }, [fechaAsignacion]);
 
   async function cargarTablero() {
     setCargandoTablero(true);
@@ -87,6 +105,44 @@ export default function Lineas() {
 
   function actualizarCampoTablero(fecha, formadoraId, campo, valor) {
     setTableroFilas(filas => filas.map(f => (f.fecha === fecha && f.formadora_id === formadoraId) ? { ...f, [campo]: valor } : f));
+  }
+  const tableroExportRef = useRef(null);
+  const [exportandoTablero, setExportandoTablero] = useState(null);
+  async function descargarTablero(formato) {
+    setExportandoTablero(formato);
+    try { await exportarElemento(tableroExportRef.current, `tablero_formadoras_${tableroDesde}_a_${tableroHasta}`, formato); }
+    catch (e) { setMensaje({ tipo: 'err', texto: e.message }); }
+    finally { setExportandoTablero(null); }
+  }
+  async function guardarMetaLinea(linea, valor) {
+    const meta = valor === '' || valor == null ? null : Number(valor);
+    if (meta !== null && (!Number.isFinite(meta) || meta < 0)) return;
+    try {
+      if (metasMes) {                               // metas por mes (se reinician cada mes)
+        if ((metasMes.get(linea.id) ?? null) === meta) return;
+        await guardarMetaMes(mesActual, linea.id, meta);
+        setMetasMes(m => { const n = new Map(m); if (meta == null) n.delete(linea.id); else n.set(linea.id, meta); return n; });
+      } else {                                      // aún sin el SQL: meta fija de antes
+        if ((linea.meta_hora ?? null) === meta) return;
+        await actualizarLinea(linea.id, { meta_hora: meta });
+        setLineas(ls => ls.map(l => l.id === linea.id ? { ...l, meta_hora: meta } : l));
+      }
+    } catch (e) {
+      setMensaje({ tipo: 'err', texto: 'No se pudo guardar la meta. ¿Ya corriste el SQL de metas por mes? ' + e.message });
+    }
+  }
+  async function cambiarFormadoraLinea(lineaId, valor) {
+    try {
+      await setFormadoraLinea(fechaAsignacion, lineaId, valor ? Number(valor) : null);
+      setFormadoraDeLinea(await getFormadoraLinea(fechaAsignacion));
+    } catch (e) {
+      setMensaje({ tipo: 'err', texto: e.message });
+    }
+  }
+  function usarResultadoAuto(fila) {
+    const nueva = { ...fila, resultadoClasificacion: fila.resultadoAuto };
+    setTableroFilas(filas => filas.map(f => (f.fecha === fila.fecha && f.formadora_id === fila.formadora_id) ? nueva : f));
+    guardarFilaTableroAhora(nueva);
   }
   async function guardarFilaTableroAhora(fila) {
     const clave = `${fila.fecha}_${fila.formadora_id}`;
@@ -108,9 +164,9 @@ export default function Lineas() {
   const lineasActivas = useMemo(() => lineas.filter(l => l.activa), [lineas]);
 
   const personasFiltradas = useMemo(() => {
-    if (!busquedaPersona) return personas.filter(p => p.activo).slice(0, 30);
-    const b = busquedaPersona.toLowerCase();
-    return personas.filter(p => p.activo && (p.nombre.toLowerCase().includes(b) || String(p.id).includes(b))).slice(0, 30);
+    const vigentes = personas.filter(p => p.activo && !esFilaMesaLegada(p));
+    if (!busquedaPersona) return vigentes.slice(0, 30);
+    return vigentes.filter(p => coincidePersona(p, busquedaPersona)).slice(0, 30);
   }, [personas, busquedaPersona]);
 
   const asignacionesPorLinea = useMemo(() => {
@@ -165,7 +221,9 @@ export default function Lineas() {
       return;
     }
     try {
-      await asignarPersona({ fecha: hoy, colaboradorId, lineaId: Number(asigLinea), formadoraId: Number(asigFormadora) });
+      await asignarPersona({ fecha: fechaAsignacion, colaboradorId, lineaId: Number(asigLinea), formadoraId: Number(asigFormadora) });
+      // Si esa línea todavía no tiene formadora a cargo ese día, queda con la que se está usando
+      if (!formadoraDeLinea.get(Number(asigLinea))) await setFormadoraLinea(fechaAsignacion, Number(asigLinea), Number(asigFormadora)).catch(() => {});
       setBusquedaPersona('');
       await cargarTodo();
     } catch (e) {
@@ -186,7 +244,7 @@ export default function Lineas() {
           <div className="card"><div className="icon"><i className="fa-solid fa-industry"></i></div>
             <div><span>Total Líneas</span><h2>{lineas.length}</h2><small>{lineasActivas.length} activas</small></div></div>
           <div className="card acento-azul"><div className="icon"><i className="fa-solid fa-users"></i></div>
-            <div><span>Operarios Asignados</span><h2>{asignaciones.length}</h2><small>hoy ({hoy})</small></div></div>
+            <div><span>Operarios Asignados</span><h2>{asignaciones.length}</h2><small>{fechaAsignacion === hoy ? 'hoy' : 'el'} {formatoFecha(fechaAsignacion)}</small></div></div>
           <div className="card acento-oro"><div className="icon"><i className="fa-solid fa-gauge-high"></i></div>
             <div><span>Cumplimiento Promedio</span><h2>{resumen.promedioCumplimiento}%</h2><small>líneas con producción</small></div></div>
           <div className="card acento-rojo"><div className="icon"><i className="fa-solid fa-chalkboard-user"></i></div>
@@ -202,7 +260,7 @@ export default function Lineas() {
         <div className="two-col-panels">
           <section className="table-panel">
             <div className="panel-header">
-              <div><h2>Líneas <span className="badge-count">{lineas.length}</span></h2><p>Activa o desactiva; solo las activas se pueden usar para asignar hoy.</p></div>
+              <div><h2>Líneas <span className="badge-count">{lineas.length}</span></h2><p>Activa o desactiva; solo las activas se pueden usar para asignar.</p></div>
             </div>
             {puedeModificar && (
               <div className="form-row" style={{ gridTemplateColumns: '2fr 2fr auto', padding: '0 20px 14px' }}>
@@ -213,12 +271,27 @@ export default function Lineas() {
             )}
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Línea</th><th>Supervisor</th><th>Estado</th>{puedeModificar && <th>Acción</th>}</tr></thead>
+                <thead><tr><th>Línea</th><th>Supervisor</th><th title="Meta de tallos por hora en clasificación. Se define cada mes: al empezar un mes nuevo arranca vacía.">Meta clasif. /h · {nombreMes(mesActual)}</th><th>Estado</th>{puedeModificar && <th>Acción</th>}</tr></thead>
                 <tbody>
                   {lineas.map(l => (
                     <tr key={l.id}>
                       <td>{l.nombre}</td>
                       <td>{l.supervisor || '—'}</td>
+                      <td>
+                        {(() => {
+                          const valor = metasMes ? (metasMes.get(l.id) ?? '') : (l.meta_hora ?? '');
+                          const previo = metasMesPrevio?.get(l.id);
+                          if (!puedeModificar) return valor === '' ? '—' : valor;
+                          return (
+                            <>
+                              <input key={`${l.id}-${mesActual}-${valor}`} type="number" min="0" className="meta-linea-input" defaultValue={valor} placeholder="—" onBlur={e => guardarMetaLinea(l, e.target.value)} />
+                              {metasMes && valor === '' && previo != null && (
+                                <button className="meta-usar-previa" title={`El mes pasado fue ${previo}. Toca para usarla este mes.`} onClick={() => guardarMetaLinea(l, previo)}>↺ {previo}</button>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </td>
                       <td><span className={`status ${l.activa ? 'success' : 'danger'}`}>{l.activa ? 'Activa' : 'Inactiva'}</span></td>
                       {puedeModificar && <td>
                         <button title={l.activa ? 'Desactivar' : 'Activar'} onClick={() => toggleLinea(l)}>
@@ -264,7 +337,35 @@ export default function Lineas() {
         </div>
 
         <section className="step-panel">
-          <h3><i className="fa-solid fa-user-plus"></i> Asignación de hoy ({hoy}) — se reinicia cada día</h3>
+          <h3><i className="fa-solid fa-user-plus"></i> Asignación de personas a formadora y línea</h3>
+          <div className="asig-fecha">
+            <div>
+              <label>Fecha de la asignación</label>
+              <input type="date" value={fechaAsignacion} onChange={e => e.target.value && setFechaAsignacion(e.target.value)} />
+            </div>
+            <p>
+              Cada fecha tiene su propia asignación (no se mezclan). Elige el día para asignar o corregir
+              {fechaAsignacion === hoy ? '' : <strong> — estás editando el {formatoFecha(fechaAsignacion)}, no hoy</strong>}.
+              {fechaAsignacion !== hoy && <button className="btn-secondary" style={{ marginLeft: 10 }} onClick={() => setFechaAsignacion(hoy)}>Volver a hoy</button>}
+            </p>
+          </div>
+
+          <div className="linea-formadora">
+            <h4><i className="fa-solid fa-link"></i> Formadora a cargo de cada línea · {formatoFecha(fechaAsignacion)}</h4>
+            <p>Elige qué formadora lleva cada línea ese día: los tallos de clasificación de esa línea se cuentan para ella. Si no eliges, se asigna sola la primera vez que le pones gente a una línea.</p>
+            <div className="linea-formadora-grid">
+              {lineasActivas.map(l => (
+                <label key={l.id} className="linea-formadora-item">
+                  <span>{l.nombre}</span>
+                  <select value={formadoraDeLinea.get(l.id)?.formadora_id ?? ''} onChange={e => cambiarFormadoraLinea(l.id, e.target.value)} disabled={!puedeModificar}>
+                    <option value="">Sin asignar</option>
+                    {formadoras.filter(f => f.activa).map(f => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+                  </select>
+                </label>
+              ))}
+              {lineasActivas.length === 0 && <span style={{ fontSize: 12, color: 'var(--gray)' }}>No hay líneas activas.</span>}
+            </div>
+          </div>
 
           {formadoras.filter(f => f.activa).length === 0 && (
             <div className="alert-inline" style={{ marginBottom: 14 }}>
@@ -304,7 +405,7 @@ export default function Lineas() {
             <div className="asignacion-busqueda">
               <span className="asignacion-paso-num">3</span>
               <div className="asignacion-paso-campo">
-                <label>Toca a la persona para asignarla de una vez (busca por nombre o código)</label>
+                <label>Toca a la persona para asignarla de una vez (busca por nombre o por código)</label>
                 <div className="search">
                   <i className="fa-solid fa-magnifying-glass"></i>
                   <input type="text" autoFocus placeholder="Escribe para buscar..." value={busquedaPersona} onChange={e => setBusquedaPersona(e.target.value)} />
@@ -313,7 +414,7 @@ export default function Lineas() {
                   {personasFiltradas.length === 0 && <div className="empty-state" style={{ padding: 16 }}>Sin resultados.</div>}
                   {personasFiltradas.map(p => (
                     <button key={p.id} className="asignacion-resultado-item" onClick={() => asignarDirecto(p.id)}>
-                      <span className="asignacion-resultado-codigo">{p.id}</span>
+                      <span className="asignacion-resultado-codigo" title="Código (mesa)">{p.mesa ?? '—'}</span>
                       <span>{p.nombre}</span>
                       <i className="fa-solid fa-circle-plus"></i>
                     </button>
@@ -329,12 +430,12 @@ export default function Lineas() {
 
           <div className="table-scroll" style={{ marginTop: 18 }}>
             <table>
-              <thead><tr><th>Código</th><th>Colaborador</th><th>Formadora</th><th>Línea</th><th>Acción</th></tr></thead>
+              <thead><tr><th>Código (mesa)</th><th>Colaborador</th><th>Formadora</th><th>Línea</th><th>Acción</th></tr></thead>
               <tbody>
-                {asignaciones.length === 0 && <tr><td colSpan={5}><div className="empty-state"><i className="fa-solid fa-user-group"></i>Todavía no hay asignaciones para hoy.</div></td></tr>}
+                {asignaciones.length === 0 && <tr><td colSpan={5}><div className="empty-state"><i className="fa-solid fa-user-group"></i>Todavía no hay asignaciones para esta fecha.</div></td></tr>}
                 {asignaciones.map(a => (
                   <tr key={a.id}>
-                    <td>{a.colaborador_id}</td>
+                    <td><strong>{a.mesa ?? '—'}</strong></td>
                     <td>{a.colaborador}</td>
                     <td>{a.formadora}</td>
                     <td>{a.linea}</td>
@@ -395,38 +496,58 @@ export default function Lineas() {
           <div className="panel-header">
             <div>
               <h2><i className="fa-solid fa-table" style={{ color: 'var(--primary)', marginRight: 8 }}></i>Tablero Integrado de Formadoras</h2>
-              <p>Una fila por formadora y día. Formadora, fecha y rendimiento promedio se llenan solos; edita Semana, Meta, Resultado y Devoluciones a mano — se guardan al salir del campo.</p>
+              <p>Formadora, línea, fecha y rendimiento promedio se llenan solos (de Boncheo). Escribe a mano Semana, Meta, Resultado y Devoluciones — se guardan al salir del campo.</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-secondary" disabled={!!exportandoTablero || tableroFilas.length === 0} onClick={() => descargarTablero('png')}><i className="fa-solid fa-file-image"></i> {exportandoTablero === 'png' ? 'Generando…' : 'Imagen'}</button>
+              <button className="btn-secondary" disabled={!!exportandoTablero || tableroFilas.length === 0} onClick={() => descargarTablero('pdf')}><i className="fa-solid fa-file-pdf"></i> {exportandoTablero === 'pdf' ? 'Generando…' : 'PDF'}</button>
             </div>
           </div>
           <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', padding: '0 20px 14px' }}>
             <div><label>Desde</label><input type="date" value={tableroDesde} onChange={e => setTableroDesde(e.target.value)} /></div>
             <div><label>Hasta</label><input type="date" value={tableroHasta} max={hoy} onChange={e => setTableroHasta(e.target.value)} /></div>
           </div>
+          <div className="tab-leyenda">
+            <span><i className="cls-punto cls-mejor"></i> Rendimiento ≥ {metaHora} /h (cumple)</span>
+            <span><i className="cls-punto cls-peor"></i> Rendimiento por debajo de {metaHora} /h</span>
+            <span><i className="cls-punto cls-peor"></i> Devoluciones mayores a 0</span>
+          </div>
           <div className="table-scroll">
-            <table>
+            <table className="tablero-tabla">
               <thead>
                 <tr>
-                  <th>Semana</th><th>Fecha</th><th>Formadora</th>
+                  <th>Semana</th><th>Fecha</th><th>Formadora</th><th>Línea</th>
                   <th>Meta tallos Clasificación</th><th>Resultado Clasificación</th>
                   <th>Rendimiento Promedio Boncheo</th><th>N° Devoluciones</th>
                 </tr>
               </thead>
               <tbody>
-                {cargandoTablero && <tr><td colSpan={7}><div className="empty-state">Cargando...</div></td></tr>}
-                {!cargandoTablero && tableroFilas.length === 0 && <tr><td colSpan={7}><div className="empty-state"><i className="fa-solid fa-table"></i>Sin asignaciones en este rango — asigna personas a formadoras arriba para que aparezcan aquí.</div></td></tr>}
+                {cargandoTablero && <tr><td colSpan={8}><div className="empty-state">Cargando...</div></td></tr>}
+                {!cargandoTablero && tableroFilas.length === 0 && <tr><td colSpan={8}><div className="empty-state"><i className="fa-solid fa-table"></i>Sin asignaciones en este rango — asigna personas a formadoras arriba para que aparezcan aquí.</div></td></tr>}
                 {tableroFilas.map(f => {
                   const clave = `${f.fecha}_${f.formadora_id}`;
                   const guardando = guardandoFilaTablero === clave;
+                  const claseRend = f.rendimientoPromedio > 0 ? (f.rendimientoPromedio >= metaHora ? 'tab-verde' : 'tab-rojo') : '';
+                  const claseDev = f.devoluciones === '' ? '' : (Number(f.devoluciones) > 0 ? 'tab-rojo' : 'tab-verde');
+                  const sinResultado = f.resultadoClasificacion === '' || f.resultadoClasificacion == null;
                   return (
                     <tr key={clave}>
                       <td><input type="text" style={{ width: 70 }} value={f.semana} onChange={e => actualizarCampoTablero(f.fecha, f.formadora_id, 'semana', e.target.value)} onBlur={() => guardarFilaTableroAhora(f)} /></td>
-                      <td>{f.fecha}</td>
+                      <td>{formatoFecha(f.fecha)}</td>
                       <td>{f.formadora}</td>
+                      <td>{f.lineas}</td>
                       <td><input type="number" style={{ width: 90 }} value={f.metaClasificacion} onChange={e => actualizarCampoTablero(f.fecha, f.formadora_id, 'metaClasificacion', e.target.value)} onBlur={() => guardarFilaTableroAhora(f)} /></td>
-                      <td><input type="number" style={{ width: 90 }} value={f.resultadoClasificacion} onChange={e => actualizarCampoTablero(f.fecha, f.formadora_id, 'resultadoClasificacion', e.target.value)} onBlur={() => guardarFilaTableroAhora(f)} /></td>
-                      <td><strong>{f.rendimientoPromedio}</strong></td>
                       <td>
-                        <input type="number" style={{ width: 80 }} value={f.devoluciones} onChange={e => actualizarCampoTablero(f.fecha, f.formadora_id, 'devoluciones', e.target.value)} onBlur={() => guardarFilaTableroAhora(f)} />
+                        <input type="number" style={{ width: 90 }} value={f.resultadoClasificacion} onChange={e => actualizarCampoTablero(f.fecha, f.formadora_id, 'resultadoClasificacion', e.target.value)} onBlur={() => guardarFilaTableroAhora(f)} />
+                        {sinResultado && f.resultadoAuto != null && (
+                          <button className="tab-auto" title="Total que ya se cargó en Clasificación para su(s) línea(s) ese día" onClick={() => usarResultadoAuto(f)}>
+                            usar {f.resultadoAuto.toLocaleString('es-CO')}
+                          </button>
+                        )}
+                      </td>
+                      <td className={claseRend}><strong>{f.rendimientoPromedio || '—'}</strong></td>
+                      <td className={claseDev}>
+                        <input type="number" min="0" style={{ width: 80 }} value={f.devoluciones} onChange={e => actualizarCampoTablero(f.fecha, f.formadora_id, 'devoluciones', e.target.value)} onBlur={() => guardarFilaTableroAhora(f)} />
                         {guardando && <i className="fa-solid fa-spinner fa-spin" style={{ marginLeft: 6, color: 'var(--gray)' }}></i>}
                       </td>
                     </tr>
@@ -434,6 +555,36 @@ export default function Lineas() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Versión de solo lectura (fuera de pantalla) que se usa para descargar imagen y PDF */}
+          <div className="tablero-export-oculto" aria-hidden="true">
+            <div ref={tableroExportRef} className="tablero-export">
+              <div className="tablero-export-cab">
+                <img src={logo} alt="" />
+                <div>
+                  <h3>Tablero Integrado de Formadoras</h3>
+                  <p>{formatoFecha(tableroDesde)} al {formatoFecha(tableroHasta)} · Meta de rendimiento: {metaHora} tallos/h</p>
+                </div>
+              </div>
+              <table className="tablero-export-tabla">
+                <thead>
+                  <tr><th>Semana</th><th>Fecha</th><th>Formadora</th><th>Línea</th><th>Meta tallos<br />Clasificación</th><th>Resultado<br />Clasificación</th><th>Rendimiento<br />Promedio Boncheo</th><th>N° de<br />devoluciones</th></tr>
+                </thead>
+                <tbody>
+                  {tableroFilas.map(f => (
+                    <tr key={`${f.fecha}_${f.formadora_id}`}>
+                      <td>{f.semana}</td><td>{formatoFecha(f.fecha)}</td><td>{f.formadora}</td><td>{f.lineas}</td>
+                      <td>{f.metaClasificacion !== '' ? Number(f.metaClasificacion).toLocaleString('es-CO') : ''}</td>
+                      <td>{f.resultadoClasificacion !== '' ? Number(f.resultadoClasificacion).toLocaleString('es-CO') : ''}</td>
+                      <td className={f.rendimientoPromedio > 0 ? (f.rendimientoPromedio >= metaHora ? 'tab-verde' : 'tab-rojo') : ''}>{f.rendimientoPromedio || ''}</td>
+                      <td className={f.devoluciones === '' ? '' : (Number(f.devoluciones) > 0 ? 'tab-rojo' : 'tab-verde')}>{f.devoluciones}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="tablero-export-pie">Verde: cumple o supera la meta de {metaHora} /h · Rojo: por debajo de la meta, o con devoluciones</p>
+            </div>
           </div>
         </section>
       </div>

@@ -7,13 +7,14 @@ import { calcularPorcentajeMeta, clasificarEstado, horasAMinutos, minutosAHoras,
 import { supabaseConfigurado } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
 import { puedeEditar } from '../lib/roles';
+import { fechaLocalISO } from '../lib/clasificacionCalculos';
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalISO();
 }
 function ayerISO() {
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  return fechaLocalISO(d);
 }
 export default function Rendimientos() {
   const {

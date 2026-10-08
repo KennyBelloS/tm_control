@@ -175,11 +175,18 @@ async function asegurarPersonas(registros) {
 
 /** Lista completa de personas para el módulo Personas (con código, rol, activo). */
 export async function listarPersonasModulo() {
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('personas')
-    .select('id, nombre, codigo_empleado, rol, activo')
+    .select('id, nombre, codigo_empleado, rol, activo, mesa')
     .order('nombre', { ascending: true });
-  if (error) throw error;
+  if (error) {
+    // Si todavía no se corrió el SQL (columna "mesa"), todo sigue funcionando sin ella.
+    ({ data, error } = await supabase
+      .from('personas')
+      .select('id, nombre, codigo_empleado, rol, activo')
+      .order('nombre', { ascending: true }));
+    if (error) throw error;
+  }
   return data || [];
 }
 
@@ -207,35 +214,40 @@ export async function getHorasTotalesPorPersona() {
 /** Sube (o actualiza) muchas personas de una vez desde el Excel de Activos Boncheo. */
 export async function insertarPersonasDesdeExcel(personas) {
   if (!personas || personas.length === 0) return { insertados: 0 };
-  const { error, count } = await supabase.from('personas').upsert(personas, {
-    onConflict: 'id',
-    count: 'exact'
-  });
-  if (error) throw error;
-  return { insertados: count ?? personas.length };
+  let r = await supabase.from('personas').upsert(personas, { onConflict: 'id', count: 'exact' });
+  if (r.error && /mesa/i.test(r.error.message || '')) {
+    const sinMesa = personas.map(({ mesa, ...resto }) => resto); // aún no existe la columna "mesa"
+    r = await supabase.from('personas').upsert(sinMesa, { onConflict: 'id', count: 'exact' });
+  }
+  if (r.error) throw r.error;
+  return { insertados: r.count ?? personas.length };
 }
 
-/** Agrega una sola persona manualmente (opcional, además de la carga por Excel). */
-export async function agregarPersonaManual({ id, nombre, codigo_empleado, rol }) {
-  const { error } = await supabase.from('personas').insert({
-    id,
-    nombre,
-    codigo_empleado: codigo_empleado || null,
-    rol: rol || null,
-    activo: true
-  });
-  if (error) {
-    if (error.code === '23505') throw new Error(`Ya existe una persona con el código ${id}.`);
-    throw error;
+/** Agrega una persona a mano. "id" es su Emp.Cod (el código con el que la identifica el boncheo). */
+export async function agregarPersonaManual({ id, nombre, mesa, rol }) {
+  const fila = { id, nombre, codigo_empleado: String(id), mesa: mesa || null, rol: rol || null, activo: true };
+  let r = await supabase.from('personas').insert(fila);
+  if (r.error && /mesa/i.test(r.error.message || '')) {
+    const { mesa: _m, ...sinMesa } = fila;
+    r = await supabase.from('personas').insert(sinMesa);
+  }
+  if (r.error) {
+    if (r.error.code === '23505') throw new Error(`Ya existe una persona con el Emp.Cod ${id}.`);
+    throw r.error;
   }
 }
 
-/** Edita nombre/código/rol de una persona existente. */
+/** Edita nombre, mesa o rol. El Emp.Cod (id) no se cambia: es lo que la une con sus rendimientos. */
 export async function actualizarPersonaModulo(id, cambios) {
-  const permitido = (({ nombre, codigo_empleado, rol }) => ({ nombre, codigo_empleado, rol }))(cambios);
-  Object.keys(permitido).forEach(k => permitido[k] === undefined && delete permitido[k]);
+  const permitido = {};
+  if (cambios.nombre !== undefined) permitido.nombre = cambios.nombre;
+  if (cambios.rol !== undefined) permitido.rol = cambios.rol || null;
+  if (cambios.mesa !== undefined) permitido.mesa = cambios.mesa === '' || cambios.mesa == null ? null : Number(cambios.mesa);
   const { error } = await supabase.from('personas').update(permitido).eq('id', id);
-  if (error) throw error;
+  if (error) {
+    if (/mesa/i.test(error.message || '')) throw new Error('Falta correr en Supabase el SQL que agrega la columna "mesa".');
+    throw error;
+  }
 }
 
 /** Activa/desactiva una persona (no se borra, para no romper el histórico ya guardado). */

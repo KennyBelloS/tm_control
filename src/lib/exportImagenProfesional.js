@@ -79,7 +79,7 @@ export async function exportarImagenProfesional({
   const generado = new Date().toLocaleString('es-CO');
   const logo = await logoBase64();
   const contenedor = document.createElement('div');
-  contenedor.style.cssText = 'position:fixed; left:-9999px; top:0; width:1120px; background:#fff; font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;';
+  contenedor.style.cssText = 'position:fixed; left:-9999px; top:0; min-width:1120px; width:max-content; background:#fff; font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;';
   contenedor.innerHTML = `
     <div style="background:linear-gradient(120deg,${VERDE_OSCURO},${VERDE}); padding:26px 30px; display:flex; align-items:center; gap:16px;">
       ${logo ? `<img src="${logo}" style="width:52px;height:52px;border-radius:50%;background:#fff;" />` : ''}

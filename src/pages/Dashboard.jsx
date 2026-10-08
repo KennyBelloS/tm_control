@@ -8,10 +8,13 @@ const TendenciaTallosChart = lazy(() => import('../components/charts/TendenciaTa
 const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChart'));
 import DashboardCarrusel from '../components/DashboardCarrusel';
 import ModoPresentacion from '../components/ModoPresentacion';
-import { getRendimientoPorLinea } from '../lib/lineas';
+import NumeroAnimado from '../components/NumeroAnimado';
+import ClasificacionLineasDashboard from '../components/ClasificacionLineasDashboard';
+import FormadoresLineasPanel from '../components/FormadoresLineasPanel';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
+import { fechaLocalISO } from '../lib/clasificacionCalculos';
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalISO();
 }
 function emojiCumplimiento(pct) {
   if (pct >= 100) return { icono: '🤩', texto: '¡Meta alcanzada!' };
@@ -40,7 +43,6 @@ export default function Dashboard() {
   const [carruselAyer, setCarruselAyer] = useState([]);
   const [fechaHistoricoMostrado, setFechaHistoricoMostrado] = useState(null);
   const [presentando, setPresentando] = useState(false);
-  const [resumenPorLinea, setResumenPorLinea] = useState([]);
 
   const [tickTiempoReal, setTickTiempoReal] = useState(0);
   useRealtimeRefresco(['rendimiento_historico', 'rendimiento_actual', 'metas_diarias', 'configuracion'], () => setTickTiempoReal(t => t + 1));
@@ -115,10 +117,7 @@ export default function Dashboard() {
   }, [hoy, tickTiempoReal]);
   return <>
       <PageHeader title="Dashboard Ejecutivo" subtitle="Resumen general de producción, en tiempo real desde el Turno Actual.">
-        <button className="btn-secondary" onClick={() => {
-          setPresentando(true);
-          getRendimientoPorLinea(hoy, hoy).then(setResumenPorLinea).catch(() => {});
-        }}>
+        <button className="btn-secondary" onClick={() => setPresentando(true)}>
           <i className="fa-solid fa-expand"></i> Presentar
         </button>
         <Link to="/rendimientos" className="btn-primary">
@@ -145,13 +144,13 @@ export default function Dashboard() {
             <h3 className="dashboard-section-title"><i className="fa-solid fa-bolt"></i> Turno Actual (en vivo, {stats.actual.bloques} bloques cargados)</h3>
             <section className="cards">
               <div className="card"><div className="icon"><i className="fa-solid fa-users"></i></div>
-                <div><span>Mesas Activas</span><h2>{stats.actual.personas}</h2><small>{hoy}</small></div></div>
+                <div><span>Mesas Activas</span><h2><NumeroAnimado valor={stats.actual.personas} /></h2><small>{hoy}</small></div></div>
               <div className="card"><div className="icon"><i className="fa-solid fa-seedling"></i></div>
-                <div><span>Total Tallos</span><h2>{stats.actual.totalTallos.toLocaleString()}</h2><small>Última carga por hora</small></div></div>
+                <div><span>Total Tallos</span><h2><NumeroAnimado valor={stats.actual.totalTallos} /></h2><small>Última carga por hora</small></div></div>
               <div className="card acento-oro"><div className="icon"><i className="fa-solid fa-gauge-high"></i></div>
-                <div><span>Rendimiento Promedio</span><h2>{stats.actual.rendimientoPromedio}</h2><small>tallos/hora real</small></div></div>
+                <div><span>Rendimiento Promedio</span><h2><NumeroAnimado valor={stats.actual.rendimientoPromedio} /></h2><small>tallos/hora real</small></div></div>
               <div className="card acento-azul"><div className="icon"><i className="fa-solid fa-chart-line"></i></div>
-                <div><span>Cumplimiento</span><h2>{stats.actual.cumplimiento}%</h2><small>Meta de hoy: {metaHoy.toLocaleString()}</small></div></div>
+                <div><span>Cumplimiento</span><h2><NumeroAnimado valor={stats.actual.cumplimiento} formato={n => `${n}%`} /></h2><small>Meta de hoy: {metaHoy.toLocaleString()}</small></div></div>
             </section>
 
             <section className="performance-summary">
@@ -167,7 +166,7 @@ export default function Dashboard() {
 
                 <div className="progress-con-emoji">
                   <div className="progress">
-                    <div style={{ width: `${Math.min(stats.actual.cumplimiento, 100)}%`, background: colorProgreso(stats.actual.cumplimiento) }}></div>
+                    <div style={{ width: `${Math.min(Number(stats.actual.cumplimiento) || 0, 100)}%`, background: colorProgreso(stats.actual.cumplimiento) }}></div>
                     <span
                       className="progress-emoji-flotante"
                       title={emojiCumplimiento(stats.actual.cumplimiento).texto}
@@ -238,6 +237,10 @@ export default function Dashboard() {
 
             <DashboardCarrusel personasHoy={carruselHoy} personasAyer={carruselAyer} metaHora={stats.cfg.metaHora} fechaHistorico={fechaHistoricoMostrado} />
 
+            <h3 className="dashboard-section-title"><i className="fa-solid fa-boxes-stacked"></i> Clasificación y formadoras</h3>
+            <ClasificacionLineasDashboard />
+            <FormadoresLineasPanel metaHora={stats.cfg.metaHora} />
+
             <h3 className="dashboard-section-title"><i className="fa-solid fa-chart-simple"></i> Visualizaciones</h3>
             <div className="dashboard-charts-grid">
               <section className="panel">
@@ -285,7 +288,6 @@ export default function Dashboard() {
           totalTallos={stats.actual.totalTallos}
           metaHoy={metaHoy}
           cumplimiento={stats.actual.cumplimiento}
-          resumenPorLinea={resumenPorLinea}
           onCerrar={() => setPresentando(false)}
         />
       )}

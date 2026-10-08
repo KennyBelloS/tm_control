@@ -33,6 +33,13 @@ export const MODULOS = {
   gerencia: {
     roles: ['administrador', 'ingeniero', 'profesional', 'digitador']
   },
+  clasificacion: {
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor']
+  },
+  tableros: {
+    // Todos los roles pueden ver este módulo, tal como pediste.
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
+  },
   configuracion: {
     roles: ['administrador', 'digitador']
   },

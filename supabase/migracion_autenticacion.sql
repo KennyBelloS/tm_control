@@ -290,3 +290,160 @@ create policy "acceso_total_tablero_formadoras" on tablero_formadoras for all us
 alter table perfiles drop constraint if exists perfiles_rol_check;
 alter table perfiles add constraint perfiles_rol_check
   check (rol in ('administrador','ingeniero','profesional','digitador','supervisor','formador'));
+
+-- ---------------------------------------------------------------------
+-- 16. Clasificación hora a hora
+--     - clasificacion_hora: tallos movidos por línea y hora (se conserva
+--       solo 2 días; se borra a las 5 a.m. del segundo día siguiente).
+--     - clasificacion_cargas: una fila por día (hasta qué hora llega el reporte).
+--     - clasificacion_historico: total diario por línea, PERMANENTE y automático.
+--     - lineas.meta_hora: meta de tallos/hora de clasificación por línea.
+-- ---------------------------------------------------------------------
+alter table lineas add column if not exists meta_hora integer;
+
+create table if not exists clasificacion_hora (
+  fecha        date     not null,
+  linea        smallint not null,
+  hora         smallint not null check (hora between 0 and 23),
+  tallos       integer  not null default 0,
+  movimientos  integer  not null default 0,
+  primary key (fecha, linea, hora)
+);
+create index if not exists idx_clasificacion_hora_fecha on clasificacion_hora (fecha);
+
+create table if not exists clasificacion_cargas (
+  fecha        date primary key,
+  corte_min    smallint not null,
+  ultima_hora  smallint not null,
+  parcial      boolean  not null default false,
+  movimientos  integer  not null default 0,
+  cargado_en   timestamptz not null default now()
+);
+
+create table if not exists clasificacion_historico (
+  fecha          date     not null,
+  linea          smallint not null,
+  total_tallos   integer  not null default 0,
+  movimientos    integer  not null default 0,
+  actualizado_en timestamptz not null default now(),
+  primary key (fecha, linea)
+);
+
+alter table clasificacion_hora enable row level security;
+alter table clasificacion_cargas enable row level security;
+alter table clasificacion_historico enable row level security;
+drop policy if exists "acceso_total_clasificacion_hora" on clasificacion_hora;
+create policy "acceso_total_clasificacion_hora" on clasificacion_hora for all using (true) with check (true);
+drop policy if exists "acceso_total_clasificacion_cargas" on clasificacion_cargas;
+create policy "acceso_total_clasificacion_cargas" on clasificacion_cargas for all using (true) with check (true);
+drop policy if exists "acceso_total_clasificacion_historico" on clasificacion_historico;
+create policy "acceso_total_clasificacion_historico" on clasificacion_historico for all using (true) with check (true);
+
+do $$
+declare tabla text;
+begin
+  foreach tabla in array array['clasificacion_hora', 'clasificacion_cargas']
+  loop
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = tabla) then
+      execute format('alter publication supabase_realtime add table %I', tabla);
+    end if;
+  end loop;
+end $$;
+
+NOTIFY pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------
+-- 17. Personas: el identificador es el Emp.Cod (el "Colaborador Id" que trae
+--     el reporte de boncheo). La mesa pasa a ser un dato más (es el "código"
+--     que se ve en pantalla). Corrige a quienes quedaron guardados con la
+--     mesa como id, para que las asignaciones crucen con los rendimientos.
+-- ---------------------------------------------------------------------
+alter table personas add column if not exists mesa integer;
+
+insert into personas (id, nombre, codigo_empleado, rol, activo, mesa)
+select p.codigo_empleado::integer, p.nombre, p.codigo_empleado, p.rol, p.activo, p.id
+from personas p
+where p.codigo_empleado ~ '^[0-9]{1,9}$' and p.codigo_empleado::integer <> p.id
+on conflict (id) do update set
+  codigo_empleado = excluded.codigo_empleado,
+  rol    = coalesce(excluded.rol, personas.rol),
+  mesa   = coalesce(excluded.mesa, personas.mesa),
+  activo = excluded.activo;
+
+update asignaciones_diarias a
+set colaborador_id = p.codigo_empleado::integer
+from personas p
+where a.colaborador_id = p.id
+  and p.codigo_empleado ~ '^[0-9]{1,9}$' and p.codigo_empleado::integer <> p.id
+  and not exists (select 1 from asignaciones_diarias b where b.fecha = a.fecha and b.colaborador_id = p.codigo_empleado::integer);
+
+delete from personas p
+where p.codigo_empleado ~ '^[0-9]{1,9}$' and p.codigo_empleado::integer <> p.id
+  and not exists (select 1 from rendimiento_historico h where h.colaborador_id = p.id)
+  and not exists (select 1 from rendimiento_actual r where r.colaborador_id = p.id);
+
+NOTIFY pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------
+-- 18. Meta de tallos/hora por línea, POR MES (se reinicia cada mes).
+--     Lo que ya tenías definido pasa a ser la meta del mes actual.
+-- ---------------------------------------------------------------------
+create table if not exists metas_linea_mes (
+  mes        text   not null check (mes ~ '^[0-9]{4}-[0-9]{2}$'),
+  linea_id   bigint not null references lineas(id) on delete cascade,
+  meta_hora  integer not null check (meta_hora >= 0),
+  primary key (mes, linea_id)
+);
+alter table metas_linea_mes enable row level security;
+drop policy if exists "acceso_total_metas_linea_mes" on metas_linea_mes;
+create policy "acceso_total_metas_linea_mes" on metas_linea_mes for all using (true) with check (true);
+insert into metas_linea_mes (mes, linea_id, meta_hora)
+select to_char((now() at time zone 'America/Bogota'), 'YYYY-MM'), id, meta_hora
+from lineas where meta_hora is not null
+on conflict (mes, linea_id) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 19. Formadora a cargo de cada línea, por fecha (se elige a mano).
+-- ---------------------------------------------------------------------
+create table if not exists formadora_linea (
+  fecha        date   not null,
+  linea_id     bigint not null references lineas(id) on delete cascade,
+  formadora_id bigint not null references formadoras(id) on delete cascade,
+  primary key (fecha, linea_id)
+);
+alter table formadora_linea enable row level security;
+drop policy if exists "acceso_total_formadora_linea" on formadora_linea;
+create policy "acceso_total_formadora_linea" on formadora_linea for all using (true) with check (true);
+
+-- ---------------------------------------------------------------------
+-- 20. Notas privadas de módulos (la contraseña del tablero). Solo la leen
+--     Administrador, Ingeniero y Supervisor; solo el Administrador la cambia.
+--     Así NO queda escrita en el código de la app (que se descarga en el navegador).
+-- ---------------------------------------------------------------------
+create table if not exists notas_modulo (
+  clave          text primary key,
+  valor          text not null,
+  actualizado_en timestamptz not null default now()
+);
+alter table notas_modulo enable row level security;
+drop policy if exists "notas_leer_roles" on notas_modulo;
+create policy "notas_leer_roles" on notas_modulo for select using (
+  exists (select 1 from perfiles p where p.id = auth.uid() and p.activo and p.rol in ('administrador', 'ingeniero', 'supervisor'))
+);
+drop policy if exists "notas_admin_escribe" on notas_modulo;
+create policy "notas_admin_escribe" on notas_modulo for all using (es_administrador()) with check (es_administrador());
+insert into notas_modulo (clave, valor) values ('tableros_clave', 'miClave2026')
+on conflict (clave) do update set valor = excluded.valor, actualizado_en = now();
+
+do $$
+declare tabla text;
+begin
+  foreach tabla in array array['metas_linea_mes', 'formadora_linea']
+  loop
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = tabla) then
+      execute format('alter publication supabase_realtime add table %I', tabla);
+    end if;
+  end loop;
+end $$;
+
+NOTIFY pgrst, 'reload schema';

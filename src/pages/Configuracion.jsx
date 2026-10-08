@@ -4,8 +4,9 @@ import { getConfig, setConfig, getHistorico, getActual, borrarTablaHistorico, bo
 import { supabaseConfigurado } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
 import { ROL_LABEL, cerrarSesion } from '../lib/roles';
+import { fechaLocalISO } from '../lib/clasificacionCalculos';
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalISO();
 }
 export default function Configuracion() {
   const {

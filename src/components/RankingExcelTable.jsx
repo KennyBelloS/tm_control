@@ -74,7 +74,7 @@ export default function RankingExcelTable({
                     <span className="ranking-avatar">{iniciales(p.colaborador)}</span>
                     <div>
                       <div className="ranking-nombre">{p.colaborador}</div>
-                      <div className="ranking-id">Código {p.colaborador_id}</div>
+                      <div className="ranking-id">{p.codigo ? `Código ${p.codigo}` : `Emp.Cod ${p.colaborador_id}`}</div>
                     </div>
                   </td>
                   <td>{(p.totalTallos || 0).toLocaleString()}</td>

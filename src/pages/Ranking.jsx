@@ -7,9 +7,10 @@ const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChar
 import { getRankingDia, getRankingHoraAHora, getRankingRango, getConfig, getMetaTotalPeriodo } from '../lib/db';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { calcularPorcentajeMeta, clasificarEstado } from '../lib/calculos';
+import { fechaLocalISO } from '../lib/clasificacionCalculos';
 
 function hoyISO() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocalISO();
 }
 function mesActualISO() {
   return new Date().toISOString().slice(0, 7);

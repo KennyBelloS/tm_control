@@ -97,57 +97,47 @@ export function parsearReporteBoncheo(arrayBuffer, {
  */
 export function parsearReportePersonas(arrayBuffer) {
   const workbook = leerLibro(arrayBuffer);
-  const nombreHoja = workbook.SheetNames[0];
-  const hoja = workbook.Sheets[nombreHoja];
-  const matriz = XLSX.utils.sheet_to_json(hoja, {
-    header: 1,
-    raw: true,
-    defval: null
-  });
+  const hoja = workbook.Sheets[workbook.SheetNames[0]];
+  const matriz = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: true, defval: null });
   let filaHeader = -1;
   const columnas = {};
   for (let r = 0; r < matriz.length; r++) {
     const fila = matriz[r] || [];
-    const idx = fila.findIndex(c => normalizar(c) === 'mesa');
-    if (idx !== -1) {
+    if (fila.findIndex(c => normalizar(c) === 'mesa') !== -1) {
       filaHeader = r;
-      fila.forEach((c, i) => {
-        const t = normalizar(c);
-        if (t) columnas[t] = i;
-      });
+      fila.forEach((c, i) => { const t = normalizar(c); if (t) columnas[t] = i; });
       break;
     }
   }
-  if (filaHeader === -1) {
-    throw new Error('No se encontró la columna "Mesa" en el archivo. Verifica que sea el reporte de Activos Boncheo.');
-  }
+  if (filaHeader === -1) throw new Error('No se encontró la columna "Mesa" en el archivo. Verifica que sea el reporte de Activos Boncheo.');
   const idxMesa = columnas['mesa'];
   const idxNombre = columnas['nombre'];
   const idxEmpCod = columnas['emp.cod'] ?? columnas['emp cod'] ?? columnas['empcod'];
   const idxRol = columnas['rol'];
-  if (idxNombre === undefined) {
-    throw new Error('No se encontró la columna "Nombre" en el archivo.');
-  }
+  if (idxNombre === undefined) throw new Error('No se encontró la columna "Nombre" en el archivo.');
+  if (idxEmpCod === undefined) throw new Error('No se encontró la columna "Emp.Cod". Es el código con el que el boncheo identifica a cada persona, así que es obligatorio.');
 
-  const personas = [];
+  const porCodigo = new Map();
+  let sinCodigo = 0;
   for (let r = filaHeader + 1; r < matriz.length; r++) {
     const fila = matriz[r] || [];
-    const mesa = fila[idxMesa];
     const nombre = fila[idxNombre];
-    if (mesa === null || mesa === undefined || !nombre) continue;
-    const id = Number(mesa);
-    if (!Number.isFinite(id) || id === 0) continue;
-    personas.push({
-      id,
-      nombre: String(nombre).trim(),
-      codigo_empleado: idxEmpCod !== undefined && fila[idxEmpCod] !== null ? String(fila[idxEmpCod]).trim() : null,
+    if (!nombre) continue;
+    const empCod = Number(String(fila[idxEmpCod] ?? '').trim());
+    if (!Number.isInteger(empCod) || empCod <= 0) { sinCodigo++; continue; }
+    const mesa = Number(fila[idxMesa]);
+    porCodigo.set(empCod, {
+      id: empCod,                                   // el boncheo identifica a la persona por su Emp.Cod
+      nombre: String(nombre).replace(/\{\}/g, '').replace(/\s+/g, ' ').trim(),
+      codigo_empleado: String(empCod),
+      mesa: Number.isInteger(mesa) && mesa > 0 ? mesa : null,
       rol: idxRol !== undefined && fila[idxRol] ? String(fila[idxRol]).trim() : null,
       activo: true
     });
   }
-  if (personas.length === 0) {
-    throw new Error('No se encontraron personas válidas en el archivo.');
-  }
+  const personas = [...porCodigo.values()];
+  if (personas.length === 0) throw new Error('No se encontraron personas válidas en el archivo.');
+  personas.sinCodigo = sinCodigo;
   return personas;
 }
 

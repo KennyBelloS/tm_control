@@ -2,6 +2,8 @@ import { createContext, useContext, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import AvisoHistoricoDesactualizado from './AvisoHistoricoDesactualizado';
+import PieLegal from './PieLegal';
+import PaletaComandos from './PaletaComandos';
 const MenuContext = createContext(() => {});
 export function useMenuToggle() {
   return useContext(MenuContext);
@@ -10,10 +12,12 @@ export default function Layout() {
   const [open, setOpen] = useState(false);
   return <MenuContext.Provider value={() => setOpen(o => !o)}>
       <div className={`overlay ${open ? 'visible' : ''}`} onClick={() => setOpen(false)} />
+      <PaletaComandos />
       <Sidebar open={open} onNavigate={() => setOpen(false)} onClose={() => setOpen(false)} />
       <main className="main">
         <AvisoHistoricoDesactualizado />
         <Outlet />
+        <PieLegal />
       </main>
     </MenuContext.Provider>;
 }

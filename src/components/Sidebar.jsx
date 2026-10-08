@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import logo from '../assets/logo-icon.png';
 import { puedeVer } from '../lib/roles';
 import { useSesion } from '../lib/useSesion';
-const MODULOS_PRINCIPALES = [{
+export const MODULOS_PRINCIPALES = [{
   to: '/',
   icon: 'fa-house',
   label: 'Dashboard',
@@ -33,8 +33,18 @@ const MODULOS_PRINCIPALES = [{
   icon: 'fa-warehouse',
   label: 'Líneas',
   key: 'lineas'
+}, {
+  to: '/clasificacion',
+  icon: 'fa-boxes-stacked',
+  label: 'Clasificación',
+  key: 'clasificacion'
+}, {
+  to: '/tableros',
+  icon: 'fa-table-columns',
+  label: 'Tableros',
+  key: 'tableros'
 }];
-const MODULOS_GESTION = [{
+export const MODULOS_GESTION = [{
   to: '/indirectos',
   icon: 'fa-user-gear',
   label: 'Indirectos',
@@ -50,7 +60,7 @@ const MODULOS_GESTION = [{
   label: 'Configuración',
   key: 'configuracion'
 }];
-const MODULOS_TECNICOS = [{
+export const MODULOS_TECNICOS = [{
   to: '/usuarios',
   icon: 'fa-user-shield',
   label: 'Usuarios',
