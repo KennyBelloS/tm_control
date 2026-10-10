@@ -4,7 +4,7 @@ import ClasificacionPanel from '../components/ClasificacionPanel';
 import { useSesion } from '../lib/useSesion';
 import { puedeEditar } from '../lib/roles';
 import {
-  fechaLocalISO, formatoFecha, etiquetaHora, minutosAHora, horaAMinutos,
+  fechaLocalISO, formatoFecha, etiquetaHora, minutosAHora, horaAMinutos, etiquetaCortaLinea, nombreLineaClasificacion,
   parsearMovimientosClasificacion, resumirMovimientos,
   getCargaDia, guardarClasificacionDia, getHistoricoClasificacion
 } from '../lib/clasificacion';
@@ -131,11 +131,18 @@ export default function Clasificacion() {
                   <div className="alert err"><i className="fa-solid fa-circle-exclamation"></i> Con esa hora no queda ningún movimiento. Elige una hora más tarde.</div>
                 ) : (
                   <div className="cls-previa">
-                    <div><span>Líneas</span><strong>{resumen.lineas.map(l => `L${l}`).join(' · ')}</strong></div>
+                    <div><span>Líneas</span><strong>{resumen.lineas.map(etiquetaCortaLinea).join(' · ')}</strong></div>
                     <div><span>Horas</span><strong>{etiquetaHora(resumen.horaInicial)} → {etiquetaHora(resumen.ultimaHora)}</strong></div>
                     <div><span>Tallos</span><strong>{fmt(resumen.totalTallos)}</strong></div>
                     <div><span>Movimientos</span><strong>{resumen.movimientosIncluidos}{resumen.excluidos > 0 ? ` (${resumen.excluidos} quedan fuera)` : ''}</strong></div>
                     <div><span>Última hora</span><strong>{resumen.parcial ? `en curso (${resumen.corteMin % 60} min)` : 'completa'}</strong></div>
+                  </div>
+                )}
+
+                {parseado?.sinNumero > 0 && !resumen.vacio && (
+                  <div className="alert ok" style={{ marginTop: 12 }}>
+                    <i className="fa-solid fa-circle-info"></i>
+                    {parseado.sinNumero} movimiento(s) vienen de una <strong>mesa sin número</strong> (por ejemplo "supportTable"). Se cuentan como <strong>Support Table</strong>, así el total coincide con el reporte.
                   </div>
                 )}
 
@@ -178,7 +185,7 @@ export default function Clasificacion() {
             </div>
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Fecha</th>{lineasHistorico.map(l => <th key={l}>Línea {l}</th>)}<th>Total</th></tr></thead>
+                <thead><tr><th>Fecha</th>{lineasHistorico.map(l => <th key={l}>{nombreLineaClasificacion(l)}</th>)}<th>Total</th></tr></thead>
                 <tbody>
                   {fechasHistorico.map(f => {
                     const filas = historico.filter(h => h.fecha === f);

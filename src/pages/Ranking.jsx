@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, lazy, Suspense } from 'react';
 import PageHeader from '../components/PageHeader';
 import RankingExcelTable from '../components/RankingExcelTable';
 import Top3Podium from '../components/Top3Podium';
+import RankingFormadoras from '../components/RankingFormadoras';
 import CarruselLista from '../components/CarruselLista';
 const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChart'));
 import { getRankingDia, getRankingHoraAHora, getRankingRango, getConfig, getMetaTotalPeriodo } from '../lib/db';
@@ -100,6 +101,10 @@ export default function Ranking() {
     const tallosTotales = lista.reduce((s, p) => s + (p.totalTallos || 0), 0);
     return { mejor, operarios, cumplen, promedioPct, tallosTotales };
   }, [lista, rendimientoPromedioGeneral, metaHora]);
+
+  // período que se está viendo (para el ranking de formadoras)
+  const [desdeRank, hastaRank] = fuente === 'actual' || periodo === 'dia' ? [fecha, fecha]
+    : periodo === 'semana' ? [rangoSemanaActual.inicio, rangoSemanaActual.fin] : [rangoMesActual.inicio, rangoMesActual.fin];
 
   const tituloTabla = fuente === 'actual'
     ? 'Ranking del Turno Actual (hora a hora)'
@@ -200,6 +205,8 @@ export default function Ranking() {
             </Suspense>
           </section>
         )}
+
+        <RankingFormadoras fuente={fuente} desde={desdeRank} hasta={hastaRank} metaHora={metaHora} />
 
         <section className="panel">
           {!cargando && lista.length === 0 ? (

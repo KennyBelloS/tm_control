@@ -12,7 +12,8 @@ import {
   listarFormadoras, crearFormadora, cambiarActivaFormadora,
   getAsignacionesDia, asignarPersona, quitarAsignacion,
   getRendimientoPorLinea, getTableroFormadoras, guardarFilaTablero,
-  getMetasMes, guardarMetaMes, mesDe, mesAnterior, getFormadoraLinea, setFormadoraLinea
+  getMetasMes, guardarMetaMes, mesDe, mesAnterior, getFormadoraLinea, setFormadoraLinea,
+  actualizarFormadora, eliminarFormadora, actualizarAsignacion, getLineasDia, setLineaDia
 } from '../lib/lineas';
 
 const nombreMes = mes => {
@@ -53,6 +54,12 @@ export default function Lineas() {
   const [cargando, setCargando] = useState(true);
   const [mensaje, setMensaje] = useState(null);
 
+  const [metaTick, setMetaTick] = useState(0);
+  const [lineasDia, setLineasDia] = useState(new Map());     // ajustes de "trabaja / no trabaja" para la fecha elegida
+  const [editandoLineaId, setEditandoLineaId] = useState(null);
+  const [borradorLinea, setBorradorLinea] = useState({ nombre: '', supervisor: '' });
+  const [editandoFormId, setEditandoFormId] = useState(null);
+  const [borradorForm, setBorradorForm] = useState('');
   const [nuevaLinea, setNuevaLinea] = useState('');
   const [nuevoSupervisor, setNuevoSupervisor] = useState('');
   const [nuevaFormadora, setNuevaFormadora] = useState('');
@@ -64,7 +71,7 @@ export default function Lineas() {
   async function cargarTodo() {
     setCargando(true);
     try {
-      const [l, f, p, a, r, cfg, mm, mp, fl] = await Promise.all([
+      const [l, f, p, a, r, cfg, mm, mp, fl, ld] = await Promise.all([
         listarLineas(),
         listarFormadoras(),
         listarPersonasModulo(),
@@ -73,9 +80,10 @@ export default function Lineas() {
         getConfig(),
         getMetasMes(mesActual),
         getMetasMes(mesAnterior(mesActual)),
-        getFormadoraLinea(fechaAsignacion)
+        getFormadoraLinea(fechaAsignacion),
+        getLineasDia(fechaAsignacion)
       ]);
-      setMetasMes(mm); setMetasMesPrevio(mp); setFormadoraDeLinea(fl);
+      setMetasMes(mm); setMetasMesPrevio(mp); setFormadoraDeLinea(fl); setLineasDia(ld);
       setLineas(l);
       setFormadoras(f);
       setPersonas(p);
@@ -117,6 +125,11 @@ export default function Lineas() {
   async function guardarMetaLinea(linea, valor) {
     const meta = valor === '' || valor == null ? null : Number(valor);
     if (meta !== null && (!Number.isFinite(meta) || meta < 0)) return;
+    // La meta es por HORA (ej. 5.000). Un número muy grande suele ser la meta del DÍA escrita por error.
+    if (meta !== null && meta > 15000 && !confirm(`${meta.toLocaleString('es-CO')} tallos POR HORA parece demasiado alto (¿es la meta del día?). Este campo es la meta por hora, por ejemplo 5.000.\n\n¿Guardar ${meta.toLocaleString('es-CO')} de todos modos?`)) {
+      setMetaTick(t => t + 1);
+      return;
+    }
     try {
       if (metasMes) {                               // metas por mes (se reinician cada mes)
         if ((metasMes.get(linea.id) ?? null) === meta) return;
@@ -161,7 +174,8 @@ export default function Lineas() {
     }
   }
 
-  const lineasActivas = useMemo(() => lineas.filter(l => l.activa), [lineas]);
+  // Una línea trabaja ese día si así se ajustó; si no hay ajuste, vale lo general de la línea (activa/inactiva)
+  const lineasActivas = useMemo(() => lineas.filter(l => lineasDia.has(l.id) ? lineasDia.get(l.id) : l.activa), [lineas, lineasDia]);
 
   const personasFiltradas = useMemo(() => {
     const vigentes = personas.filter(p => p.activo && !esFilaMesaLegada(p));
@@ -187,6 +201,48 @@ export default function Lineas() {
 
   const maxOperariosLinea = Math.max(1, ...asignacionesPorLinea.map(l => l.cantidad));
 
+  async function guardarEdicionLinea(id) {
+    const nombre = borradorLinea.nombre.trim();
+    if (!nombre) { setMensaje({ tipo: 'err', texto: 'La línea necesita un nombre.' }); return; }
+    try {
+      await actualizarLinea(id, { nombre, supervisor: borradorLinea.supervisor.trim() || null });
+      setEditandoLineaId(null);
+      await cargarTodo();
+    } catch (e) {
+      setMensaje({ tipo: 'err', texto: e.code === '23505' ? 'Ya existe una línea con ese nombre.' : e.message });
+    }
+  }
+  async function guardarEdicionFormadora(id) {
+    const nombre = borradorForm.trim();
+    if (!nombre) { setMensaje({ tipo: 'err', texto: 'La formadora necesita un nombre.' }); return; }
+    try {
+      await actualizarFormadora(id, nombre);
+      setEditandoFormId(null);
+      await cargarTodo();
+    } catch (e) {
+      setMensaje({ tipo: 'err', texto: e.message });
+    }
+  }
+  async function borrarFormadora(f) {
+    if (!confirm(`¿Eliminar a ${f.nombre}? También se quitarán sus asignaciones y las líneas que tenía a cargo. Si solo quieres que no aparezca, mejor desactívala.`)) return;
+    try { await eliminarFormadora(f.id); await cargarTodo(); } catch (e) { setMensaje({ tipo: 'err', texto: e.message }); }
+  }
+  async function corregirAsignacion(a, campo, valor) {
+    try {
+      await actualizarAsignacion(a.id, campo === 'linea' ? { lineaId: Number(valor) } : { formadoraId: Number(valor) });
+      await cargarTodo();
+    } catch (e) {
+      setMensaje({ tipo: 'err', texto: e.message });
+    }
+  }
+  async function cambiarLineaDia(linea, trabaja) {
+    try {
+      await setLineaDia(fechaAsignacion, linea.id, trabaja);
+      setLineasDia(await getLineasDia(fechaAsignacion));
+    } catch (e) {
+      setMensaje({ tipo: 'err', texto: e.message });
+    }
+  }
   async function agregarLinea() {
     if (!nuevaLinea.trim()) return;
     try {
@@ -271,12 +327,16 @@ export default function Lineas() {
             )}
             <div className="table-scroll">
               <table>
-                <thead><tr><th>Línea</th><th>Supervisor</th><th title="Meta de tallos por hora en clasificación. Se define cada mes: al empezar un mes nuevo arranca vacía.">Meta clasif. /h · {nombreMes(mesActual)}</th><th>Estado</th>{puedeModificar && <th>Acción</th>}</tr></thead>
+                <thead><tr><th>Línea</th><th>Supervisor</th><th title="Meta de tallos de clasificación de TODO el día para esa línea. Es solo informativa (no cambia lo que deberían llevar a cada hora). Se define cada mes: al empezar un mes nuevo arranca vacía.">Meta del día (tallos) · {nombreMes(mesActual)}</th><th>Estado</th>{puedeModificar && <th>Acción</th>}</tr></thead>
                 <tbody>
                   {lineas.map(l => (
                     <tr key={l.id}>
-                      <td>{l.nombre}</td>
-                      <td>{l.supervisor || '—'}</td>
+                      {editandoLineaId === l.id
+                        ? <td><input type="text" value={borradorLinea.nombre} onChange={e => setBorradorLinea(b => ({ ...b, nombre: e.target.value }))} /></td>
+                        : <td>{l.nombre}</td>}
+                      {editandoLineaId === l.id
+                        ? <td><input type="text" value={borradorLinea.supervisor} placeholder="—" onChange={e => setBorradorLinea(b => ({ ...b, supervisor: e.target.value }))} /></td>
+                        : <td>{l.supervisor || '—'}</td>}
                       <td>
                         {(() => {
                           const valor = metasMes ? (metasMes.get(l.id) ?? '') : (l.meta_hora ?? '');
@@ -284,7 +344,7 @@ export default function Lineas() {
                           if (!puedeModificar) return valor === '' ? '—' : valor;
                           return (
                             <>
-                              <input key={`${l.id}-${mesActual}-${valor}`} type="number" min="0" className="meta-linea-input" defaultValue={valor} placeholder="—" onBlur={e => guardarMetaLinea(l, e.target.value)} />
+                              <input key={`${l.id}-${mesActual}-${valor}-${metaTick}`} type="number" min="0" className="meta-linea-input" defaultValue={valor} placeholder="—" onBlur={e => guardarMetaLinea(l, e.target.value)} />
                               {metasMes && valor === '' && previo != null && (
                                 <button className="meta-usar-previa" title={`El mes pasado fue ${previo}. Toca para usarla este mes.`} onClick={() => guardarMetaLinea(l, previo)}>↺ {previo}</button>
                               )}
@@ -294,9 +354,19 @@ export default function Lineas() {
                       </td>
                       <td><span className={`status ${l.activa ? 'success' : 'danger'}`}>{l.activa ? 'Activa' : 'Inactiva'}</span></td>
                       {puedeModificar && <td>
-                        <button title={l.activa ? 'Desactivar' : 'Activar'} onClick={() => toggleLinea(l)}>
-                          <i className={`fa-solid ${l.activa ? 'fa-toggle-on' : 'fa-toggle-off'}`}></i>
-                        </button>
+                        {editandoLineaId === l.id ? (
+                          <>
+                            <button title="Guardar" onClick={() => guardarEdicionLinea(l.id)}><i className="fa-solid fa-check"></i></button>
+                            <button title="Cancelar" onClick={() => setEditandoLineaId(null)}><i className="fa-solid fa-xmark"></i></button>
+                          </>
+                        ) : (
+                          <>
+                            <button title="Editar nombre y supervisor" onClick={() => { setEditandoLineaId(l.id); setBorradorLinea({ nombre: l.nombre, supervisor: l.supervisor || '' }); }}><i className="fa-solid fa-pen"></i></button>
+                            <button title={l.activa ? 'Desactivar (en general)' : 'Activar (en general)'} onClick={() => toggleLinea(l)}>
+                              <i className={`fa-solid ${l.activa ? 'fa-toggle-on' : 'fa-toggle-off'}`}></i>
+                            </button>
+                          </>
+                        )}
                       </td>}
                     </tr>
                   ))}
@@ -321,12 +391,25 @@ export default function Lineas() {
                 <tbody>
                   {formadoras.map(f => (
                     <tr key={f.id}>
-                      <td>{f.nombre}</td>
+                      {editandoFormId === f.id
+                        ? <td><input type="text" value={borradorForm} onChange={e => setBorradorForm(e.target.value)} onKeyDown={e => e.key === 'Enter' && guardarEdicionFormadora(f.id)} /></td>
+                        : <td>{f.nombre}</td>}
                       <td><span className={`status ${f.activa ? 'success' : 'danger'}`}>{f.activa ? 'Activa' : 'Inactiva'}</span></td>
                       {puedeModificar && <td>
-                        <button title={f.activa ? 'Desactivar' : 'Activar'} onClick={() => toggleFormadora(f)}>
-                          <i className={`fa-solid ${f.activa ? 'fa-toggle-on' : 'fa-toggle-off'}`}></i>
-                        </button>
+                        {editandoFormId === f.id ? (
+                          <>
+                            <button title="Guardar" onClick={() => guardarEdicionFormadora(f.id)}><i className="fa-solid fa-check"></i></button>
+                            <button title="Cancelar" onClick={() => setEditandoFormId(null)}><i className="fa-solid fa-xmark"></i></button>
+                          </>
+                        ) : (
+                          <>
+                            <button title="Cambiar el nombre" onClick={() => { setEditandoFormId(f.id); setBorradorForm(f.nombre); }}><i className="fa-solid fa-pen"></i></button>
+                            <button title={f.activa ? 'Desactivar' : 'Activar'} onClick={() => toggleFormadora(f)}>
+                              <i className={`fa-solid ${f.activa ? 'fa-toggle-on' : 'fa-toggle-off'}`}></i>
+                            </button>
+                            <button title="Eliminar" onClick={() => borrarFormadora(f)}><i className="fa-solid fa-trash"></i></button>
+                          </>
+                        )}
                       </td>}
                     </tr>
                   ))}
@@ -351,19 +434,27 @@ export default function Lineas() {
           </div>
 
           <div className="linea-formadora">
-            <h4><i className="fa-solid fa-link"></i> Formadora a cargo de cada línea · {formatoFecha(fechaAsignacion)}</h4>
-            <p>Elige qué formadora lleva cada línea ese día: los tallos de clasificación de esa línea se cuentan para ella. Si no eliges, se asigna sola la primera vez que le pones gente a una línea.</p>
+            <h4><i className="fa-solid fa-link"></i> Líneas y formadora a cargo · {formatoFecha(fechaAsignacion)}</h4>
+            <p>Marca qué líneas trabajan este día y elige qué formadora lleva cada una: los tallos de clasificación de esa línea se cuentan para ella. Si no eliges, se asigna sola la primera vez que le pones gente a una línea.</p>
             <div className="linea-formadora-grid">
-              {lineasActivas.map(l => (
-                <label key={l.id} className="linea-formadora-item">
-                  <span>{l.nombre}</span>
-                  <select value={formadoraDeLinea.get(l.id)?.formadora_id ?? ''} onChange={e => cambiarFormadoraLinea(l.id, e.target.value)} disabled={!puedeModificar}>
-                    <option value="">Sin asignar</option>
-                    {formadoras.filter(f => f.activa).map(f => <option key={f.id} value={f.id}>{f.nombre}</option>)}
-                  </select>
-                </label>
-              ))}
-              {lineasActivas.length === 0 && <span style={{ fontSize: 12, color: 'var(--gray)' }}>No hay líneas activas.</span>}
+              {lineas.map(l => {
+                const trabaja = lineasDia.has(l.id) ? lineasDia.get(l.id) : l.activa;
+                return (
+                  <div key={l.id} className={`linea-formadora-item ${trabaja ? '' : 'linea-descansa'}`}>
+                    <span className="linea-formadora-cab">
+                      {l.nombre}
+                      <label className="linea-trabaja" title="Marca si esta línea trabaja este día. Solo cambia esta fecha.">
+                        <input type="checkbox" checked={trabaja} disabled={!puedeModificar} onChange={e => cambiarLineaDia(l, e.target.checked)} /> trabaja este día
+                      </label>
+                    </span>
+                    <select value={formadoraDeLinea.get(l.id)?.formadora_id ?? ''} onChange={e => cambiarFormadoraLinea(l.id, e.target.value)} disabled={!puedeModificar || !trabaja}>
+                      <option value="">Sin asignar</option>
+                      {formadoras.filter(f => f.activa).map(f => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+                    </select>
+                  </div>
+                );
+              })}
+              {lineas.length === 0 && <span style={{ fontSize: 12, color: 'var(--gray)' }}>No hay líneas.</span>}
             </div>
           </div>
 
@@ -437,8 +528,16 @@ export default function Lineas() {
                   <tr key={a.id}>
                     <td><strong>{a.mesa ?? '—'}</strong></td>
                     <td>{a.colaborador}</td>
-                    <td>{a.formadora}</td>
-                    <td>{a.linea}</td>
+                    <td>{puedeModificar
+                      ? <select className="asig-select" value={a.formadora_id} onChange={e => corregirAsignacion(a, 'formadora', e.target.value)}>
+                          {formadoras.filter(f => f.activa || f.id === a.formadora_id).map(f => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+                        </select>
+                      : a.formadora}</td>
+                    <td>{puedeModificar
+                      ? <select className="asig-select" value={a.linea_id} onChange={e => corregirAsignacion(a, 'linea', e.target.value)}>
+                          {lineas.filter(l => lineasActivas.some(x => x.id === l.id) || l.id === a.linea_id).map(l => <option key={l.id} value={l.id}>{l.nombre}</option>)}
+                        </select>
+                      : a.linea}</td>
                     <td><button title="Quitar" onClick={() => quitar(a.id)}><i className="fa-solid fa-trash"></i></button></td>
                   </tr>
                 ))}

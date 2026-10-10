@@ -38,6 +38,11 @@ function minutosDeCelda(v) {
   return horaAMinutos(String(v).trim());
 }
 
+/** Código interno de la mesa SIN número (ej. "supportTable"). No es una línea de producción: no compite por el liderazgo. */
+export const LINEA_SUPPORT = 99;
+export const nombreLineaClasificacion = n => (n === LINEA_SUPPORT ? 'Support Table' : `Línea ${n}`);
+export const etiquetaCortaLinea = n => (n === LINEA_SUPPORT ? 'Support' : `L${n}`);
+
 /** Lee el "Reporte de movimiento de clasificación": Mesa (= línea), Hora Salida, Total Tallos. */
 export function parsearMovimientosClasificacion(arrayBuffer) {
   const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: false, raw: true });
@@ -55,18 +60,23 @@ export function parsearMovimientosClasificacion(arrayBuffer) {
     throw new Error('No encontré las columnas "Mesa", "Hora Salida" y "Total Tallos". Verifica que sea el Reporte de movimiento de clasificación.');
   }
   const movimientos = [];
-  let ignoradas = 0;
+  let ignoradas = 0, sinNumero = 0;
   for (let r = filaHeader + 1; r < matriz.length; r++) {
     const fila = matriz[r] || [];
     if (fila.every(c => c == null || c === '')) continue;
-    const linea = Number(fila[iMesa]);
     const minutos = minutosDeCelda(fila[iHora]);
     const tallos = Number(fila[iTallos]);
-    if (!Number.isFinite(linea) || linea <= 0 || minutos == null || !Number.isFinite(tallos)) { ignoradas++; continue; }
-    movimientos.push({ linea: Math.round(linea), minutos, tallos: Math.round(tallos) });
+    if (minutos == null || !Number.isFinite(tallos)) { ignoradas++; continue; }
+    // Mesa con número = esa línea. Mesa SIN número (ej. "supportTable", o vacía) = "Support Table":
+    // sus tallos también se cuentan, para que el total coincida con el reporte.
+    const bruta = fila[iMesa];
+    const numero = Number(bruta);
+    const esLinea = bruta != null && String(bruta).trim() !== '' && Number.isFinite(numero) && numero > 0;
+    if (!esLinea) sinNumero++;
+    movimientos.push({ linea: esLinea ? Math.round(numero) : LINEA_SUPPORT, minutos, tallos: Math.round(tallos) });
   }
   if (movimientos.length === 0) throw new Error('El archivo no tiene movimientos válidos.');
-  return { movimientos, ignoradas };
+  return { movimientos, ignoradas, sinNumero };
 }
 
 /**

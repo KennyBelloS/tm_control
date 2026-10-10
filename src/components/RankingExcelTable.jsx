@@ -50,62 +50,44 @@ export default function RankingExcelTable({
         </div>
       </div>
 
-      <div className="table-scroll">
-        <table className="ranking-excel-table">
-          <thead>
-            <tr>
-              <th>Puesto</th><th>Colaborador</th><th>Tallos</th><th>Rendimiento</th>
-              <th>Progreso</th><th>% Eficiencia</th><th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibles.map((p, i) => {
-            const pct = calcularPorcentajeMeta(p.promedioRend, metaHora);
-            const estado = clasificarEstado(pct);
-            const colores = COLOR_ESTADO[estado.css];
-            const anchoBarra = Math.max(4, Math.min(100, Math.round(p.promedioRend / maxRend * 100)));
-            return <tr key={p.colaborador_id} className={`ranking-row-anim ${p.pocoTiempo ? 'ranking-fila-poco-tiempo' : ''}`} style={{
-              animationDelay: `${Math.min(i, 12) * 30}ms`
-            }}>
-                  <td>
-                    {i < 3 ? <span className="puesto-medalla">{MEDALLAS[i]}</span> : <span className="puesto-numero">#{i + 1}</span>}
-                  </td>
-                  <td className="ranking-nombre-cell">
-                    <span className="ranking-avatar">{iniciales(p.colaborador)}</span>
-                    <div>
-                      <div className="ranking-nombre">{p.colaborador}</div>
-                      <div className="ranking-id">{p.codigo ? `Código ${p.codigo}` : `Emp.Cod ${p.colaborador_id}`}</div>
-                    </div>
-                  </td>
-                  <td>{(p.totalTallos || 0).toLocaleString()}</td>
-                  <td>
-                    <strong>{p.promedioRend}</strong> <span className="ranking-unidad">/h</span>
-                    {p.pocoTiempo && (
-                      <div className="ranking-poco-tiempo" title={`Solo ${p.horasTrabajadas} h trabajadas (el promedio del grupo es ${p.promedioHorasGrupo} h) — este rendimiento no es representativo`}>
-                        <i className="fa-solid fa-triangle-exclamation"></i> Solo {p.horasTrabajadas} h — no confiable
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    <div className="ranking-progreso">
-                      <div style={{
-                    width: `${anchoBarra}%`,
-                    background: colores.color
-                  }}></div>
-                    </div>
-                  </td>
-                  <td>{pct.toFixed(2)}%</td>
-                  <td>
-                    <span className="ranking-estado" style={{
-                  color: colores.color,
-                  background: colores.bg
-                }}>{estado.label}</span>
-                    {estado.css === 'warning' && <div className="ranking-alusivo">{estado.mensaje}</div>}
-                  </td>
-                </tr>;
-          })}
-          </tbody>
-        </table>
+      <div className="rk-lista">
+        {visibles.map((p, i) => {
+          const pct = calcularPorcentajeMeta(p.promedioRend, metaHora);
+          const estado = clasificarEstado(pct);
+          const colores = COLOR_ESTADO[estado.css];
+          const escala = Math.max(maxRend, metaHora * 1.15);
+          const ancho = Math.max(3, Math.min(100, (p.promedioRend / escala) * 100));
+          const marcaMeta = Math.min(100, (metaHora / escala) * 100);
+          return (
+            <div key={p.colaborador_id} className={`rk-fila ranking-row-anim ${i === 0 ? 'rk-primero' : ''} ${p.pocoTiempo ? 'ranking-fila-poco-tiempo' : ''}`} style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}>
+              <span className="rk-puesto">{i < 3 ? MEDALLAS[i] : `#${i + 1}`}</span>
+              <span className="rk-persona">
+                <span className="ranking-avatar" style={i === 0 ? { boxShadow: '0 0 0 3px #fff, 0 0 0 5px var(--gold)' } : undefined}>{iniciales(p.colaborador)}</span>
+                <span className="rk-nombre">
+                  <strong>{p.colaborador}</strong>
+                  <small>{p.codigo ? `Código ${p.codigo}` : `Emp.Cod ${p.colaborador_id}`} · {(p.totalTallos || 0).toLocaleString('es-CO')} tallos</small>
+                </span>
+              </span>
+              <span className="rk-barra-zona">
+                <span className="rk-barra">
+                  <i className="rk-relleno" style={{ width: `${ancho}%`, background: `linear-gradient(90deg, ${colores.color}, ${colores.color}CC)` }}>
+                    <b>{p.promedioRend}<small>/h</small></b>
+                  </i>
+                  <s className="rk-meta" style={{ left: `${marcaMeta}%` }} title={`Meta ${metaHora}/h`}></s>
+                </span>
+                {p.pocoTiempo && (
+                  <span className="ranking-poco-tiempo" title={`Solo ${p.horasTrabajadas} h trabajadas (el promedio del grupo es ${p.promedioHorasGrupo} h) — este rendimiento no es representativo`}>
+                    <i className="fa-solid fa-triangle-exclamation"></i> Solo {p.horasTrabajadas} h — no confiable
+                  </span>
+                )}
+              </span>
+              <span className="rk-estado">
+                <strong style={{ color: colores.color }}>{pct.toFixed(1)}%</strong>
+                <span className="ranking-estado" style={{ color: colores.color, background: colores.bg }}>{estado.label}</span>
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {ordenada.length > topInicial && <button className="btn-secondary" style={{

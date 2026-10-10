@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
-import { supabase } from '../lib/supabaseClient';
-import { useSesion } from '../lib/useSesion';
+import NotaClave from '../components/NotaClave';
 const URL_TABLEROS = 'https://wondrous-mooncake-2cb81e.netlify.app';
 const TIEMPO_SOSPECHA_MS = 8000;
 function BarraNavegador({
@@ -24,43 +23,6 @@ function BarraNavegador({
         </button>}
     </div>;
 }
-const ROLES_CON_CLAVE = ['administrador', 'ingeniero', 'supervisor'];
-
-/** Nota con la contraseña del tablero. Se lee de la base de datos (no está escrita en el código) y solo la ven estos roles. */
-function NotaClave() {
-  const { sesion } = useSesion();
-  const puede = ROLES_CON_CLAVE.includes(sesion?.rol);
-  const [clave, setClave] = useState(undefined);
-  const [ver, setVer] = useState(false);
-  const [copiado, setCopiado] = useState(false);
-  useEffect(() => {
-    if (!puede) return;
-    supabase.from('notas_modulo').select('valor').eq('clave', 'tableros_clave').maybeSingle()
-      .then(({ data, error }) => setClave(error ? null : (data?.valor ?? null)));
-  }, [puede]);
-  if (!puede || clave === undefined) return null;
-  if (clave === null) {
-    return sesion.rol === 'administrador' ? (
-      <div className="nota-clave nota-clave-falta"><i className="fa-solid fa-key"></i> Falta guardar la contraseña del tablero: corre en Supabase el SQL de "notas de módulo".</div>
-    ) : null;
-  }
-  async function copiar() {
-    try { await navigator.clipboard.writeText(clave); setCopiado(true); setTimeout(() => setCopiado(false), 1800); } catch { /* sin permiso del portapapeles */ }
-  }
-  return (
-    <div className="nota-clave">
-      <span className="nota-clave-icono"><i className="fa-solid fa-key"></i></span>
-      <div className="nota-clave-texto">
-        <strong>Contraseña del tablero</strong>
-        <small>Solo la ven Administrador, Ingeniero y Supervisor</small>
-      </div>
-      <code className="nota-clave-valor">{ver ? clave : '•'.repeat(Math.min(clave.length, 12))}</code>
-      <button className="nota-clave-btn" onClick={() => setVer(v => !v)} title={ver ? 'Ocultar' : 'Mostrar'}><i className={`fa-solid ${ver ? 'fa-eye-slash' : 'fa-eye'}`}></i></button>
-      <button className="nota-clave-btn" onClick={copiar} title="Copiar"><i className={`fa-solid ${copiado ? 'fa-check' : 'fa-copy'}`}></i></button>
-    </div>
-  );
-}
-
 export default function Tableros() {
   const [cargando, setCargando] = useState(true);
   const [sospecha, setSospecha] = useState(false);
@@ -121,7 +83,7 @@ export default function Tableros() {
             </div>
           </div>
 
-          <NotaClave />
+          <NotaClave clave="tableros_clave" roles={['administrador', 'ingeniero', 'supervisor']} titulo="Contraseña del tablero" quienes="Administrador, Ingeniero y Supervisor" />
 
           {sospecha && <div className="alert warn">
               <i className="fa-solid fa-triangle-exclamation"></i>

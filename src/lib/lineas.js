@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient';
 import { getHistorico, getActual, getConfig, getDescansosDiariosRango } from './db';
-import { agregarTurnoActualPorPersona } from './calculos';
-import { getComparacionClasificacion, getHistoricoClasificacion } from './clasificacion';
+import { agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from './calculos';
+import { getComparacionClasificacion, getHistoricoClasificacion, minutosAHora, LINEA_SUPPORT } from './clasificacion';
 
 export async function listarLineas() {
   let { data, error } = await supabase.from('lineas').select('id, nombre, supervisor, activa, meta_hora').order('nombre');
@@ -78,6 +78,45 @@ export async function getAsignacionesDia(fecha) {
     formadora_id: a.formadora_id,
     formadora: a.formadoras?.nombre || '—'
   }));
+}
+
+/** Cambia el nombre de una formadora. */
+export async function actualizarFormadora(id, nombre) {
+  const { error } = await supabase.from('formadoras').update({ nombre }).eq('id', id);
+  if (error) {
+    if (error.code === '23505') throw new Error('Ya existe una formadora con ese nombre.');
+    throw error;
+  }
+}
+/** Elimina una formadora (también se quitan sus asignaciones y las líneas que tenía a cargo). */
+export async function eliminarFormadora(id) {
+  const { error } = await supabase.from('formadoras').delete().eq('id', id);
+  if (error) throw error;
+}
+/** Corrige una asignación ya hecha: cambia su línea y/o su formadora, sin tener que borrarla y volverla a crear. */
+export async function actualizarAsignacion(id, { lineaId, formadoraId }) {
+  const cambios = {};
+  if (lineaId != null) cambios.linea_id = lineaId;
+  if (formadoraId != null) cambios.formadora_id = formadoraId;
+  const { error } = await supabase.from('asignaciones_diarias').update(cambios).eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * Qué líneas trabajan un día concreto. Si un día no tiene ajuste, vale lo general de la línea (activa/inactiva).
+ * Devuelve Map(linea_id → true/false) solo con los días ajustados; vacío si aún no se corrió el SQL.
+ */
+export async function getLineasDia(fecha) {
+  const { data, error } = await supabase.from('lineas_dia').select('linea_id, activa').eq('fecha', fecha);
+  if (error) return new Map();
+  return new Map((data || []).map(r => [r.linea_id, !!r.activa]));
+}
+export async function setLineaDia(fecha, lineaId, activa) {
+  const { error } = await supabase.from('lineas_dia').upsert({ fecha, linea_id: lineaId, activa }, { onConflict: 'fecha,linea_id' });
+  if (error) {
+    if (error.code === '42P01') throw new Error('Falta correr en Supabase el SQL de "líneas por día".');
+    throw error;
+  }
 }
 
 /** "2026-10-08" → "2026-10" */
@@ -371,6 +410,183 @@ export async function getTableroFormadoras(fechaInicio, fechaFin) {
   }).sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : a.formadora.localeCompare(b.formadora));
 }
 
+/**
+ * Ranking de formadoras en un período (día, semana o mes), con datos del Histórico:
+ *  - rendimiento de boncheo: promedio de lo que rindió su gente cada día que trabajó;
+ *  - clasificación: tallos que movió su línea (la asignada a mano, o donde tenía más gente) esos días.
+ */
+export async function getRankingFormadoras(desde, hasta) {
+  const [asigRes, filas, lineasLista, manoRes, clasifRes] = await Promise.all([
+    supabase.from('asignaciones_diarias').select('fecha, colaborador_id, linea_id, lineas(nombre), formadora_id, formadoras(nombre)').gte('fecha', desde).lte('fecha', hasta),
+    getHistorico({ desde, hasta }),
+    listarLineas(),
+    supabase.from('formadora_linea').select('fecha, linea_id, formadora_id').gte('fecha', desde).lte('fecha', hasta),
+    supabase.from('clasificacion_historico').select('fecha, linea, total_tallos').gte('fecha', desde).lte('fecha', hasta)
+  ]);
+  if (asigRes.error) throw asigRes.error;
+  const asig = asigRes.data || [];
+  const rendDelDia = new Map(filas.map(r => [`${r.fecha}_${r.colaborador_id}`, r]));
+  const numeroPorId = new Map(lineasLista.map(l => [l.id, numeroDeLinea(l.nombre)]));
+  const clasifDelDia = new Map((clasifRes.data || []).map(r => [`${r.fecha}|${r.linea}`, r.total_tallos]));
+
+  const porFormadora = new Map();
+  const grupo = (id, nombre) => {
+    if (!porFormadora.has(id)) porFormadora.set(id, { id, nombre, sumaRend: 0, n: 0, personas: new Set(), dias: new Set(), tallos: 0, clasif: 0, hayClasif: false, lineas: new Set() });
+    return porFormadora.get(id);
+  };
+  for (const a of asig) {
+    const g = grupo(a.formadora_id, a.formadoras?.nombre || '—');
+    const r = rendDelDia.get(`${a.fecha}_${a.colaborador_id}`);
+    if (r && r.rendimiento > 0) { g.sumaRend += r.rendimiento; g.n++; g.tallos += r.total_tallos || 0; g.personas.add(a.colaborador_id); g.dias.add(a.fecha); }
+  }
+  for (const fecha of new Set(asig.map(a => a.fecha))) {
+    const delDia = asig.filter(a => a.fecha === fecha);
+    const aMano = new Map((manoRes.data || []).filter(e => e.fecha === fecha).map(e => [e.linea_id, { formadora_id: e.formadora_id }]));
+    const { porFormadora: lineasDe } = lineasPorGrupo(delDia, aMano, numeroPorId);
+    for (const [formadoraId, nums] of lineasDe) {
+      const g = porFormadora.get(formadoraId);
+      if (!g) continue;
+      for (const n of nums) {
+        g.lineas.add(n);
+        const t = clasifDelDia.get(`${fecha}|${n}`);
+        if (t != null) { g.clasif += t; g.hayClasif = true; }
+      }
+    }
+  }
+  return [...porFormadora.values()]
+    .filter(g => g.n > 0 || g.hayClasif)
+    .map(g => ({
+      id: g.id, nombre: g.nombre,
+      rendPromedio: g.n ? redondear1(g.sumaRend / g.n) : 0,
+      operarios: g.personas.size, dias: g.dias.size, totalTallosBoncheo: g.tallos,
+      clasifTallos: g.hayClasif ? g.clasif : null,
+      lineas: [...g.lineas].sort((x, y) => x - y)
+    }))
+    .sort((x, y) => y.rendPromedio - x.rendPromedio);
+}
+
+const hhmm = h => String(h || '').slice(0, 5);
+const aMin = hm => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + (m || 0); };
+
+/** Asignación de personas del día; si todavía no se hizo, la anterior más reciente (para no dejar el cálculo vacío). */
+async function asignacionesConRespaldo(fecha) {
+  const traer = f => supabase.from('asignaciones_diarias')
+    .select('colaborador_id, linea_id, lineas(nombre), formadora_id, formadoras(nombre)').eq('fecha', f);
+  let { data, error } = await traer(fecha);
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    const { data: previa } = await supabase.from('asignaciones_diarias').select('fecha').lte('fecha', fecha).order('fecha', { ascending: false }).limit(1);
+    if (previa && previa.length) ({ data, error } = await traer(previa[0].fecha));
+    if (error) throw error;
+  }
+  return data || [];
+}
+
+/** Horas trabajadas entre dos horas del día, sin contar el almuerzo. Si el corte es antes del inicio, 0. */
+function horasTrabajadas(inicio, corte, descansos) {
+  if (!inicio || !corte || aMin(corte) <= aMin(inicio)) return 0;
+  return Math.max(0, minutosEntreBloque(inicio, corte) - minutosDescansoAplicable(inicio, corte, descansos)) / 60;
+}
+
+/**
+ * CUÁNTO DEBERÍAN LLEVAR a la hora del último corte — boncheo y clasificación, cada uno por su lado.
+ * No hay que definir ninguna meta: sale de la gente que está trabajando.
+ *
+ *   esperado = personas activas × rendimiento (la meta por hora, 470) × horas trabajadas
+ *
+ *   - En general: todas las personas activas.   - Por línea: las personas asignadas a esa línea.
+ *   - BONCHEO: las horas van del inicio del Turno Actual hasta su corte (sin almuerzo).
+ *   - CLASIFICACIÓN: las horas van del inicio del turno hasta el corte del reporte de clasificación (sin almuerzo);
+ *     sin Turno Actual de hoy, se cuentan las personas asignadas, desde la primera hora con movimiento.
+ *   - Cumplimiento = lo que llevan ÷ lo que deberían llevar. "Faltan" = lo que deberían menos lo que llevan.
+ * La meta del día de cada línea (si la definiste en Líneas) se muestra aparte, solo como información.
+ */
+export async function getAvanceEsperado(metaHora = 470, fecha) {
+  const salida = { fecha, metaHora, boncheo: { disponible: false }, clasificacion: { disponible: false } };
+  let descansos = [];
+  try {
+    const cfg = await getConfig();
+    const excepciones = await getDescansosDiariosRango([fecha], 'actual');
+    const ex = excepciones.get(fecha);
+    descansos = ex ? (ex.activos ? ex.descansos : []) : (cfg.descansosActivosActual ? cfg.descansosActual : []);
+  } catch { /* sin configuración: no se descuenta almuerzo */ }
+
+  let filas = [], asig = [];
+  try { filas = (await getActual({})).filter(r => r.fecha === fecha); } catch { /* sin Turno Actual */ }
+  try { asig = await asignacionesConRespaldo(fecha); } catch { /* sin asignaciones */ }
+  const tallosDe = new Map();
+  for (const r of filas) tallosDe.set(r.colaborador_id, (tallosDe.get(r.colaborador_id) || 0) + (r.total_tallos || 0));
+  const inicios = filas.map(r => hhmm(r.hora_inicio)).filter(Boolean).sort();
+  const fines = filas.map(r => hhmm(r.hora_fin)).filter(Boolean).sort();
+  const hayTurno = tallosDe.size > 0 && inicios.length > 0 && fines.length > 0;
+
+  // ---------------- Boncheo ----------------
+  if (hayTurno) {
+    const inicio = inicios[0], corte = fines[fines.length - 1];
+    const horas = horasTrabajadas(inicio, corte, descansos);
+    const real = [...tallosDe.values()].reduce((a, b) => a + b, 0);
+    const esperado = Math.round(tallosDe.size * metaHora * horas);
+    const lineas = new Map();
+    const asignadas = new Set();
+    for (const a of asig) {
+      if (!tallosDe.has(a.colaborador_id) || asignadas.has(a.colaborador_id)) continue;
+      asignadas.add(a.colaborador_id);
+      if (!lineas.has(a.linea_id)) lineas.set(a.linea_id, { id: a.linea_id, nombre: a.lineas?.nombre || '—', personas: 0, real: 0 });
+      const l = lineas.get(a.linea_id);
+      l.personas++; l.real += tallosDe.get(a.colaborador_id);
+    }
+    const porLinea = [...lineas.values()]
+      .map(l => { const e = Math.round(l.personas * metaHora * horas); return { ...l, esperado: e, pct: e > 0 ? (l.real / e) * 100 : null }; })
+      .sort((x, y) => (numeroDeLinea(x.nombre) ?? 99) - (numeroDeLinea(y.nombre) ?? 99));
+    const sinPersonas = [...tallosDe.keys()].filter(id => !asignadas.has(id));
+    const sinAsignar = sinPersonas.length ? { personas: sinPersonas.length, real: sinPersonas.reduce((s, id) => s + tallosDe.get(id), 0), esperado: Math.round(sinPersonas.length * metaHora * horas) } : null;
+    salida.boncheo = {
+      disponible: true, inicio, corte, horas: Math.round(horas * 100) / 100, personas: tallosDe.size,
+      esperado, real, pct: esperado > 0 ? (real / esperado) * 100 : null, porLinea, sinAsignar
+    };
+  }
+
+  // ---------------- Clasificación ----------------
+  try {
+    const cmp = await getComparacionClasificacion(fecha);
+    if (!cmp.vacio && cmp.cargaHoy) {
+      const etiquetas = await getContextoLineas(fecha).catch(() => ({}));
+      const corte = minutosAHora(cmp.cargaHoy.corte_min);
+      // Con Turno Actual: todas sus personas, desde su inicio. Sin él: las personas asignadas, desde la primera hora con movimiento.
+      const inicio = hayTurno ? inicios[0] : (cmp.total.primeraHora != null ? `${String(cmp.total.primeraHora).padStart(2, '0')}:00` : null);
+      const horas = horasTrabajadas(inicio, corte, descansos);
+      const activas = new Set(hayTurno ? tallosDe.keys() : asig.map(a => a.colaborador_id));
+      const personasPorLinea = new Map();
+      const contadas = new Set();
+      for (const a of asig) {
+        if (!activas.has(a.colaborador_id) || contadas.has(a.colaborador_id)) continue;
+        contadas.add(a.colaborador_id);
+        const n = numeroDeLinea(a.lineas?.nombre);
+        if (n != null) personasPorLinea.set(n, (personasPorLinea.get(n) || 0) + 1);
+      }
+      const lineas = cmp.porLinea.filter(l => l.linea !== LINEA_SUPPORT).map(l => {
+        const info = etiquetas[l.linea] || {};
+        const personas = personasPorLinea.get(l.linea) || 0;
+        const esperado = Math.round(personas * metaHora * horas);
+        const metaDia = info.meta_dia ?? null;
+        return {
+          linea: l.linea, nombre: info.nombre || `Línea ${l.linea}`, formadora: info.formadora || null,
+          personas, esperado, real: l.totalHoy, pct: esperado > 0 ? (l.totalHoy / esperado) * 100 : null,
+          metaDia, avanceMeta: metaDia > 0 ? (l.totalHoy / metaDia) * 100 : null
+        };
+      });
+      const esperado = Math.round(activas.size * metaHora * horas);
+      const real = cmp.total.totalHoy;                                  // en general: TODO lo que se movió
+      salida.clasificacion = {
+        disponible: true, conTurno: hayTurno, corte, inicio, horas: Math.round(horas * 100) / 100,
+        personas: activas.size, esperado, real, pct: esperado > 0 ? (real / esperado) * 100 : null,
+        lineas, sinPersonas: lineas.filter(l => l.personas === 0).map(l => l.nombre)
+      };
+    }
+  } catch { /* sin clasificación de hoy */ }
+  return salida;
+}
+
 /** Guarda los campos manuales de una fila del Tablero (fecha + formadora). */
 export async function guardarFilaTablero(fecha, formadoraId, campos) {
   const { error } = await supabase.from('tablero_formadoras').upsert({
@@ -417,14 +633,16 @@ export async function getContextoLineas(fecha) {
   for (const [n, l] of porNumero) {
     const c = cuentas.get(l.id);
     const porMayoria = c ? [...c.entries()].sort((x, y) => y[1] - x[1])[0][0] : null;
+    const metaDia = metasMes ? (metasMes.get(l.id) ?? null) : (l.meta_hora ?? null);
     etiquetas[n] = {
       nombre: l.nombre,
-      // la meta es del MES de la fecha (se reinicia cada mes); sin el SQL se usa la meta fija anterior
-      meta_hora: metasMes ? (metasMes.get(l.id) ?? null) : (l.meta_hora ?? null),
+      // meta del DÍA de la línea (informativa), del MES de la fecha: se reinicia cada mes; sin el SQL se usa la meta fija anterior
+      meta_dia: metaDia,
       formadora: explicitas.get(l.id)?.nombre || porMayoria,
       fechaAsignacion
     };
   }
+  etiquetas[99] = { nombre: 'Support Table', meta_dia: null, formadora: null, fechaAsignacion };
   return etiquetas;
 }
 

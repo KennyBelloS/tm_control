@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
+import NotaClave from '../components/NotaClave';
 const URL_CALCULADORA = 'https://calculadora-costo-tallo.vercel.app/';
 const TIEMPO_SOSPECHA_MS = 8000;
 function BarraNavegador({
@@ -81,6 +82,8 @@ export default function Gerencia() {
               </a>
             </div>
           </div>
+
+          <NotaClave clave="gerencia_clave" roles={['administrador', 'ingeniero']} titulo="Contraseña de Gerencia" quienes="Administrador e Ingeniero" />
 
           {sospecha && <div className="alert warn">
               <i className="fa-solid fa-triangle-exclamation"></i>

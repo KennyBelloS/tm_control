@@ -9,8 +9,10 @@ const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChar
 import DashboardCarrusel from '../components/DashboardCarrusel';
 import ModoPresentacion from '../components/ModoPresentacion';
 import NumeroAnimado from '../components/NumeroAnimado';
+import { entrarPantallaCompleta, salirPantallaCompleta } from '../lib/pantallaCompleta';
 import ClasificacionLineasDashboard from '../components/ClasificacionLineasDashboard';
 import FormadoresLineasPanel from '../components/FormadoresLineasPanel';
+import AvanceEsperado from '../components/AvanceEsperado';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
 function hoyISO() {
@@ -57,7 +59,8 @@ export default function Dashboard() {
           meta,
           tablaLista
         } = await getMetaDia(hoy);
-        const turnoActual = await getActual({});
+        // El Turno Actual se REINICIA cada día: solo cuenta lo cargado con la fecha de hoy.
+        const turnoActual = (await getActual({})).filter(r => r.fecha === hoy);
         const descansosPorFechaHoy = await getDescansosDiariosRango([hoy], 'actual');
         // Muestra el último día registrado en el Histórico, no "ayer" fijo —
         // si el domingo no se trabaja, el pendiente por revisar sigue siendo el sábado.
@@ -79,7 +82,7 @@ export default function Dashboard() {
         const conRendAyer = historicoAyer.filter(r => r.rendimiento > 0);
         const rendimientoPromedioAyer = conRendAyer.length > 0 ? Math.round(conRendAyer.reduce((s, r) => s + r.rendimiento, 0) / conRendAyer.length) : 0;
         if (!activo) return;
-        setMetaHoy(meta);
+        setMetaHoy(Number(meta) || 0);
         setMetaTablaLista(tablaLista);
         setPersonasParaDona(agregarTurnoActualPorPersona(turnoActual, cfg.descansosActivosActual ? cfg.descansosActual : [], descansosPorFechaHoy).map(p => ({
           colaborador_id: p.colaborador_id,
@@ -117,7 +120,7 @@ export default function Dashboard() {
   }, [hoy, tickTiempoReal]);
   return <>
       <PageHeader title="Dashboard Ejecutivo" subtitle="Resumen general de producción, en tiempo real desde el Turno Actual.">
-        <button className="btn-secondary" onClick={() => setPresentando(true)}>
+        <button className="btn-secondary" onClick={() => { entrarPantallaCompleta(); setPresentando(true); }}>
           <i className="fa-solid fa-expand"></i> Presentar
         </button>
         <Link to="/rendimientos" className="btn-primary">
@@ -211,7 +214,7 @@ export default function Dashboard() {
 
             {stats.actual.bloques === 0 && <div className="alert warn">
                 <i className="fa-solid fa-triangle-exclamation"></i>
-                Todavía no hay ninguna carga de Turno Actual. Ve a <Link to="/rendimientos" style={{
+                Todavía no se ha cargado el Turno Actual de hoy ({hoy.split('-').reverse().join('/')}). Esta sección <strong>se reinicia cada día</strong>. Ve a <Link to="/rendimientos" style={{
             fontWeight: 700,
             textDecoration: 'underline'
           }}>Rendimientos</Link> y sube el Reporte Consolidado Boncheo (opción "Turno actual").
@@ -238,6 +241,7 @@ export default function Dashboard() {
             <DashboardCarrusel personasHoy={carruselHoy} personasAyer={carruselAyer} metaHora={stats.cfg.metaHora} fechaHistorico={fechaHistoricoMostrado} />
 
             <h3 className="dashboard-section-title"><i className="fa-solid fa-boxes-stacked"></i> Clasificación y formadoras</h3>
+            <AvanceEsperado metaHora={stats.cfg.metaHora} hoy={hoy} />
             <ClasificacionLineasDashboard />
             <FormadoresLineasPanel metaHora={stats.cfg.metaHora} />
 
@@ -288,7 +292,7 @@ export default function Dashboard() {
           totalTallos={stats.actual.totalTallos}
           metaHoy={metaHoy}
           cumplimiento={stats.actual.cumplimiento}
-          onCerrar={() => setPresentando(false)}
+          onCerrar={() => { salirPantallaCompleta(); setPresentando(false); }}
         />
       )}
     </>;

@@ -8,6 +8,7 @@ import { supabaseConfigurado } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
 import { puedeEditar } from '../lib/roles';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
+import { coincideFila } from '../lib/personasUtil';
 function hoyISO() {
   return fechaLocalISO();
 }
@@ -32,6 +33,7 @@ export default function Rendimientos() {
   const [resumenHistoricoTotal, setResumenHistoricoTotal] = useState(null);
   const [fFecha, setFFecha] = useState('');
   const [fFechaLista, setFFechaLista] = useState(false);
+  const [ultimaFechaConDatos, setUltimaFechaConDatos] = useState(null);
   const [fFechaActual, setFFechaActual] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [destino, setDestino] = useState('actual');
@@ -85,13 +87,12 @@ export default function Rendimientos() {
   useEffect(() => { cargarResumenHistoricoTotal(); }, []);
   useRealtimeRefresco(['rendimiento_historico'], cargarResumenHistoricoTotal);
   useEffect(() => {
-    // Abre el Histórico mostrando el último día registrado (no "ayer" fijo):
-    // si el domingo no se trabaja, el pendiente por revisar sigue siendo el sábado.
+    // El Histórico abre en el DÍA ACTUAL. Si hoy todavía no tiene registros, se avisa y se ofrece
+    // saltar al último día que sí tenga (por ejemplo el sábado, si el domingo no se trabaja).
+    setFFecha(hoyISO());
+    setFFechaLista(true);
     let activo = true;
-    getUltimaFechaHistorico()
-      .then(fecha => { if (activo) setFFecha(fecha || ayerISO()); })
-      .catch(() => { if (activo) setFFecha(ayerISO()); })
-      .finally(() => { if (activo) setFFechaLista(true); });
+    getUltimaFechaHistorico().then(f => { if (activo) setUltimaFechaConDatos(f); }).catch(() => {});
     return () => { activo = false; };
   }, []);
   useEffect(() => {
@@ -180,8 +181,7 @@ export default function Rendimientos() {
   }
   const historicoFiltrado = useMemo(() => {
     if (!busqueda) return historico;
-    const b = busqueda.toLowerCase();
-    return historico.filter(r => r.colaborador.toLowerCase().includes(b));
+    return historico.filter(r => coincideFila(r.colaborador, r.codigos ?? r.codigo, busqueda));
   }, [historico, busqueda]);
   useEffect(() => {
     if (historicoFiltrado.length === 0) {
@@ -199,8 +199,7 @@ export default function Rendimientos() {
     let base = actual;
     if (fFechaActual) base = base.filter(r => r.fecha === fFechaActual);
     if (busqueda) {
-      const b = busqueda.toLowerCase();
-      base = base.filter(r => r.colaborador.toLowerCase().includes(b) || String(r.mesa ?? '').includes(b));
+      base = base.filter(r => coincideFila(r.colaborador, r.mesa, busqueda));
     }
     return base;
   }, [actual, fFechaActual, busqueda]);
@@ -343,7 +342,7 @@ export default function Rendimientos() {
           }}>
               <div>
                 <label>Colaborador</label>
-                <input type="text" placeholder="Buscar por nombre o Código..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
+                <input type="text" placeholder="Buscar por nombre o código (mesa)..." value={busqueda} onChange={e => setBusqueda(e.target.value)} />
               </div>
               <div>
                 <label>Fecha — Histórico</label>
@@ -387,7 +386,9 @@ export default function Rendimientos() {
             <div><span>Meta de Tallos</span><h2>{kpis.metaGlobal.toLocaleString()}</h2><small>{fFecha ? 'del día filtrado' : 'del período mostrado'}</small></div></div>
         </section>
 
-        <TablaHistorico filas={historicoFiltrado} cfg={cfg} onEliminarTabla={() => eliminarTabla('historico')} onGuardarFila={async (id, cambios) => {
+        <TablaHistorico avisoVacio={fFecha === hoyISO() && !busqueda && ultimaFechaConDatos && ultimaFechaConDatos !== fFecha
+          ? <>Hoy todavía no hay Histórico cargado. El último día con datos es el <strong>{ultimaFechaConDatos.split('-').reverse().join('/')}</strong>.<br /><button className="btn-secondary" style={{ marginTop: 10 }} onClick={() => setFFecha(ultimaFechaConDatos)}>Ver ese día</button></>
+          : null} filas={historicoFiltrado} cfg={cfg} onEliminarTabla={() => eliminarTabla('historico')} onGuardarFila={async (id, cambios) => {
         await actualizarRegistroHistorico(id, cambios);
         await cargarTodo();
       }} onEliminarFila={async id => {
@@ -409,45 +410,6 @@ export default function Rendimientos() {
               <div><span>Rendimiento Promedio</span><h2>{promedioActual}</h2><small>tallos/hora real</small></div></div>
           </section>
 
-          {totalPorPersonaActual.length > 0 && <section className="panel">
-              <div className="panel-header">
-                <div>
-                  <h2>Total de Tallos por Persona</h2>
-                  <p>Suma de todos los bloques cargados del Turno Actual, con el rendimiento real de cada colaborador.</p>
-                </div>
-              </div>
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr><th>Código</th><th>Colaborador</th><th>Mesa</th><th>Total Tallos</th><th>Rendimiento</th><th>% Meta</th><th>Estado</th>{puedeModificar && <th>Acciones</th>}</tr>
-                  </thead>
-                  <tbody>
-                    {totalPorPersonaActual.map(p => {
-                  const pct = calcularPorcentajeMeta(p.rendimiento, cfg?.metaHora || 470);
-                  const estado = clasificarEstado(pct);
-                  return <tr key={p.colaborador_id}>
-                          <td>{p.colaborador_id}</td>
-                          <td>{p.colaborador}</td>
-                          <td>{p.codigos.length > 0 ? p.codigos.join(', ') : '—'}</td>
-                          <td><strong>{p.total_tallos.toLocaleString()}</strong></td>
-                          <td>{p.rendimiento}</td>
-                          <td>{pct.toFixed(2)}%</td>
-                          <td><span className={`status ${estado.css}`}>{estado.label}</span></td>
-                          {puedeModificar && <td>
-                              <button title="Eliminar todos los bloques de esta persona" onClick={() => {
-                        if (confirm(`¿Eliminar todos los registros de ${p.colaborador} del Turno Actual?`)) {
-                          eliminarPersonaDeActual(p.colaborador_id).then(cargarTodo);
-                        }
-                      }}>
-                                <i className="fa-solid fa-trash"></i>
-                              </button>
-                            </td>}
-                        </tr>;
-                })}
-                  </tbody>
-                </table>
-              </div>
-            </section>}
 
           <TablaActual filas={actualFiltrado} cfg={cfg} onEliminarTabla={() => eliminarTabla('actual')} onGuardarFila={async (id, cambios) => {
           await actualizarRegistroActual(id, cambios);
@@ -484,6 +446,7 @@ function VistaPreviaTiempo({
     </div>;
 }
 function TablaHistorico({
+  avisoVacio,
   filas,
   cfg,
   onEliminarTabla,
@@ -563,7 +526,9 @@ function TablaHistorico({
             </tr>
           </thead>
           <tbody>
-            {filas.length === 0 && <tr><td colSpan={11}><div className="empty-state"><i className="fa-solid fa-inbox"></i>Sin registros para el filtro actual.</div></td></tr>}
+            {filas.length === 0 && <tr><td colSpan={11}><div className="empty-state"><i className="fa-solid fa-inbox"></i>
+              {avisoVacio || 'Sin registros para el filtro actual.'}
+            </div></td></tr>}
             {filas.map(r => {
             const editando = editandoId === r.id;
             const porcentaje = calcularPorcentajeMeta(r.rendimiento, metaHora);

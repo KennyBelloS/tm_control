@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getComparacionClasificacion, getUltimaFechaClasificacion, limpiarClasificacionAntigua, etiquetaHora, formatoFecha, minutosAHora, fechaLocalISO } from '../lib/clasificacion';
+import { getComparacionClasificacion, getUltimaFechaClasificacion, limpiarClasificacionAntigua, etiquetaHora, formatoFecha, nombreLineaClasificacion, LINEA_SUPPORT, minutosAHora, fechaLocalISO } from '../lib/clasificacion';
 import { getContextoLineas } from '../lib/lineas';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 
@@ -83,12 +83,16 @@ export default function ClasificacionLineasDashboard() {
   const t = datos.total;
   const esHoy = fecha === fechaLocalISO();
   const hayAyer = !!datos.fechaAyer;
-  const metaMax = Math.max(0, ...datos.lineas.map(n => etiquetas[n]?.meta_hora || 0));
-  const escala = Math.max(1, metaMax, ...datos.porLinea.flatMap(l => l.celdas.map(c => c.hoy)));
+  const escala = Math.max(1, ...datos.porLinea.flatMap(l => l.celdas.map(c => c.hoy)));
   const hayBase = datos.ultimaCompletaHora >= datos.horas[0];
   const pct = hayAyer && hayBase && t.ayerCompletas > 0 ? Math.round((t.diferencia / t.ayerCompletas) * 1000) / 10 : null;
   const ranking = [...datos.porLinea].sort((a, b) => b.totalHoy - a.totalHoy);
-  const mejor = ranking[0];
+  const competidoras = ranking.filter(l => l.linea !== LINEA_SUPPORT && l.totalHoy > 0);
+  const lider = competidoras[0] || null;
+  const segunda = competidoras[1] || null;
+  const infoLider = lider ? (etiquetas[lider.linea] || {}) : {};
+  const iniciales = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(x => x[0]).join('').toUpperCase();
+  const mejor = lider;
 
   return (
     <section className="clsd">
@@ -119,6 +123,29 @@ export default function ClasificacionLineasDashboard() {
           estado={t.ultimaCompleta ? (t.ultimaCompleta.hoy > t.ultimaCompleta.ayer ? 'mejor' : t.ultimaCompleta.hoy < t.ultimaCompleta.ayer ? 'peor' : 'igual') : 'neutro'} />
       </div>
 
+      {lider && (
+        <div className="clsd-lider">
+          <span className="clsd-lider-corona" aria-hidden="true">👑</span>
+          <div className="clsd-lider-info">
+            <small>Línea líder en clasificación</small>
+            <h3>{infoLider.nombre || nombreLineaClasificacion(lider.linea)}</h3>
+            {infoLider.formadora
+              ? <div className="clsd-lider-formadora"><span className="clsd-lider-avatar">{iniciales(infoLider.formadora)}</span><span>Formadora <strong>{infoLider.formadora}</strong></span></div>
+              : <div className="clsd-lider-formadora"><span>Sin formadora asignada · asígnala en Líneas</span></div>}
+          </div>
+          <div className="clsd-lider-cifras">
+            <strong>{fmt(lider.totalHoy)}</strong>
+            <span>tallos movidos hoy</span>
+            {segunda && <em>+{fmt(lider.totalHoy - segunda.totalHoy)} sobre {(etiquetas[segunda.linea] || {}).nombre || nombreLineaClasificacion(segunda.linea)}</em>}
+          </div>
+          <div className="clsd-lider-cifras clsd-lider-ritmo">
+            <strong>{lider.promedioHora != null ? fmt(lider.promedioHora) : '—'}</strong>
+            <span>tallos por hora</span>
+            {hayAyer && hayBase && <em className={`clsd-lider-chip clsd-chip-${lider.estado}`}>{flecha(lider.diferencia)} vs ayer</em>}
+          </div>
+        </div>
+      )}
+
       <div className="clsd-cuerpo">
         <div className="clsd-grafica panel">
           <h5><i className="fa-solid fa-chart-line"></i> Tallos acumulados: hoy vs ayer</h5>
@@ -132,10 +159,10 @@ export default function ClasificacionLineasDashboard() {
             const info = etiquetas[l.linea] || {};
             const parte = t.totalHoy > 0 ? (l.totalHoy / t.totalHoy) * 100 : 0;
             return (
-              <div key={l.linea} className="clsd-rank-fila">
+              <div key={l.linea} className={`clsd-rank-fila ${l === lider ? 'clsd-rank-lider' : ''}`}>
                 <div className="clsd-rank-top">
-                  <span className="clsd-rank-puesto">{i + 1}</span>
-                  <span className="clsd-rank-nombre">{info.nombre || `Línea ${l.linea}`}{info.formadora && <small>{info.formadora}</small>}</span>
+                  <span className="clsd-rank-puesto">{l === lider ? '👑' : i + 1}</span>
+                  <span className="clsd-rank-nombre">{info.nombre || nombreLineaClasificacion(l.linea)}{info.formadora && <small>{info.formadora}</small>}</span>
                   <strong>{fmt(l.totalHoy)}</strong>
                 </div>
                 <div className="clsd-rank-barra"><span style={{ width: `${parte}%` }}></span></div>
@@ -152,30 +179,28 @@ export default function ClasificacionLineasDashboard() {
       <div className="clsd-grid">
         {datos.porLinea.map(l => {
           const info = etiquetas[l.linea] || {};
-          const meta = info.meta_hora;
-          const cumple = meta && l.promedioHora != null ? l.promedioHora >= meta : null;
+          const metaDia = info.meta_dia;          // meta de TODO el día de esa línea (informativa)
           const uc = l.ultimaCompleta;
           return (
-            <Link to="/clasificacion" key={l.linea} className={`clsd-card clsd-card-${l.estado}`}>
+            <Link to="/clasificacion" key={l.linea} className={`clsd-card clsd-card-${l.estado} ${l === lider ? 'clsd-card-lider' : ''}`}>
+              {l === lider && <span className="clsd-cinta-lider">👑 Líder</span>}
               <div className="clsd-linea-cab">
-                <span className="clsd-card-titulo">{info.nombre || `Línea ${l.linea}`}</span>
+                <span className="clsd-card-titulo">{info.nombre || nombreLineaClasificacion(l.linea)}</span>
                 {info.formadora && <span className="clsd-formadora"><i className="fa-solid fa-chalkboard-user"></i> {info.formadora}</span>}
               </div>
               <strong className="clsd-numero">{fmt(l.totalHoy)}</strong>
-              <span className="clsd-unidad">tallos movidos{l === mejor ? ' · la que más mueve' : ''}</span>
+              <span className="clsd-unidad">tallos movidos{l.linea === LINEA_SUPPORT ? ' · mesa sin número' : ''}</span>
               {hayAyer && hayBase && <span className={`clsd-chip clsd-chip-${l.estado}`}>{flecha(l.diferencia)} vs ayer · horas completas</span>}
-              <Barras celdas={l.celdas} escala={escala} meta={meta} />
+              <Barras celdas={l.celdas} escala={escala} meta={null} />
               <div className="clsd-meta">
                 {uc && <span>Última hora completa ({etiquetaHora(uc.hora)}): <strong>{fmt(uc.hoy)}</strong>{hayAyer ? ` · ayer ${fmt(uc.ayer)}` : ''}</span>}
                 <span>Promedio <strong>{l.promedioHora != null ? fmt(l.promedioHora) : '—'}</strong> por hora</span>
-                {meta
-                  ? (l.promedioHora != null && (
-                    <>
-                      <span className={cumple ? 'clsd-ok' : 'clsd-mal'}>Meta {fmt(meta)}/h · {Math.round((l.promedioHora / meta) * 100)}% {cumple ? '✓ cumple' : 'por debajo'}</span>
-                      <div className="clsd-rank-barra"><span className={cumple ? 'clsd-barra-ok' : 'clsd-barra-mal'} style={{ width: `${Math.min((l.promedioHora / meta) * 100, 100)}%` }}></span></div>
-                    </>
-                  ))
-                  : <span className="clsd-sinmeta">Sin meta por hora (se define en Líneas)</span>}
+                {metaDia > 0 && (
+                  <>
+                    <span>Meta del día <strong>{fmt(metaDia)}</strong> · lleva <strong>{Math.round((l.totalHoy / metaDia) * 100)}%</strong></span>
+                    <div className="clsd-rank-barra"><span style={{ width: `${Math.min((l.totalHoy / metaDia) * 100, 100)}%` }}></span></div>
+                  </>
+                )}
               </div>
             </Link>
           );

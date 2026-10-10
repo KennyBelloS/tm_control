@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react';
-import { etiquetaHora, formatoFecha } from '../lib/clasificacionCalculos';
+import { etiquetaHora, formatoFecha, nombreLineaClasificacion } from '../lib/clasificacionCalculos';
 
 const fmt = n => (n ?? 0).toLocaleString('es-CO');
 const signo = n => (n > 0 ? `▲ +${fmt(n)}` : n < 0 ? `▼ −${fmt(Math.abs(n))}` : '＝ igual');
@@ -87,7 +87,7 @@ export default function ClasificacionGrid({ datos, modo = 'hora', etiquetas = {}
           </tr>
         </thead>
         <tbody>
-          {porLinea.map(l => grupo(l, etiquetas[l.linea]?.nombre || `Línea ${l.linea}`, etiquetas[l.linea]?.formadora, false))}
+          {porLinea.map(l => grupo(l, etiquetas[l.linea]?.nombre || nombreLineaClasificacion(l.linea), etiquetas[l.linea]?.formadora, false))}
           {porLinea.length > 1 && grupo(total, 'Total', 'todas las líneas', true)}
         </tbody>
       </table>

@@ -447,3 +447,36 @@ begin
 end $$;
 
 NOTIFY pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------
+-- 21. Líneas que trabajan cada día (ajuste por fecha sobre lo general de la línea).
+-- ---------------------------------------------------------------------
+create table if not exists lineas_dia (
+  fecha    date   not null,
+  linea_id bigint not null references lineas(id) on delete cascade,
+  activa   boolean not null,
+  primary key (fecha, linea_id)
+);
+alter table lineas_dia enable row level security;
+drop policy if exists "acceso_total_lineas_dia" on lineas_dia;
+create policy "acceso_total_lineas_dia" on lineas_dia for all using (true) with check (true);
+NOTIFY pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------
+-- 22. Contraseña de Gerencia (TM2026) y permisos POR NOTA:
+--     - tablero:  Administrador, Ingeniero y Supervisor
+--     - gerencia: Administrador e Ingeniero (el Supervisor NO la puede leer, ni siquiera por la API)
+-- ---------------------------------------------------------------------
+drop policy if exists "notas_leer_roles" on notas_modulo;
+create policy "notas_leer_roles" on notas_modulo for select using (
+  exists (
+    select 1 from perfiles p
+    where p.id = auth.uid() and p.activo and (
+      (notas_modulo.clave = 'tableros_clave' and p.rol in ('administrador', 'ingeniero', 'supervisor'))
+      or (notas_modulo.clave = 'gerencia_clave' and p.rol in ('administrador', 'ingeniero'))
+    )
+  )
+);
+insert into notas_modulo (clave, valor) values ('gerencia_clave', 'TM2026')
+on conflict (clave) do update set valor = excluded.valor, actualizado_en = now();
+NOTIFY pgrst, 'reload schema';
