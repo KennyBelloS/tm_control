@@ -1,6 +1,7 @@
 // Lógica PURA de Clasificación (sin base de datos): leer el Excel, agrupar por
 // hora y armar la comparación hoy vs ayer. Separada para poder probarla sola.
 import * as XLSX from 'xlsx';
+import { OPCIONES_LECTURA_EXCEL } from './seguridad.js';
 
 const sinAcentos = t => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 
@@ -45,7 +46,7 @@ export const etiquetaCortaLinea = n => (n === LINEA_SUPPORT ? 'Support' : `L${n}
 
 /** Lee el "Reporte de movimiento de clasificación": Mesa (= línea), Hora Salida, Total Tallos. */
 export function parsearMovimientosClasificacion(arrayBuffer) {
-  const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: false, raw: true });
+  const wb = XLSX.read(arrayBuffer, OPCIONES_LECTURA_EXCEL);
   const hoja = wb.Sheets[wb.SheetNames[0]];
   const matriz = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: true, defval: null });
   let filaHeader = -1, iMesa = -1, iHora = -1, iTallos = -1;

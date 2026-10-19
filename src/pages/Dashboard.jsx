@@ -15,6 +15,9 @@ import FormadoresLineasPanel from '../components/FormadoresLineasPanel';
 import AvanceEsperado from '../components/AvanceEsperado';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
+import IndiceSecciones from '../components/IndiceSecciones';
+import SaludoDia from '../components/SaludoDia';
+import { TarjetasEsqueleto } from '../components/Estados';
 function hoyISO() {
   return fechaLocalISO();
 }
@@ -134,17 +137,22 @@ export default function Dashboard() {
             Supabase no está configurado. Copia <code>.env.example</code> a <code>.env</code> con las credenciales de tu proyecto "tm-control" y reinicia la app. Ver MANUAL.md.
           </div>}
         {error && <div className="alert err"><i className="fa-solid fa-circle-exclamation"></i> {error}</div>}
-        {cargando && <p style={{
-        color: 'var(--gray)'
-      }}>Cargando datos...</p>}
+        {cargando && <TarjetasEsqueleto />}
 
         {stats && <>
+            <IndiceSecciones secciones={[
+              { id: 'sec-turno', etiqueta: 'Turno actual', icono: 'fa-bolt' },
+              { id: 'sec-historico', etiqueta: 'Último histórico', icono: 'fa-calendar-days' },
+              { id: 'sec-clasificacion', etiqueta: 'Clasificación y formadoras', icono: 'fa-boxes-stacked' },
+              { id: 'sec-graficas', etiqueta: 'Visualizaciones', icono: 'fa-chart-simple' }
+            ]} />
+            <SaludoDia tallos={stats.actual.totalTallos} cumplimiento={stats.actual.cumplimiento} meta={metaHoy} bloques={stats.actual.bloques} />
             {!metaTablaLista && <div className="alert warn">
                 <i className="fa-solid fa-triangle-exclamation"></i>
                 Falta crear la tabla "metas_diarias" en Supabase — corre <code>supabase/migracion_metas_diarias.sql</code>. Mientras tanto se usa el valor por defecto de Configuración.
               </div>}
 
-            <h3 className="dashboard-section-title"><i className="fa-solid fa-bolt"></i> Turno Actual (en vivo, {stats.actual.bloques} bloques cargados)</h3>
+            <h3 id="sec-turno" className="dashboard-section-title"><i className="fa-solid fa-bolt"></i> Turno Actual (en vivo, {stats.actual.bloques} bloques cargados)</h3>
             <section className="cards">
               <div className="card"><div className="icon"><i className="fa-solid fa-users"></i></div>
                 <div><span>Mesas Activas</span><h2><NumeroAnimado valor={stats.actual.personas} /></h2><small>{hoy}</small></div></div>
@@ -220,7 +228,7 @@ export default function Dashboard() {
           }}>Rendimientos</Link> y sube el Reporte Consolidado Boncheo (opción "Turno actual").
               </div>}
 
-            <h3 className="dashboard-section-title"><i className="fa-solid fa-calendar-days"></i> Último Histórico registrado {fechaHistoricoMostrado ? `(${fechaHistoricoMostrado})` : ''}</h3>
+            <h3 id="sec-historico" className="dashboard-section-title"><i className="fa-solid fa-calendar-days"></i> Último Histórico registrado {fechaHistoricoMostrado ? `(${fechaHistoricoMostrado})` : ''}</h3>
             <section className="cards">
               <div className="card"><div className="icon"><i className="fa-solid fa-users"></i></div>
                 <div><span>Personas con Registro</span><h2>{stats.ayer.personas}</h2><small>{fechaHistoricoMostrado || 'Sin datos'}</small></div></div>
@@ -240,12 +248,12 @@ export default function Dashboard() {
 
             <DashboardCarrusel personasHoy={carruselHoy} personasAyer={carruselAyer} metaHora={stats.cfg.metaHora} fechaHistorico={fechaHistoricoMostrado} />
 
-            <h3 className="dashboard-section-title"><i className="fa-solid fa-boxes-stacked"></i> Clasificación y formadoras</h3>
+            <h3 id="sec-clasificacion" className="dashboard-section-title"><i className="fa-solid fa-boxes-stacked"></i> Clasificación y formadoras</h3>
             <AvanceEsperado metaHora={stats.cfg.metaHora} hoy={hoy} />
             <ClasificacionLineasDashboard />
             <FormadoresLineasPanel metaHora={stats.cfg.metaHora} />
 
-            <h3 className="dashboard-section-title"><i className="fa-solid fa-chart-simple"></i> Visualizaciones</h3>
+            <h3 id="sec-graficas" className="dashboard-section-title"><i className="fa-solid fa-chart-simple"></i> Visualizaciones</h3>
             <div className="dashboard-charts-grid">
               <section className="panel">
                 <div className="panel-header">

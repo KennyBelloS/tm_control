@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from './supabaseClient';
+import { notificarEstado, notificarDatos } from './vivo';
 
 /**
  * Se suscribe a cambios en vivo de las tablas indicadas (INSERT/UPDATE/DELETE
@@ -19,10 +20,13 @@ export function useRealtimeRefresco(tablas, alCambiar) {
       canal.on('postgres_changes', { event: '*', schema: 'public', table: tabla }, () => {
         // agrupa varios cambios seguidos (ej. al subir un Excel completo) en una sola recarga
         clearTimeout(timeoutRef.current);
-        timeoutRef.current = setTimeout(() => callbackRef.current(), 500);
+        timeoutRef.current = setTimeout(() => { notificarDatos(); callbackRef.current(); }, 500);
       });
     });
-    canal.subscribe();
+    canal.subscribe(status => {
+      if (status === 'SUBSCRIBED') notificarEstado('vivo');
+      else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) notificarEstado('error');
+    });
     return () => {
       clearTimeout(timeoutRef.current);
       supabase.removeChannel(canal);

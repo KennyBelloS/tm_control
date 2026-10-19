@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { calcularPorcentajeMeta, clasificarEstado } from '../lib/calculos';
 import RankingModal from './RankingModal';
+import { EstadoVacio } from './Estados';
 const MEDALLAS = ['🥇', '🥈', '🥉'];
 const COLOR_ESTADO = {
   success: {
@@ -31,10 +32,7 @@ export default function RankingExcelTable({
   const visibles = ordenada.slice(0, topInicial);
   const maxRend = ordenada[0]?.promedioRend || 1;
   if (ordenada.length === 0) {
-    return <div className="empty-state">
-        <i className="fa-solid fa-trophy"></i>
-        Sin datos suficientes para mostrar el ranking.
-      </div>;
+    return <EstadoVacio icono="fa-trophy" titulo="Sin datos suficientes para el ranking" texto="Cuando haya rendimientos cargados para este filtro, aquí aparecerán ordenados con su barra de progreso." />;
   }
   return <div className="ranking-excel">
       <div className="ranking-excel-header">

@@ -59,7 +59,7 @@ export default function Gerencia() {
           <div className="app-embed-spinner"></div>
           <span>Cargando Costo por Tallo…</span>
         </div>}
-      <iframe key={claveRecarga} src={URL_CALCULADORA} title="Calculadora Costo por Tallo" className="app-embed-iframe" onLoad={alCargar} />
+      <iframe key={claveRecarga} src={URL_CALCULADORA} sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals" referrerPolicy="no-referrer" loading="lazy" title="Calculadora Costo por Tallo" className="app-embed-iframe" onLoad={alCargar} />
     </div>;
   return <>
       <PageHeader title="Gerencia" subtitle="Vista ejecutiva: indicadores consolidados y herramientas conectadas de toda la operación." />

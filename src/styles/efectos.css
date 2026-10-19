@@ -1,0 +1,90 @@
+/* =====================================================================
+   EFECTOS Y FESTIVIDADES — capa ambiental, interacciones en 3D, saludo, panel y adornos festivos.
+   Todo usa las variables de color de la marca: al activar una festividad, TODO cambia de paleta a la vez.
+   ===================================================================== */
+
+/* ---------- Capa ambiental (detrás del contenido; no recibe clics) ---------- */
+.aurora{ position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden; }
+.aurora::before, .aurora::after, .aurora i{ content:''; position:absolute; width:62vmax; height:62vmax; border-radius:50%; opacity:.2; will-change:transform; }
+.aurora::before{ background:radial-gradient(circle, var(--primary-light), transparent 66%); left:-14vmax; top:-16vmax; animation:aurora-a 30s ease-in-out infinite alternate; }
+.aurora::after{ background:radial-gradient(circle, var(--gold), transparent 66%); right:-16vmax; bottom:-20vmax; opacity:.16; animation:aurora-b 38s ease-in-out infinite alternate; }
+.aurora i{ background:radial-gradient(circle, var(--accent), transparent 68%); left:32vw; top:40vh; width:46vmax; height:46vmax; opacity:.07; animation:aurora-c 44s ease-in-out infinite alternate; }
+@keyframes aurora-a{ to{ transform:translate3d(18vmax, 12vmax, 0) scale(1.15); } } @keyframes aurora-b{ to{ transform:translate3d(-20vmax, -10vmax, 0) scale(1.2); } } @keyframes aurora-c{ to{ transform:translate3d(-14vmax, 14vmax, 0) scale(.9); } }
+html[data-efectos="suave"] .aurora::before, html[data-efectos="suave"] .aurora::after{ opacity:.12; } html[data-efectos="suave"] .aurora i{ display:none; }
+html[data-tema="oscuro"] .aurora::before{ opacity:.14; } html[data-tema="oscuro"] .aurora::after{ opacity:.1; }
+.ambiente-canvas{ position:fixed; inset:0; z-index:-1; pointer-events:none; }
+.aura-cursor{ position:fixed; left:0; top:0; z-index:35; width:380px; height:380px; border-radius:50%; pointer-events:none; opacity:0; transition:opacity .3s ease; background:radial-gradient(circle, color-mix(in srgb, var(--primary-light) 20%, transparent), transparent 62%); mix-blend-mode:soft-light; will-change:transform; }
+html[data-tema="oscuro"] .aura-cursor{ mix-blend-mode:screen; background:radial-gradient(circle, color-mix(in srgb, var(--primary-light) 13%, transparent), transparent 62%); }
+@media print{ .aurora, .ambiente-canvas, .aura-cursor, .efx-invitacion{ display:none !important; } }
+@media (prefers-reduced-motion:reduce){ .aurora::before, .aurora::after, .aurora i{ animation:none; } }
+
+/* ---------- Tarjetas que se inclinan y botones magnéticos ---------- */
+.inclinando{ transform:perspective(900px) rotateX(calc(var(--rx, 0) * 1deg)) rotateY(calc(var(--ry, 0) * 1deg)) translateY(-4px) !important; transition:transform .12s ease-out, box-shadow .2s ease !important; box-shadow:calc(var(--ry, 0) * -1.4px) calc(var(--rx, 0) * 1.4px + 16px) 32px -12px rgba(0,0,0,.28) !important; will-change:transform; z-index:2; }
+
+/* ---------- Saludo del Dashboard ---------- */
+.saludo-dia{ position:relative; display:flex; align-items:center; gap:20px; padding:18px 24px; border-radius:var(--radius); color:#fff; overflow:hidden;
+  background:linear-gradient(115deg, var(--primary-dark), var(--primary) 58%, var(--primary-light)); background-size:160% 100%; animation:saludo-mueve 14s ease-in-out infinite alternate; box-shadow:var(--elev-3); }
+.saludo-dia::before{ content:''; position:absolute; right:-70px; top:-90px; width:300px; height:300px; border-radius:50%; background:radial-gradient(circle, color-mix(in srgb, var(--gold) 45%, transparent), transparent 68%); pointer-events:none; }
+.saludo-dia::after{ content:''; position:absolute; inset:0; background:linear-gradient(105deg, transparent 40%, rgba(255,255,255,.14) 50%, transparent 60%); transform:translateX(-120%); animation:saludo-brillo 7s ease-in-out infinite; pointer-events:none; }
+@keyframes saludo-mueve{ to{ background-position:100% 0; } } @keyframes saludo-brillo{ 0%, 55%{ transform:translateX(-120%); } 85%, 100%{ transform:translateX(120%); } }
+.saludo-emoji{ font-size:46px; line-height:1; flex-shrink:0; filter:drop-shadow(0 6px 10px rgba(0,0,0,.35)); animation:saludo-flota 4.2s ease-in-out infinite; } @keyframes saludo-flota{ 0%, 100%{ transform:translateY(0) rotate(-4deg); } 50%{ transform:translateY(-7px) rotate(5deg); } }
+.saludo-texto{ flex:1; min-width:0; position:relative; z-index:1; } .saludo-texto h2{ font-size:clamp(20px,2.3vw,29px); font-weight:900; letter-spacing:-.02em; line-height:1.15; } .saludo-texto h2 span{ color:#FFE7A3; }
+.saludo-fecha{ margin-top:3px; font-size:13px; opacity:.9; display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px; } .saludo-fiesta{ padding:2px 11px; border-radius:20px; font-size:12px; background:rgba(255,255,255,.2); }
+.saludo-msg{ margin-top:8px; font-size:13.5px; font-weight:600; opacity:.96; max-width:62ch; }
+.saludo-anillo{ position:relative; width:108px; height:108px; flex-shrink:0; z-index:1; } .saludo-anillo::before{ content:''; position:absolute; inset:2px; border-radius:50%; background:rgba(255,255,255,.2); box-shadow:inset 0 0 0 1px rgba(255,255,255,.25); }
+.saludo-anillo .flor-meta{ width:100% !important; height:100% !important; } .saludo-anillo strong{ font-size:12px; font-weight:900; }
+.saludo-dia.cumplida{ box-shadow:var(--elev-3), 0 0 0 2px color-mix(in srgb, var(--gold) 70%, transparent), 0 0 38px -4px color-mix(in srgb, var(--gold) 55%, transparent); }
+@media (max-width:640px){ .saludo-dia{ padding:14px 16px; gap:12px; } .saludo-emoji{ font-size:34px; } .saludo-anillo{ width:60px; height:60px; } }
+@media (prefers-reduced-motion:reduce){ .saludo-dia, .saludo-dia::after, .saludo-emoji{ animation:none; } }
+
+/* ---------- Banner del TIC (Tablero Integrado del Colaborador) ---------- */
+.tic-banner{ position:relative; display:flex; align-items:center; gap:16px; padding:14px 20px; border-radius:var(--radius); background:var(--panel); box-shadow:var(--elev-1), var(--borde-fino); overflow:hidden; }
+.tic-banner::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:5px; background:linear-gradient(180deg, var(--gold), var(--primary-light)); }
+.tic-sigla{ flex-shrink:0; display:flex; align-items:center; justify-content:center; width:62px; height:62px; border-radius:18px; font-size:24px; font-weight:900; letter-spacing:.02em; color:#fff; background:linear-gradient(135deg, var(--primary-dark), var(--primary) 60%, var(--primary-light)); box-shadow:0 12px 24px -12px color-mix(in srgb, var(--primary) 75%, transparent), inset 0 1px 0 rgba(255,255,255,.25); animation:tic-pulso 5s ease-in-out infinite; }
+@keyframes tic-pulso{ 0%, 100%{ box-shadow:0 12px 24px -12px color-mix(in srgb, var(--primary) 75%, transparent), inset 0 1px 0 rgba(255,255,255,.25); } 50%{ box-shadow:0 14px 30px -8px color-mix(in srgb, var(--gold) 70%, transparent), inset 0 1px 0 rgba(255,255,255,.25); } }
+.tic-banner h2{ font-size:clamp(18px,2.1vw,26px); font-weight:900; letter-spacing:-.02em; line-height:1.15; } .tic-banner h2 em{ font-style:normal; color:var(--primary); }
+.tic-banner p{ margin-top:3px; font-size:12.5px; color:var(--gray); } .tic-banner .tic-claves{ margin-left:auto; display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; } .tic-claves span{ padding:3px 11px; border-radius:20px; font-size:11.5px; font-weight:700; color:var(--primary-dark); background:var(--primary-soft,#EAF5EE); }
+html[data-tema="oscuro"] .tic-claves span{ color:var(--primary-light); }
+@media (max-width:760px){ .tic-banner{ padding:12px 14px; gap:12px; } .tic-sigla{ width:48px; height:48px; font-size:19px; border-radius:14px; } .tic-banner .tic-claves{ display:none; } }
+@media (prefers-reduced-motion:reduce){ .tic-sigla{ animation:none; } }
+
+/* ---------- Menú: sigla TIC ---------- */
+.nav-sub{ margin-left:6px; font-size:11px; font-weight:500; opacity:.62; letter-spacing:0; }
+html[data-menu="mini"] .nav-sub{ display:none; }
+
+/* ---------- Adornos festivos ---------- */
+.fiesta-chip{ display:inline-flex; align-items:center; gap:7px; padding:5px 13px 5px 10px; border-radius:20px; font-size:12px; color:var(--primary-dark); background:linear-gradient(135deg, color-mix(in srgb, var(--gold) 30%, #fff), color-mix(in srgb, var(--primary-light) 22%, #fff)); box-shadow:var(--elev-1), 0 0 0 1px color-mix(in srgb, var(--gold) 45%, transparent); animation:chip-brilla 3.2s ease-in-out infinite; }
+.fiesta-chip span{ font-size:15px; } .fiesta-chip b{ font-weight:800; white-space:nowrap; } .fiesta-chip:hover{ transform:translateY(-1px); }
+@keyframes chip-brilla{ 0%, 100%{ box-shadow:var(--elev-1), 0 0 0 1px color-mix(in srgb, var(--gold) 45%, transparent); } 50%{ box-shadow:var(--elev-2), 0 0 0 3px color-mix(in srgb, var(--gold) 38%, transparent); } }
+html[data-tema="oscuro"] .fiesta-chip{ color:#fff; background:linear-gradient(135deg, color-mix(in srgb, var(--gold) 28%, #101713), color-mix(in srgb, var(--primary) 40%, #101713)); }
+@media (max-width:1349px){ .fiesta-chip b{ display:none; } .fiesta-chip{ padding:5px 9px; } } @media (max-width:640px){ .fiesta-chip{ display:none; } }
+html[data-fiesta] .sidebar .logo{ position:relative; }
+html[data-fiesta] .sidebar .logo::after{ content:var(--fiesta-emoji); position:absolute; left:48px; top:6px; font-size:21px; line-height:1; transform:rotate(16deg); filter:drop-shadow(0 2px 4px rgba(0,0,0,.45)); animation:logo-bambolea 3.4s ease-in-out infinite; pointer-events:none; }
+html[data-menu="mini"][data-fiesta] .sidebar .logo::after{ left:calc(50% + 6px); top:10px; }
+@keyframes logo-bambolea{ 0%, 100%{ transform:rotate(12deg) translateY(0); } 50%{ transform:rotate(22deg) translateY(-2px); } }
+html[data-fiesta] .topbar{ border-image:linear-gradient(90deg, var(--primary-light), var(--gold), var(--accent), var(--primary-light)) 1; border-image-slice:1; }
+@media (prefers-reduced-motion:reduce){ .fiesta-chip, html[data-fiesta] .sidebar .logo::after{ animation:none; } }
+
+/* ---------- Invitación festiva ---------- */
+.efx-invitacion{ position:fixed; left:22px; bottom:22px; z-index:1250; display:flex; align-items:center; gap:14px; max-width:460px; padding:14px 16px; border-radius:18px; background:var(--panel); box-shadow:var(--elev-4), 0 0 0 1px color-mix(in srgb, var(--gold) 50%, transparent); animation:toast-entra .5s var(--ease-resorte); flex-wrap:wrap; }
+.efx-inv-emoji{ font-size:34px; animation:saludo-flota 3.6s ease-in-out infinite; } .efx-invitacion strong{ font-size:14px; } .efx-invitacion p{ margin:2px 0 0; font-size:12px; color:var(--gray); max-width:30ch; } .efx-inv-botones{ display:flex; gap:8px; margin-left:auto; } .efx-inv-botones button{ padding:7px 14px; font-size:12.5px; }
+
+/* ---------- Panel de efectos y festividades ---------- */
+.efx-fondo{ position:fixed; inset:0; z-index:1400; display:flex; align-items:center; justify-content:center; padding:18px; background:rgba(8,14,10,.55); -webkit-backdrop-filter:blur(5px); backdrop-filter:blur(5px); animation:modal-fade-in .2s ease; }
+.efx-panel{ width:min(760px,100%); max-height:calc(100dvh - 36px); overflow-y:auto; padding:22px 24px; border-radius:22px; background:var(--panel); box-shadow:var(--elev-4); animation:modal-pop .28s var(--ease-resorte); display:flex; flex-direction:column; gap:18px; }
+.efx-panel header{ display:flex; align-items:center; justify-content:space-between; } .efx-panel h3{ font-size:19px; font-weight:900; letter-spacing:-.02em; } .efx-panel h3 i{ color:var(--gold); margin-right:9px; }
+.efx-cerrar{ width:34px; height:34px; border-radius:10px; background:var(--superficie-3); color:var(--text-soft); } .efx-cerrar:hover{ background:var(--border); transform:rotate(90deg); transition:transform var(--mov-3) var(--ease-resorte); }
+.efx-panel h4{ font-size:12px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--gray); margin-bottom:8px; }
+.efx-nota{ margin:8px 0 0; font-size:12.5px; color:var(--text-soft); line-height:1.5; }
+.efx-maestro{ display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:10px; } .efx-maestro h4{ margin:0; } .efx-maestro small{ font-size:12.5px; color:var(--text-soft); }
+.efx-interruptor{ position:relative; width:58px; height:32px; border-radius:32px; flex-shrink:0; background:var(--borde-fuerte); transition:background-color var(--mov-3) ease; } .efx-interruptor span{ position:absolute; left:4px; top:4px; width:24px; height:24px; border-radius:50%; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.3); transition:transform var(--mov-3) var(--ease-resorte); }
+.efx-interruptor.on{ background:linear-gradient(135deg, var(--primary), var(--primary-light)); box-shadow:0 0 18px -2px color-mix(in srgb, var(--primary-light) 70%, transparent); } .efx-interruptor.on span{ transform:translateX(26px); }
+.efx-festivas{ display:flex; flex-direction:column; gap:4px; transition:opacity var(--mov-3) ease; } .efx-festivas.inactivo{ opacity:.55; }
+.efx-grid{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:12px; } @media (max-width:760px){ .efx-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.efx-fiesta{ position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:12px 12px 14px; border-radius:16px; text-align:left; color:var(--text); background:var(--superficie-2); box-shadow:var(--borde-fino); overflow:hidden; transition:transform var(--mov-2) var(--ease-resorte), box-shadow var(--mov-2) var(--ease-salida); }
+.efx-fiesta:hover{ transform:translateY(-3px) scale(1.02); box-shadow:var(--elev-2), var(--borde-fino); } .efx-emoji{ font-size:28px; line-height:1.1; margin-bottom:4px; transition:transform var(--mov-3) var(--ease-resorte); } .efx-fiesta:hover .efx-emoji{ transform:scale(1.2) rotate(-8deg); }
+.efx-fiesta strong{ font-size:12.5px; line-height:1.25; } .efx-fiesta small{ font-size:10.5px; color:var(--gray); line-height:1.3; }
+.efx-muestra{ position:absolute; left:0; right:0; bottom:0; height:5px; background:linear-gradient(90deg, var(--f1), var(--f2), var(--f3)); }
+.efx-fiesta.sel{ box-shadow:0 0 0 2px var(--f2), var(--elev-2); background:color-mix(in srgb, var(--f2) 9%, var(--panel)); } .efx-fiesta em{ position:absolute; top:8px; right:8px; padding:1px 8px; border-radius:20px; font-style:normal; font-size:9.5px; font-weight:900; letter-spacing:.05em; text-transform:uppercase; color:#fff; background:var(--f2); }
+.efx-panel footer{ display:flex; flex-wrap:wrap; gap:10px; justify-content:flex-end; padding-top:4px; border-top:1px solid var(--border); }
+@media (prefers-reduced-motion:reduce){ .efx-emoji, .efx-inv-emoji{ animation:none; transition:none; } }

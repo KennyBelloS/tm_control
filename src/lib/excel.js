@@ -1,11 +1,8 @@
 import * as XLSX from 'xlsx';
 import { minutosEntreBloque, minutosDescansoAplicable } from './calculos';
+import { OPCIONES_LECTURA_EXCEL, limpiarTexto } from './seguridad.js';
 function leerLibro(arrayBuffer) {
-  return XLSX.read(arrayBuffer, {
-    type: 'array',
-    cellDates: false,
-    raw: true
-  });
+  return XLSX.read(arrayBuffer, OPCIONES_LECTURA_EXCEL);
 }
 function normalizar(txt) {
   return String(txt ?? '').trim().toLowerCase();
@@ -74,7 +71,7 @@ export function parsearReporteBoncheo(arrayBuffer, {
     registros.push({
       fecha,
       colaborador_id: colaboradorId,
-      colaborador: nombre,
+      colaborador: limpiarTexto(nombre, 120),
       mesa,
       hora_inicio: horaInicio || null,
       hora_fin: horaFin || null,
@@ -128,10 +125,10 @@ export function parsearReportePersonas(arrayBuffer) {
     const mesa = Number(fila[idxMesa]);
     porCodigo.set(empCod, {
       id: empCod,                                   // el boncheo identifica a la persona por su Emp.Cod
-      nombre: String(nombre).replace(/\{\}/g, '').replace(/\s+/g, ' ').trim(),
+      nombre: limpiarTexto(String(nombre).replace(/\{\}/g, ''), 120),
       codigo_empleado: String(empCod),
       mesa: Number.isInteger(mesa) && mesa > 0 ? mesa : null,
-      rol: idxRol !== undefined && fila[idxRol] ? String(fila[idxRol]).trim() : null,
+      rol: idxRol !== undefined && fila[idxRol] ? limpiarTexto(fila[idxRol], 60) : null,
       activo: true
     });
   }

@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { agregarPorPersonaDia } from './excel';
 import { calcularRendimientoReal, calcularRendimientoBloque, agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from './calculos';
+import { codigoMasCorto } from './personasUtil';
 const SELECT_HISTORICO = 'id,fecha,colaborador_id,total_tallos,total_ramos,tiempo_trabajado_min,tiempo_no_productivo_min,semana,codigos,personas(nombre)';
 const SELECT_ACTUAL = 'id,fecha,colaborador_id,hora_inicio,hora_fin,mesa,total_tallos,total_ramos,rend_tallos,rend_ramos,tiempo_trabajado_min,semana,personas(nombre)';
 function aplanar(fila) {
@@ -421,7 +422,8 @@ export async function getRangoHorarioHistorico(fecha, colaboradorId) {
 export async function getHistorico({
   fecha,
   desde,
-  hasta
+  hasta,
+  colaboradorId
 } = {}) {
   let query = supabase.from('rendimiento_historico').select(SELECT_HISTORICO).order('fecha', {
     ascending: false
@@ -429,6 +431,7 @@ export async function getHistorico({
   if (fecha) query = query.eq('fecha', fecha);
   if (desde) query = query.gte('fecha', desde);
   if (hasta) query = query.lte('fecha', hasta);
+  if (colaboradorId != null) query = query.eq('colaborador_id', colaboradorId);       // solo una persona (Tablero integrado del colaborador)
   const {
     data,
     error
@@ -443,10 +446,12 @@ export async function getHistorico({
   // esta función existir), se deja el valor que ya estaba guardado.
   try {
     const fechas = [...new Set(filas.map(f => f.fecha))];
-    const { data: bloquesData, error: errorBloques } = await supabase
+    let consultaBloques = supabase
       .from('historico_bloques')
       .select('fecha,colaborador_id,hora_inicio,hora_fin')
       .in('fecha', fechas);
+    if (colaboradorId != null) consultaBloques = consultaBloques.eq('colaborador_id', colaboradorId);
+    const { data: bloquesData, error: errorBloques } = await consultaBloques;
     if (errorBloques) throw errorBloques;
 
     if (bloquesData && bloquesData.length > 0) {
@@ -850,4 +855,24 @@ export async function getMetasDiariasCompleto() {
   } catch {
     return [];
   }
+}
+
+
+/**
+ * Código (mesa) de cada persona, para cuando todavía no está guardado en el catálogo de Personas.
+ * Se toma del Turno Actual (lo más reciente) y, si no está, del último histórico. Devuelve Map(id → código más corto).
+ */
+export async function getCodigosPorPersona() {
+  const mapa = new Map();
+  const [hist, act] = await Promise.all([
+    supabase.from('rendimiento_historico').select('colaborador_id, codigos, fecha').not('codigos', 'is', null).order('fecha', { ascending: false }).limit(4000),
+    supabase.from('rendimiento_actual').select('colaborador_id, mesa').not('mesa', 'is', null).limit(2000)
+  ]);
+  for (const r of hist.data || []) {
+    if (mapa.has(r.colaborador_id)) continue;
+    const c = codigoMasCorto(r.codigos);
+    if (c) mapa.set(r.colaborador_id, c);
+  }
+  for (const r of act.data || []) mapa.set(r.colaborador_id, String(r.mesa));
+  return mapa;
 }

@@ -6,7 +6,7 @@ import { esFilaMesaLegada, coincidePersona } from '../lib/personasUtil';
 import PageHeader from '../components/PageHeader';
 import { useSesion } from '../lib/useSesion';
 import { puedeEditar } from '../lib/roles';
-import { listarPersonasModulo, getConfig } from '../lib/db';
+import { listarPersonasModulo, getConfig, getCodigosPorPersona } from '../lib/db';
 import {
   listarLineas, crearLinea, actualizarLinea, cambiarActivaLinea,
   listarFormadoras, crearFormadora, cambiarActivaFormadora,
@@ -15,6 +15,12 @@ import {
   getMetasMes, guardarMetaMes, mesDe, mesAnterior, getFormadoraLinea, setFormadoraLinea,
   actualizarFormadora, eliminarFormadora, actualizarAsignacion, getLineasDia, setLineaDia
 } from '../lib/lineas';
+import { limpiarTexto } from '../lib/seguridad';
+import { devolucionesDePersonas } from '../lib/devoluciones';
+import { Link } from 'react-router-dom';
+import { usePeriodoDev, useExtrasTablero } from '../lib/periodoDev';
+import { FiltroDevoluciones, FiltroExtrasTablero, valorPeriodo, etiquetaPeriodo, CifraDev } from '../components/devoluciones/PiezasDevLineas';
+import { EstadoVacio, FilasEsqueleto } from '../components/Estados';
 
 const nombreMes = mes => {
   const [y, m] = mes.split('-').map(Number);
@@ -55,6 +61,7 @@ export default function Lineas() {
   const [mensaje, setMensaje] = useState(null);
 
   const [metaTick, setMetaTick] = useState(0);
+  const [codigosDerivados, setCodigosDerivados] = useState(new Map());   // código de cada persona sacado del turno/histórico
   const [lineasDia, setLineasDia] = useState(new Map());     // ajustes de "trabaja / no trabaja" para la fecha elegida
   const [editandoLineaId, setEditandoLineaId] = useState(null);
   const [borradorLinea, setBorradorLinea] = useState({ nombre: '', supervisor: '' });
@@ -71,7 +78,7 @@ export default function Lineas() {
   async function cargarTodo() {
     setCargando(true);
     try {
-      const [l, f, p, a, r, cfg, mm, mp, fl, ld] = await Promise.all([
+      const [l, f, p, a, r, cfg, mm, mp, fl, ld, cd] = await Promise.all([
         listarLineas(),
         listarFormadoras(),
         listarPersonasModulo(),
@@ -81,8 +88,10 @@ export default function Lineas() {
         getMetasMes(mesActual),
         getMetasMes(mesAnterior(mesActual)),
         getFormadoraLinea(fechaAsignacion),
-        getLineasDia(fechaAsignacion)
+        getLineasDia(fechaAsignacion),
+        getCodigosPorPersona().catch(() => new Map())
       ]);
+      setCodigosDerivados(cd);
       setMetasMes(mm); setMetasMesPrevio(mp); setFormadoraDeLinea(fl); setLineasDia(ld);
       setLineas(l);
       setFormadoras(f);
@@ -97,6 +106,31 @@ export default function Lineas() {
     }
   }
   useEffect(() => { cargarTodo(); }, [fechaAsignacion]);
+  // Devoluciones de las personas asignadas, tomadas del módulo de Devoluciones. Por defecto SOLO el día; la semana y el mes se eligen aparte.
+  const [periodoDev, setPeriodoDev] = usePeriodoDev();          // filtro de la franja y de la tabla de personas (un período a la vez)
+  const [extrasTab, setExtrasTab] = useExtrasTablero();          // columnas extra del Tablero: semana y/o mes (el día siempre se ve)
+  const columnasTab = 8 + (extrasTab.semana ? 1 : 0) + (extrasTab.mes ? 1 : 0);
+  const [devPersonas, setDevPersonas] = useState(null);
+  useEffect(() => {
+    let vivo = true;
+    devolucionesDePersonas(asignaciones.map(a => ({ id: a.colaborador_id, nombre: a.colaborador, mesa: a.mesa })), fechaAsignacion)
+      .then(r => vivo && setDevPersonas(r)).catch(() => vivo && setDevPersonas(null));
+    return () => { vivo = false; };
+  }, [asignaciones, fechaAsignacion]);
+  const verDev = !!devPersonas?.hayDatos;
+  const valorDevPersona = id => valorPeriodo(devPersonas?.porPersona.get(id), periodoDev, devPersonas?.hayDia);
+  const resumenDevFormadoras = useMemo(() => {
+    if (!verDev) return [];
+    const m = new Map();
+    for (const a of asignaciones) {
+      const v = valorPeriodo(devPersonas.porPersona.get(a.colaborador_id), periodoDev, devPersonas.hayDia);
+      const e = m.get(a.formadora_id) || { id: a.formadora_id, nombre: a.formadora, personas: 0, sinDato: 0, total: 0, conDato: 0 };
+      e.personas++;
+      if (v == null) e.sinDato++; else { e.total += v; e.conDato++; }
+      m.set(a.formadora_id, e);
+    }
+    return [...m.values()].sort((x, y) => y.total - x.total);
+  }, [asignaciones, devPersonas, verDev, periodoDev]);
 
   async function cargarTablero() {
     setCargandoTablero(true);
@@ -177,11 +211,15 @@ export default function Lineas() {
   // Una línea trabaja ese día si así se ajustó; si no hay ajuste, vale lo general de la línea (activa/inactiva)
   const lineasActivas = useMemo(() => lineas.filter(l => lineasDia.has(l.id) ? lineasDia.get(l.id) : l.activa), [lineas, lineasDia]);
 
+  // Cada persona se muestra y se busca por su CÓDIGO (el más corto), nunca por el id largo
+  const codigoDe = (id, mesa) => (mesa != null ? String(mesa) : (codigosDerivados.get(id) ?? null));
   const personasFiltradas = useMemo(() => {
-    const vigentes = personas.filter(p => p.activo && !esFilaMesaLegada(p));
+    const vigentes = personas.filter(p => p.activo && !esFilaMesaLegada(p))
+      .map(p => ({ ...p, codigo: codigoDe(p.id, p.mesa) }))
+      .sort((x, y) => (Number(x.codigo) || 1e9) - (Number(y.codigo) || 1e9) || String(x.nombre).localeCompare(String(y.nombre)));
     if (!busquedaPersona) return vigentes.slice(0, 30);
-    return vigentes.filter(p => coincidePersona(p, busquedaPersona)).slice(0, 30);
-  }, [personas, busquedaPersona]);
+    return vigentes.filter(p => coincidePersona({ nombre: p.nombre, mesa: p.codigo }, busquedaPersona)).slice(0, 30);
+  }, [personas, busquedaPersona, codigosDerivados]);
 
   const asignacionesPorLinea = useMemo(() => {
     const mapa = new Map();
@@ -205,7 +243,7 @@ export default function Lineas() {
     const nombre = borradorLinea.nombre.trim();
     if (!nombre) { setMensaje({ tipo: 'err', texto: 'La línea necesita un nombre.' }); return; }
     try {
-      await actualizarLinea(id, { nombre, supervisor: borradorLinea.supervisor.trim() || null });
+      await actualizarLinea(id, { nombre: limpiarTexto(nombre, 60), supervisor: limpiarTexto(borradorLinea.supervisor, 80) || null });
       setEditandoLineaId(null);
       await cargarTodo();
     } catch (e) {
@@ -216,7 +254,7 @@ export default function Lineas() {
     const nombre = borradorForm.trim();
     if (!nombre) { setMensaje({ tipo: 'err', texto: 'La formadora necesita un nombre.' }); return; }
     try {
-      await actualizarFormadora(id, nombre);
+      await actualizarFormadora(id, limpiarTexto(nombre, 80));
       setEditandoFormId(null);
       await cargarTodo();
     } catch (e) {
@@ -246,7 +284,7 @@ export default function Lineas() {
   async function agregarLinea() {
     if (!nuevaLinea.trim()) return;
     try {
-      await crearLinea(nuevaLinea.trim(), nuevoSupervisor.trim());
+      await crearLinea(limpiarTexto(nuevaLinea, 60), limpiarTexto(nuevoSupervisor, 80));
       setNuevaLinea(''); setNuevoSupervisor('');
       await cargarTodo();
     } catch (e) {
@@ -260,7 +298,7 @@ export default function Lineas() {
   async function agregarFormadora() {
     if (!nuevaFormadora.trim()) return;
     try {
-      await crearFormadora(nuevaFormadora.trim());
+      await crearFormadora(limpiarTexto(nuevaFormadora, 80));
       setNuevaFormadora('');
       await cargarTodo();
     } catch (e) {
@@ -499,13 +537,13 @@ export default function Lineas() {
                 <label>Toca a la persona para asignarla de una vez (busca por nombre o por código)</label>
                 <div className="search">
                   <i className="fa-solid fa-magnifying-glass"></i>
-                  <input type="text" autoFocus placeholder="Escribe para buscar..." value={busquedaPersona} onChange={e => setBusquedaPersona(e.target.value)} />
+                  <input type="text" autoFocus placeholder="Busca por nombre o por código (ej. 4)…" maxLength={60} value={busquedaPersona} onChange={e => setBusquedaPersona(e.target.value)} />
                 </div>
                 <div className="asignacion-resultados">
-                  {personasFiltradas.length === 0 && <div className="empty-state" style={{ padding: 16 }}>Sin resultados.</div>}
+                  {personasFiltradas.length === 0 && <EstadoVacio titulo="Sin resultados" compacto />}
                   {personasFiltradas.map(p => (
                     <button key={p.id} className="asignacion-resultado-item" onClick={() => asignarDirecto(p.id)}>
-                      <span className="asignacion-resultado-codigo" title="Código (mesa)">{p.mesa ?? '—'}</span>
+                      <span className="asignacion-resultado-codigo" title="Código (el más corto)">{p.codigo ?? '—'}</span>
                       <span>{p.nombre}</span>
                       <i className="fa-solid fa-circle-plus"></i>
                     </button>
@@ -519,15 +557,29 @@ export default function Lineas() {
             </div>
           )}
 
+          {verDev && resumenDevFormadoras.length > 0 && (
+            <div className="dev-formadoras-strip" aria-label="Devoluciones por formadora, según las personas asignadas">
+              <div className="dev-strip-cab">
+                <span className="dev-strip-titulo"><i className="fa-solid fa-rotate-left"></i> Devoluciones de la gente de cada formadora · {etiquetaPeriodo(periodoDev, fechaAsignacion, devPersonas.ultima)}</span>
+                <FiltroDevoluciones periodo={periodoDev} onCambio={setPeriodoDev} />
+              </div>
+              {resumenDevFormadoras.map(f => (
+                <div key={f.id} className="dev-strip-item" title={f.sinDato ? `${f.sinDato} persona(s) sin dato en Devoluciones para este período` : ''}>
+                  <strong>{f.nombre}</strong><span>{f.personas} persona{f.personas === 1 ? '' : 's'}</span>
+                  <CifraDev valor={f.conDato > 0 ? f.total : null} ultima={devPersonas.ultima} periodo={periodoDev} fecha={fechaAsignacion} claseBase="dev-strip-num" />
+                </div>
+              ))}
+            </div>
+          )}
           <div className="table-scroll" style={{ marginTop: 18 }}>
             <table>
-              <thead><tr><th>Código (mesa)</th><th>Colaborador</th><th>Formadora</th><th>Línea</th><th>Acción</th></tr></thead>
+              <thead><tr><th>Código (mesa)</th><th>Colaborador</th><th>Formadora</th><th>Línea</th>{verDev && <th className="th-dev" title="Devoluciones de esta persona en el período elegido (filtro «Devoluciones»)">Devoluciones<small>{etiquetaPeriodo(periodoDev, fechaAsignacion, devPersonas.ultima)}</small></th>}<th>Acción</th></tr></thead>
               <tbody>
-                {asignaciones.length === 0 && <tr><td colSpan={5}><div className="empty-state"><i className="fa-solid fa-user-group"></i>Todavía no hay asignaciones para esta fecha.</div></td></tr>}
+                {asignaciones.length === 0 && <tr><td colSpan={verDev ? 6 : 5}><EstadoVacio icono="fa-user-group" titulo="Todavía no hay asignaciones para esta fecha" /></td></tr>}
                 {asignaciones.map(a => (
                   <tr key={a.id}>
-                    <td><strong>{a.mesa ?? '—'}</strong></td>
-                    <td>{a.colaborador}</td>
+                    <td><strong>{codigoDe(a.colaborador_id, a.mesa) ?? '—'}</strong></td>
+                    <td><Link className="enlace-colab" to={`/colaborador?id=${a.colaborador_id}`} title="Ver el tablero integrado de esta persona">{a.colaborador}</Link></td>
                     <td>{puedeModificar
                       ? <select className="asig-select" value={a.formadora_id} onChange={e => corregirAsignacion(a, 'formadora', e.target.value)}>
                           {formadoras.filter(f => f.activa || f.id === a.formadora_id).map(f => <option key={f.id} value={f.id}>{f.nombre}</option>)}
@@ -538,6 +590,7 @@ export default function Lineas() {
                           {lineas.filter(l => lineasActivas.some(x => x.id === l.id) || l.id === a.linea_id).map(l => <option key={l.id} value={l.id}>{l.nombre}</option>)}
                         </select>
                       : a.linea}</td>
+                    {verDev && <td className="td-dev"><CifraDev valor={valorDevPersona(a.colaborador_id)} ultima={devPersonas.ultima} periodo={periodoDev} fecha={fechaAsignacion} /></td>}
                     <td><button title="Quitar" onClick={() => quitar(a.id)}><i className="fa-solid fa-trash"></i></button></td>
                   </tr>
                 ))}
@@ -611,6 +664,7 @@ export default function Lineas() {
             <span><i className="cls-punto cls-peor"></i> Rendimiento por debajo de {metaHora} /h</span>
             <span><i className="cls-punto cls-peor"></i> Devoluciones mayores a 0</span>
           </div>
+          <FiltroExtrasTablero extras={extrasTab} onCambio={setExtrasTab} />
           <div className="table-scroll">
             <table className="tablero-tabla">
               <thead>
@@ -618,16 +672,19 @@ export default function Lineas() {
                   <th>Semana</th><th>Fecha</th><th>Formadora</th><th>Línea</th>
                   <th>Meta tallos Clasificación</th><th>Resultado Clasificación</th>
                   <th>Rendimiento Promedio Boncheo</th><th>N° Devoluciones</th>
+                  {extrasTab.semana && <th className="th-dev" title="Devoluciones de la gente que esta formadora tenía asignada, en la semana (domingo a sábado) de esa fecha. Se calcula solo.">Devol. semana</th>}
+                  {extrasTab.mes && <th className="th-dev" title="Devoluciones de la gente que esta formadora tenía asignada, en el mes de esa fecha. Se calcula solo.">Devol. mes</th>}
                 </tr>
               </thead>
               <tbody>
-                {cargandoTablero && <tr><td colSpan={8}><div className="empty-state">Cargando...</div></td></tr>}
-                {!cargandoTablero && tableroFilas.length === 0 && <tr><td colSpan={8}><div className="empty-state"><i className="fa-solid fa-table"></i>Sin asignaciones en este rango — asigna personas a formadoras arriba para que aparezcan aquí.</div></td></tr>}
+                {cargandoTablero && <FilasEsqueleto columnas={columnasTab} />}
+                {!cargandoTablero && tableroFilas.length === 0 && <tr><td colSpan={columnasTab}><EstadoVacio icono="fa-table" titulo="Sin asignaciones en este rango — asigna personas a formadoras arriba para que aparezcan aquí" /></td></tr>}
                 {tableroFilas.map(f => {
                   const clave = `${f.fecha}_${f.formadora_id}`;
                   const guardando = guardandoFilaTablero === clave;
                   const claseRend = f.rendimientoPromedio > 0 ? (f.rendimientoPromedio >= metaHora ? 'tab-verde' : 'tab-rojo') : '';
-                  const claseDev = f.devoluciones === '' ? '' : (Number(f.devoluciones) > 0 ? 'tab-rojo' : 'tab-verde');
+                  const devEfectiva = f.devoluciones !== '' ? f.devoluciones : (f.devolucionesAuto ?? '');      // lo escrito a mano manda; si no, el del módulo de Devoluciones
+                  const claseDev = devEfectiva === '' ? '' : (Number(devEfectiva) > 0 ? 'tab-rojo' : 'tab-verde');
                   const sinResultado = f.resultadoClasificacion === '' || f.resultadoClasificacion == null;
                   return (
                     <tr key={clave}>
@@ -646,9 +703,12 @@ export default function Lineas() {
                       </td>
                       <td className={claseRend}><strong>{f.rendimientoPromedio || '—'}</strong></td>
                       <td className={claseDev}>
-                        <input type="number" min="0" style={{ width: 80 }} value={f.devoluciones} onChange={e => actualizarCampoTablero(f.fecha, f.formadora_id, 'devoluciones', e.target.value)} onBlur={() => guardarFilaTableroAhora(f)} />
+                        <input type="number" min="0" style={{ width: 80 }} value={f.devoluciones} placeholder={f.devolucionesAuto != null ? String(f.devolucionesAuto) : ''} onChange={e => actualizarCampoTablero(f.fecha, f.formadora_id, 'devoluciones', e.target.value)} onBlur={() => guardarFilaTableroAhora(f)} />
+                        {f.devoluciones === '' && f.devolucionesAuto != null && <span className="tab-auto-dev" title="Calculado desde el módulo de Devoluciones con las personas que esta formadora tenía asignadas ese día. Escribe un número para cambiarlo.">auto</span>}
                         {guardando && <i className="fa-solid fa-spinner fa-spin" style={{ marginLeft: 6, color: 'var(--gray)' }}></i>}
                       </td>
+                      {extrasTab.semana && <td className="td-dev"><CifraDev valor={f.devolucionesSemana} ultima={f.devolucionesUltima} periodo="semana" fecha={f.fecha} /></td>}
+                      {extrasTab.mes && <td className="td-dev"><CifraDev valor={f.devolucionesMes} ultima={f.devolucionesUltima} periodo="mes" fecha={f.fecha} /></td>}
                     </tr>
                   );
                 })}
@@ -668,7 +728,7 @@ export default function Lineas() {
               </div>
               <table className="tablero-export-tabla">
                 <thead>
-                  <tr><th>Semana</th><th>Fecha</th><th>Formadora</th><th>Línea</th><th>Meta tallos<br />Clasificación</th><th>Resultado<br />Clasificación</th><th>Rendimiento<br />Promedio Boncheo</th><th>N° de<br />devoluciones</th></tr>
+                  <tr><th>Semana</th><th>Fecha</th><th>Formadora</th><th>Línea</th><th>Meta tallos<br />Clasificación</th><th>Resultado<br />Clasificación</th><th>Rendimiento<br />Promedio Boncheo</th><th>N° de<br />devoluciones</th>{extrasTab.semana && <th>Devol.<br />semana</th>}{extrasTab.mes && <th>Devol.<br />mes</th>}</tr>
                 </thead>
                 <tbody>
                   {tableroFilas.map(f => (
@@ -677,7 +737,8 @@ export default function Lineas() {
                       <td>{f.metaClasificacion !== '' ? Number(f.metaClasificacion).toLocaleString('es-CO') : ''}</td>
                       <td>{f.resultadoClasificacion !== '' ? Number(f.resultadoClasificacion).toLocaleString('es-CO') : ''}</td>
                       <td className={f.rendimientoPromedio > 0 ? (f.rendimientoPromedio >= metaHora ? 'tab-verde' : 'tab-rojo') : ''}>{f.rendimientoPromedio || ''}</td>
-                      <td className={f.devoluciones === '' ? '' : (Number(f.devoluciones) > 0 ? 'tab-rojo' : 'tab-verde')}>{f.devoluciones}</td>
+                      <td className={(f.devoluciones !== '' ? f.devoluciones : (f.devolucionesAuto ?? '')) === '' ? '' : (Number(f.devoluciones !== '' ? f.devoluciones : f.devolucionesAuto) > 0 ? 'tab-rojo' : 'tab-verde')}>{f.devoluciones !== '' ? f.devoluciones : (f.devolucionesAuto ?? '')}</td>
+                      {extrasTab.semana && <td>{f.devolucionesSemana ?? ''}</td>}{extrasTab.mes && <td>{f.devolucionesMes ?? ''}</td>}
                     </tr>
                   ))}
                 </tbody>

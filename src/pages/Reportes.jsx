@@ -8,6 +8,7 @@ import { getConfig, getHistorico, getActual } from '../lib/db';
 import { getRendimientoPorLinea, getRendimientoPorFormadora } from '../lib/lineas';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { agregarRankingPorPersona, marcarPocoTiempo } from '../lib/calculos';
+import { EstadoVacio } from '../components/Estados';
 
 function hoyISO() {
   return fechaLocalISO(); // hora local, no UTC
@@ -317,7 +318,7 @@ export default function Reportes() {
                 <table>
                   <thead><tr><th>Línea</th><th>Personas</th><th>Tallos</th><th>Rendimiento</th></tr></thead>
                   <tbody>
-                    {resumenPorLinea.length === 0 && <tr><td colSpan={4}><div className="empty-state">Sin asignaciones en este período.</div></td></tr>}
+                    {resumenPorLinea.length === 0 && <tr><td colSpan={4}><EstadoVacio titulo="Sin asignaciones en este período" /></td></tr>}
                     {resumenPorLinea.map(l => (
                       <tr key={l.linea_id}>
                         <td>{l.linea}</td>
@@ -340,7 +341,7 @@ export default function Reportes() {
                 <table>
                   <thead><tr><th>Formadora</th><th>Línea(s)</th><th>Personas</th><th>Tallos</th><th>Rendimiento</th></tr></thead>
                   <tbody>
-                    {resumenPorFormadora.length === 0 && <tr><td colSpan={5}><div className="empty-state">Sin asignaciones en este período.</div></td></tr>}
+                    {resumenPorFormadora.length === 0 && <tr><td colSpan={5}><EstadoVacio titulo="Sin asignaciones en este período" /></td></tr>}
                     {resumenPorFormadora.map(f => (
                       <tr key={f.formadora_id}>
                         <td>{f.formadora}</td>
@@ -393,7 +394,7 @@ export default function Reportes() {
           {cargando ? (
             <p style={{ color: 'var(--gray)' }}>Cargando vista previa...</p>
           ) : rankingParaMostrar.length === 0 ? (
-            <div className="empty-state"><i className="fa-solid fa-inbox"></i>Sin datos para este filtro.</div>
+            <EstadoVacio icono="fa-inbox" titulo="Sin datos para este filtro" />
           ) : (
             <RankingExcelTable
               lista={rankingParaMostrar}

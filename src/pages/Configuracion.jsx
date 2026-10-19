@@ -354,7 +354,7 @@ export default function Configuracion() {
           gap: 12,
           alignItems: 'center'
         }}>
-            <button className="btn-primary" disabled={guardando} onClick={guardar}>
+            <button className={`btn-primary ${guardando ? 'btn-cargando' : ''}`} disabled={guardando} onClick={guardar}>
               <i className="fa-solid fa-floppy-disk"></i> {guardando ? 'Guardando...' : 'Guardar cambios'}
             </button>
             {guardado && <span className="alert ok"><i className="fa-solid fa-check"></i> Configuración guardada</span>}

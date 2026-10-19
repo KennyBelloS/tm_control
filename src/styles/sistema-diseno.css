@@ -1,0 +1,161 @@
+/* =====================================================================
+   SISTEMA DE DISEÑO — Torremolinos TMControl
+   Se carga DESPUÉS de index.css: refina tokens y componentes sin tocar la lógica ni la estructura.
+   Orden: 1 tokens · 2 tipografía · 3 superficies y elevación · 4 componentes · 5 micro-interacciones · 6 carga
+   ===================================================================== */
+
+/* ---------- 1) TOKENS ---------- */
+:root{
+  /* Paleta: verde marca (más profundo y menos "verde bandera"), oro cálido de acento, neutros cálidos */
+  --primary:#176B3A; --primary-dark:#0E3B22; --primary-light:#34A35A; --primary-soft:#E7F3EB; --primary-ink:#0B2E1A;
+  --gold:#C8962E; --gold-soft:#FBF1D9;
+  --background:#F3F2EC; --panel:#FFFFFF;
+  --superficie-2:#FAF9F5; --superficie-3:#F0EFE8;
+  --text:#18201C; --text-soft:#3A4540; --gray:#69746E;
+  --border:#E4E2D9; --borde-fuerte:#CFCCBF;
+  --ok:#15803D; --ok-soft:#DCFCE7; --aviso:#B45309; --aviso-soft:#FEF3C7; --peligro:#BE123C; --peligro-soft:#FFE4E6; --info:#2563EB; --info-soft:#DBEAFE;
+
+  /* Tipografía */
+  --fuente:'Inter Variable','Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --fuente-mono:ui-monospace,'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;
+  --t-xs:11px; --t-sm:12.5px; --t-base:14px; --t-md:16px; --t-lg:20px; --t-xl:26px; --t-2xl:34px;
+
+  /* Espaciado (base 4) y radios */
+  --e-1:4px; --e-2:8px; --e-3:12px; --e-4:16px; --e-5:20px; --e-6:24px; --e-8:32px;
+  --radius:18px; --radius-sm:12px; --radius-xs:8px;
+
+  /* Elevación en capas: cada nivel suma una sombra de contacto + una difusa (más realista que una sola) */
+  --elev-1:0 1px 2px rgba(20,28,24,.05), 0 1px 1px rgba(20,28,24,.04);
+  --elev-2:0 1px 2px rgba(20,28,24,.05), 0 6px 14px -6px rgba(20,28,24,.14);
+  --elev-3:0 2px 4px rgba(20,28,24,.05), 0 14px 28px -10px rgba(20,28,24,.2);
+  --elev-4:0 4px 8px rgba(20,28,24,.06), 0 28px 56px -18px rgba(14,59,34,.32);
+  --shadow:var(--elev-2); --shadow-lg:var(--elev-4);
+  --borde-fino:0 0 0 1px var(--border);
+  --brillo:inset 0 1px 0 rgba(255,255,255,.65);             /* filo de luz superior: da volumen sin colores nuevos */
+  --anillo:0 0 0 3px rgba(52,163,90,.28);
+
+  /* Vidrio sutil */
+  --vidrio:rgba(255,255,255,.72); --vidrio-borde:rgba(255,255,255,.6); --desenfoque:saturate(1.5) blur(14px);
+
+  /* Movimiento */
+  --mov-1:120ms; --mov-2:200ms; --mov-3:360ms;
+  --ease-salida:cubic-bezier(.22,1,.36,1); --ease-resorte:cubic-bezier(.34,1.56,.64,1); --ease-suave:cubic-bezier(.4,0,.2,1);
+  --transition:all var(--mov-2) var(--ease-suave);
+}
+
+/* ---------- 2) TIPOGRAFÍA ---------- */
+*{ font-family:var(--fuente); }
+html{ font-feature-settings:'cv11','ss03','calt'; text-rendering:optimizeLegibility; -webkit-font-smoothing:antialiased; }
+body{ font-size:var(--t-base); line-height:1.5; font-variant-numeric:tabular-nums; letter-spacing:-.003em; }
+h1,h2,h3,h4{ letter-spacing:-.022em; line-height:1.2; text-wrap:balance; }
+.topbar h1{ font-size:var(--t-lg); font-weight:800; }
+.topbar p{ font-size:var(--t-sm); color:var(--gray); letter-spacing:0; }
+.panel-header h2, .step-panel h3{ font-size:var(--t-md); font-weight:800; }
+.panel-header p{ font-size:var(--t-sm); color:var(--gray); }
+.fl-rend, .nota-clave-valor{ font-family:var(--fuente-mono); }
+::selection{ background:rgba(52,163,90,.28); }
+
+/* ---------- 3) SUPERFICIES ---------- */
+.panel, .step-panel, .table-panel, .card, .avx-card, .fl2-card, .rk-fila, .clsd-card{
+  border-radius:var(--radius); border:none; box-shadow:var(--elev-1), var(--borde-fino), var(--brillo);
+}
+.panel, .step-panel, .table-panel{ background:var(--panel); }
+.card{ background:linear-gradient(180deg, var(--panel), var(--superficie-2)); box-shadow:var(--elev-2), var(--borde-fino), var(--brillo); }
+
+/* Barra superior: vidrio con filo de color */
+.topbar{ background:var(--vidrio); -webkit-backdrop-filter:var(--desenfoque); backdrop-filter:var(--desenfoque); box-shadow:0 1px 0 var(--vidrio-borde) inset, 0 8px 24px -18px rgba(20,28,24,.35); border-bottom:1px solid rgba(20,28,24,.05); }
+
+/* ---------- 4) COMPONENTES ---------- */
+/* Botones: volumen sutil (luz arriba, sombra de contacto abajo), movimiento con resorte */
+.btn-primary, .btn-secondary{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px; padding:0 18px;
+  border-radius:var(--radius-sm); font-size:var(--t-sm); font-weight:700; letter-spacing:-.005em;
+  transition:transform var(--mov-2) var(--ease-resorte), box-shadow var(--mov-2) var(--ease-salida), background-color var(--mov-1) ease, border-color var(--mov-1) ease, filter var(--mov-1) ease;
+}
+.btn-primary{
+  color:#fff; background:linear-gradient(180deg, var(--primary-light) -30%, var(--primary) 45%, var(--primary-dark) 140%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.22), 0 1px 2px rgba(14,59,34,.4), 0 6px 14px -6px color-mix(in srgb, var(--primary) 55%, transparent);
+}
+.btn-primary:hover:not(:disabled){ transform:translateY(-1.5px); filter:brightness(1.07); box-shadow:inset 0 1px 0 rgba(255,255,255,.28), 0 2px 4px rgba(14,59,34,.4), 0 14px 22px -8px color-mix(in srgb, var(--primary) 65%, transparent); }
+.btn-primary:active:not(:disabled){ transform:translateY(0) scale(.975); filter:brightness(.97); box-shadow:inset 0 2px 4px rgba(0,0,0,.25); }
+.btn-secondary{ color:var(--text); background:var(--panel); box-shadow:var(--elev-1), var(--borde-fino), var(--brillo); }
+.btn-secondary:hover:not(:disabled){ transform:translateY(-1px); background:var(--superficie-2); box-shadow:var(--elev-2), 0 0 0 1px var(--primary-light); color:var(--primary-dark); }
+.btn-secondary:active:not(:disabled){ transform:translateY(0) scale(.975); box-shadow:inset 0 1px 3px rgba(20,28,24,.18), 0 0 0 1px var(--primary-light); }
+:focus-visible{ outline:none; box-shadow:var(--anillo) !important; }
+.btn-primary:focus-visible{ box-shadow:var(--anillo), inset 0 1px 0 rgba(255,255,255,.22) !important; }
+
+/* Campos */
+input[type="text"], input[type="number"], input[type="date"], input[type="password"], input[type="email"], input[type="search"], input:not([type]), select, textarea{
+  min-height:40px; border:none; border-radius:var(--radius-sm); background:var(--panel); color:var(--text);
+  box-shadow:var(--borde-fino), inset 0 1px 2px rgba(20,28,24,.05); padding:0 12px; font-size:var(--t-sm);
+  transition:box-shadow var(--mov-2) var(--ease-salida), background-color var(--mov-1) ease;
+}
+textarea{ padding:10px 12px; }
+input::placeholder, textarea::placeholder{ color:#98a39d; }
+input:hover:not(:disabled):not(:focus), select:hover:not(:disabled):not(:focus){ box-shadow:0 0 0 1px var(--borde-fuerte), inset 0 1px 2px rgba(20,28,24,.05); }
+input:focus, select:focus, textarea:focus{ box-shadow:0 0 0 1.5px var(--primary-light), var(--anillo) !important; background:var(--panel); }
+.search{ border:none; background:var(--panel); box-shadow:var(--borde-fino), inset 0 1px 2px rgba(20,28,24,.05); border-radius:var(--radius-sm); transition:box-shadow var(--mov-2) var(--ease-salida); }
+.search:focus-within{ box-shadow:0 0 0 1.5px var(--primary-light), var(--anillo); }
+.search input{ box-shadow:none !important; background:transparent; min-height:auto; padding:0; }
+
+/* Tablas: encabezado discreto, filas con indicador de color al pasar el cursor */
+table{ font-size:var(--t-sm); }
+thead th{ font-size:var(--t-xs); font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--gray); }
+table tbody tr:hover > td:first-child{ box-shadow:inset 3px 0 0 var(--primary-light); }
+
+/* Estados (chips): punto de color + fondo suave */
+.status{ display:inline-flex; align-items:center; gap:6px; padding:4px 11px; font-weight:700; letter-spacing:.01em; }
+.status::before{ content:''; width:6px; height:6px; border-radius:50%; background:currentColor; opacity:.9; }
+
+/* Modales: fondo con desenfoque y entrada con resorte */
+.ranking-modal-overlay{ background:rgba(12,22,17,.5); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); }
+.ranking-modal{ border-radius:22px; box-shadow:var(--elev-4), var(--borde-fino); }
+
+/* Jerarquía de datos: etiqueta pequeña y apagada, cifra grande y firme */
+.card span:first-of-type:not(.numero-animado){ font-size:var(--t-xs); font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--gray); }
+.card h2{ font-size:var(--t-xl); font-weight:800; letter-spacing:-.03em; line-height:1.1; }
+.card h2 .numero-animado, .numero-animado{ font:inherit !important; letter-spacing:inherit !important; text-transform:none !important; color:inherit !important; }
+.card small{ font-size:var(--t-sm); color:var(--gray); }
+.card .icon{ border-radius:14px; box-shadow:var(--elev-2), inset 0 1px 0 rgba(255,255,255,.25); }
+
+/* Menú lateral */
+.sidebar nav li a{ border-radius:12px; transition:background-color var(--mov-2) var(--ease-suave), transform var(--mov-2) var(--ease-resorte); }
+.sidebar nav li a:hover{ transform:translateX(2px); }
+.sidebar nav li a.nav-active{ box-shadow:inset 3px 0 0 var(--gold), 0 6px 14px -10px rgba(0,0,0,.6); }
+
+/* ---------- 5) MICRO-INTERACCIONES ---------- */
+.card{ transition:transform var(--mov-3) var(--ease-resorte), box-shadow var(--mov-3) var(--ease-salida); }
+.card:hover{ transform:translateY(-4px); box-shadow:var(--elev-3), var(--borde-fino), var(--brillo); }
+.card:active{ transform:translateY(-1px) scale(.992); }
+.avx-card, .fl2-card, .rk-fila, .clsd-card{ transition:transform var(--mov-3) var(--ease-resorte), box-shadow var(--mov-3) var(--ease-salida); }
+.avx-card:hover, .rk-fila:hover, .clsd-card:hover{ transform:translateY(-2px); box-shadow:var(--elev-3), var(--borde-fino); }
+/* Entrada escalonada de listas y tarjetas (cada hijo entra un poco después del anterior) */
+@keyframes aparece{ from{ opacity:0; transform:translateY(10px) scale(.985); } to{ opacity:1; transform:none; } }
+.cards > *, .rk-lista > *, .fl2-lista > *, .clsd-grid > *, .avx-grid > *{ animation:aparece var(--mov-3) var(--ease-salida) backwards; }
+.cards > *:nth-child(2), .rk-lista > *:nth-child(2), .fl2-lista > *:nth-child(2), .clsd-grid > *:nth-child(2), .avx-grid > *:nth-child(2){ animation-delay:60ms; }
+.cards > *:nth-child(3), .rk-lista > *:nth-child(3), .fl2-lista > *:nth-child(3), .clsd-grid > *:nth-child(3){ animation-delay:120ms; }
+.cards > *:nth-child(4), .rk-lista > *:nth-child(4), .fl2-lista > *:nth-child(4){ animation-delay:180ms; }
+.rk-lista > *:nth-child(n+5), .fl2-lista > *:nth-child(n+5){ animation-delay:240ms; }
+/* Barras de progreso: llenado suave al aparecer */
+@keyframes llena{ from{ transform:scaleX(0); } to{ transform:scaleX(1); } }
+.rk-relleno, .fl2-relleno, .avx-relleno, .clsd-rank-barra > span, .pres-form-barra i{ transform-origin:left center; animation:llena 900ms var(--ease-salida) backwards; }
+/* Los botones de ícono "respiran" al enfocar con teclado y confirman el clic */
+table td button:active:not(:disabled){ transform:scale(.92); }
+.nota-clave-btn, .presentacion-pausa, .menu-toggle{ transition:transform var(--mov-2) var(--ease-resorte), background-color var(--mov-1) ease; }
+.nota-clave-btn:active, .menu-toggle:active{ transform:scale(.9); }
+
+/* ---------- 6) CARGA ---------- */
+.esqueleto{
+  background:linear-gradient(100deg, var(--superficie-3) 30%, var(--superficie-2) 50%, var(--superficie-3) 70%);
+  background-size:300% 100%; animation:brillo-esqueleto 1.5s ease-in-out infinite;
+}
+@keyframes brillo-esqueleto{ 0%{ background-position:100% 0; } 100%{ background-position:0 0; } }
+
+/* ---------- Botón de tema claro/oscuro ---------- */
+.boton-tema{ width:38px; height:38px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; font-size:15px; color:var(--text-soft); background:var(--panel); box-shadow:var(--elev-1), var(--borde-fino); transition:transform var(--mov-2) var(--ease-resorte), box-shadow var(--mov-2) var(--ease-salida), color var(--mov-1) ease; }
+.boton-tema:hover{ transform:translateY(-1px) rotate(-12deg); color:var(--gold); box-shadow:var(--elev-2), 0 0 0 1px var(--gold); }
+.boton-tema:active{ transform:scale(.9); }
+.boton-tema i{ transition:transform var(--mov-3) var(--ease-resorte); }
+html[data-tema="oscuro"] .boton-tema i{ transform:rotate(360deg); }
+
+@media (prefers-reduced-motion:reduce){ .cards > *, .rk-lista > *, .fl2-lista > *, .clsd-grid > *, .avx-grid > *, .rk-relleno, .fl2-relleno, .avx-relleno{ animation:none !important; } .card:hover, .btn-primary:hover, .btn-secondary:hover{ transform:none !important; } }

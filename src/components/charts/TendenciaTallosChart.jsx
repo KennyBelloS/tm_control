@@ -1,8 +1,9 @@
 import Chart from 'react-apexcharts';
+import { EstadoVacio } from '../Estados';
 
 export default function TendenciaTallosChart({ categorias = [], valores = [], height = 320 }) {
   if (categorias.length === 0) {
-    return <div className="empty-state"><i className="fa-solid fa-chart-area"></i>Sin histórico suficiente para graficar la tendencia.</div>;
+    return <EstadoVacio icono="fa-chart-area" titulo="Sin histórico suficiente para graficar la tendencia" />;
   }
 
   const promedio = valores.length > 0 ? Math.round(valores.reduce((s, v) => s + v, 0) / valores.length) : 0;

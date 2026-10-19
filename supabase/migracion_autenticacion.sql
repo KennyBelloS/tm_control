@@ -480,3 +480,187 @@ create policy "notas_leer_roles" on notas_modulo for select using (
 insert into notas_modulo (clave, valor) values ('gerencia_clave', 'TM2026')
 on conflict (clave) do update set valor = excluded.valor, actualizado_en = now();
 NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 23. SEGURIDAD DE LA BASE DE DATOS (córrelo al final; es seguro repetirlo)
+--     - Cierra las políticas abiertas "for all using (true)" de los módulos de Líneas, Clasificación, etc.:
+--       antes cualquiera con la llave pública del navegador, SIN iniciar sesión, podía leer, cambiar o borrar esos datos.
+--     - Leer: cualquier usuario con sesión.  Escribir: solo quien puede editar (Administrador, Ingeniero, Profesional, Digitador).
+--     - La función puede_editar() ahora coincide con los permisos que muestra la app.
+--     - Quita todo acceso al usuario anónimo (sin sesión).
+-- =====================================================================
+
+-- a) Funciones de permisos: mismo criterio que la app y con la ruta de búsqueda fija (evita suplantación de funciones)
+create or replace function es_administrador()
+returns boolean language sql security definer stable set search_path = public, pg_temp
+as $$ select exists (select 1 from public.perfiles where id = auth.uid() and rol = 'administrador' and activo = true); $$;
+
+create or replace function puede_editar()
+returns boolean language sql security definer stable set search_path = public, pg_temp
+as $$ select exists (select 1 from public.perfiles where id = auth.uid() and activo = true and rol in ('administrador', 'ingeniero', 'profesional', 'digitador')); $$;
+
+revoke all on function es_administrador() from public, anon;
+revoke all on function puede_editar() from public, anon;
+grant execute on function es_administrador() to authenticated;
+grant execute on function puede_editar() to authenticated;
+do $$ begin
+  if to_regprocedure('public.almacenamiento_usado_mb()') is not null then
+    alter function almacenamiento_usado_mb() set search_path = public, pg_temp;
+    revoke all on function almacenamiento_usado_mb() from public, anon;
+    grant execute on function almacenamiento_usado_mb() to authenticated;
+  end if;
+end $$;
+
+-- b) Tablas de los módulos: se borran TODAS sus políticas anteriores y se crean las correctas
+do $$
+declare t text; pol record;
+begin
+  foreach t in array array['lineas', 'formadoras', 'asignaciones_diarias', 'descansos_diarios', 'tablero_formadoras',
+                           'clasificacion_hora', 'clasificacion_cargas', 'clasificacion_historico',
+                           'metas_linea_mes', 'formadora_linea', 'lineas_dia']
+  loop
+    if to_regclass('public.' || t) is null then continue; end if;
+    execute format('alter table public.%I enable row level security', t);
+    for pol in select policyname from pg_policies where schemaname = 'public' and tablename = t loop
+      execute format('drop policy %I on public.%I', pol.policyname, t);
+    end loop;
+    execute format('create policy %I on public.%I for select to authenticated using (true)', 'leer_' || t, t);
+    execute format('create policy %I on public.%I for insert to authenticated with check (puede_editar())', 'insertar_' || t, t);
+    execute format('create policy %I on public.%I for update to authenticated using (puede_editar()) with check (puede_editar())', 'actualizar_' || t, t);
+    execute format('create policy %I on public.%I for delete to authenticated using (puede_editar())', 'borrar_' || t, t);
+  end loop;
+end $$;
+
+-- c) El usuario anónimo (sin sesión) no necesita NADA de las tablas ni de las funciones
+revoke all on all tables in schema public from anon;
+revoke all on all sequences in schema public from anon;
+revoke execute on all functions in schema public from anon;
+alter default privileges in schema public revoke all on tables from anon;
+alter default privileges in schema public revoke all on sequences from anon;
+alter default privileges in schema public revoke execute on functions from anon;
+
+NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 24. MÓDULO DE DEVOLUCIONES (almacenamiento mínimo + carga incremental)
+--   - devoluciones_dia:        UNA fila por persona y día; solo guarda las razones con valor (jsonb) y el total.
+--   - devoluciones_asistencia: UNA fila por persona y MES; los días trabajados van en un número (bit 0 = día 1 … bit 30 = día 31).
+--   - devoluciones_personas:   el nombre y código de cada persona, UNA sola vez.
+--   - devoluciones_meta:       hasta qué día ya se cargó (así la próxima vez solo entra lo nuevo) y el orden de las razones.
+--   Leer: cualquier usuario con sesión. Escribir: quien puede editar. El usuario sin sesión no ve nada.
+-- =====================================================================
+create table if not exists devoluciones_personas (
+  colaborador_id bigint primary key,
+  nombre text not null check (char_length(nombre) between 1 and 160),
+  codigo integer
+);
+create table if not exists devoluciones_dia (
+  fecha date not null,
+  colaborador_id bigint not null,
+  codigo integer,
+  razones jsonb not null default '{}'::jsonb,
+  total integer not null check (total >= 0),
+  filas smallint not null default 1,
+  primary key (fecha, colaborador_id)
+);
+create index if not exists devoluciones_dia_persona_idx on devoluciones_dia (colaborador_id);
+create table if not exists devoluciones_asistencia (
+  colaborador_id bigint not null,
+  mes date not null check (mes = date_trunc('month', mes)::date),
+  dias integer not null check (dias >= 0),
+  primary key (colaborador_id, mes)
+);
+create table if not exists devoluciones_meta (
+  id smallint primary key default 1 check (id = 1),
+  ultima_fecha_registro date,
+  ultima_fecha_asistencia date,
+  razones jsonb not null default '[]'::jsonb,
+  actualizado_en timestamptz not null default now()
+);
+insert into devoluciones_meta (id) values (1) on conflict (id) do nothing;
+
+do $$
+declare t text; pol record;
+begin
+  foreach t in array array['devoluciones_personas', 'devoluciones_dia', 'devoluciones_asistencia', 'devoluciones_meta'] loop
+    execute format('alter table public.%I enable row level security', t);
+    for pol in select policyname from pg_policies where schemaname = 'public' and tablename = t loop
+      execute format('drop policy %I on public.%I', pol.policyname, t);
+    end loop;
+    execute format('create policy %I on public.%I for select to authenticated using (true)', 'leer_' || t, t);
+    execute format('create policy %I on public.%I for insert to authenticated with check (puede_editar())', 'insertar_' || t, t);
+    execute format('create policy %I on public.%I for update to authenticated using (puede_editar()) with check (puede_editar())', 'actualizar_' || t, t);
+    execute format('create policy %I on public.%I for delete to authenticated using (puede_editar())', 'borrar_' || t, t);
+  end loop;
+end $$;
+revoke all on devoluciones_personas, devoluciones_dia, devoluciones_asistencia, devoluciones_meta from anon;
+
+/*
+ * Importación en UNA sola operación (si algo falla, no queda nada a medias).
+ *   p_desde_reg / p_desde_asis: desde qué día se reemplaza lo guardado (la carga incremental). Nulo = es la primera carga.
+ *   p_reemplazar: borra TODO antes de cargar (para recargar desde cero tras corregir datos viejos).
+ * Corre con los permisos de quien la llama (security invoker): las políticas de arriba siguen mandando.
+ */
+create or replace function devoluciones_importar(
+  p_personas jsonb, p_dias jsonb, p_asistencia jsonb, p_razones jsonb,
+  p_desde_reg date, p_desde_asis date, p_reemplazar boolean default false
+) returns jsonb
+language plpgsql security invoker set search_path = public, pg_temp
+as $$
+declare n_dias int := 0; n_asis int := 0; n_pers int := 0; max_reg date; max_asis date; mes_desde date;
+begin
+  if not puede_editar() then raise exception 'No tienes permiso para cargar devoluciones.' using errcode = '42501'; end if;
+
+  if p_reemplazar then
+    delete from devoluciones_dia where true;
+    delete from devoluciones_asistencia where true;
+    p_desde_reg := null; p_desde_asis := null;
+  end if;
+
+  insert into devoluciones_personas (colaborador_id, nombre, codigo)
+  select (x->>'i')::bigint, left(x->>'n', 160), nullif(x->>'c', '')::int from jsonb_array_elements(coalesce(p_personas, '[]'::jsonb)) x
+  on conflict (colaborador_id) do update set nombre = excluded.nombre, codigo = coalesce(excluded.codigo, devoluciones_personas.codigo);
+  get diagnostics n_pers = row_count;
+
+  -- Registro: se reemplaza desde el último día guardado (ese día pudo estar incompleto) y se inserta lo recibido
+  if p_desde_reg is not null then delete from devoluciones_dia where fecha >= p_desde_reg; end if;
+  insert into devoluciones_dia (fecha, colaborador_id, codigo, razones, total, filas)
+  select (x->>'f')::date, (x->>'i')::bigint, nullif(x->>'c', '')::int, coalesce(x->'r', '{}'::jsonb), (x->>'t')::int, coalesce((x->>'n')::smallint, 1)
+  from jsonb_array_elements(coalesce(p_dias, '[]'::jsonb)) x
+  on conflict (fecha, colaborador_id) do update set codigo = excluded.codigo, razones = excluded.razones, total = excluded.total, filas = excluded.filas;
+  get diagnostics n_dias = row_count;
+
+  -- Asistencia: los meses anteriores al de "desde" no se tocan; en el mes de "desde" se conservan los días anteriores a esa fecha
+  if p_desde_asis is not null then
+    mes_desde := date_trunc('month', p_desde_asis)::date;
+    delete from devoluciones_asistencia where mes > mes_desde;
+  end if;
+  insert into devoluciones_asistencia (colaborador_id, mes, dias)
+  select (x->>'i')::bigint, (x->>'m')::date, (x->>'d')::int from jsonb_array_elements(coalesce(p_asistencia, '[]'::jsonb)) x
+  on conflict (colaborador_id, mes) do update set dias = case
+    when p_desde_asis is not null and excluded.mes = date_trunc('month', p_desde_asis)::date
+      then (devoluciones_asistencia.dias & ((1 << (extract(day from p_desde_asis)::int - 1)) - 1)) | excluded.dias
+    else excluded.dias end;
+  get diagnostics n_asis = row_count;
+
+  -- hasta qué día hay datos: el último registro, y para la asistencia el bit más alto encendido del último mes
+  select max(fecha) into max_reg from devoluciones_dia;
+  select max(mes + floor(log(2::numeric, dias::numeric))::int) into max_asis from devoluciones_asistencia where dias > 0;
+  update devoluciones_meta set
+    ultima_fecha_registro = max_reg,
+    ultima_fecha_asistencia = max_asis,
+    razones = case when jsonb_array_length(coalesce(p_razones, '[]'::jsonb)) > 0 then p_razones else razones end,
+    actualizado_en = now()
+  where id = 1;
+  return jsonb_build_object('dias', n_dias, 'asistencia', n_asis, 'personas', n_pers);
+end $$;
+revoke all on function devoluciones_importar(jsonb, jsonb, jsonb, jsonb, date, date, boolean) from public, anon;
+grant execute on function devoluciones_importar(jsonb, jsonb, jsonb, jsonb, date, date, boolean) to authenticated;
+
+do $$ begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    begin alter publication supabase_realtime add table devoluciones_dia; exception when duplicate_object then null; end;
+    begin alter publication supabase_realtime add table devoluciones_meta; exception when duplicate_object then null; end;
+  end if;
+end $$;
+NOTIFY pgrst, 'reload schema';

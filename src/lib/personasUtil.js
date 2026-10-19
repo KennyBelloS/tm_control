@@ -32,3 +32,13 @@ export function coincideFila(nombre, codigos, texto) {
   if (!b) return true;
   return String(nombre || '').toLowerCase().includes(b) || coincideCodigo(codigos, b);
 }
+
+/**
+ * Una persona puede traer varios códigos ("4, 6"). Se muestra el MÁS CORTO (y si empatan, el primero):
+ * es el que se usa en el piso y el más fácil de buscar.
+ */
+export function codigoMasCorto(codigos) {
+  const lista = String(codigos ?? '').split(/[^0-9A-Za-z]+/).filter(Boolean);
+  if (!lista.length) return null;
+  return lista.reduce((mejor, c) => (c.length < mejor.length ? c : mejor));
+}

@@ -1,0 +1,187 @@
+/* =====================================================================
+   NAVEGACIÓN Y USO — se carga después de sistema-diseno.css y ANTES del tema oscuro.
+   Mantiene la paleta de la app; solo añade comportamiento y jerarquía. Todo usa los tokens (--panel, --border, --primary…),
+   así que el tema oscuro lo hereda sin ajustes aparte.
+   ===================================================================== */
+
+/* ---------- 1) BARRA SUPERIOR: sube de capa al desplazarse + migas de contexto ---------- */
+.topbar{ transition:box-shadow var(--mov-3) var(--ease-suave), background-color var(--mov-3) var(--ease-suave); }
+.topbar.elevado{ box-shadow:0 12px 26px -20px rgba(20,28,24,.5), 0 1px 0 var(--border); }
+.topbar-eyebrow{ display:flex; align-items:center; gap:7px; margin-bottom:3px; font-size:10.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--gray); }
+.topbar-eyebrow span:first-child{ color:var(--gold); }
+.topbar-eyebrow i{ font-size:8px; opacity:.55; }
+@media (max-width:640px){ .topbar-eyebrow{ display:none; } }
+
+/* ---------- 2) INDICADOR "EN VIVO" ---------- */
+.en-vivo{ display:flex; align-items:center; gap:9px; padding:6px 13px 6px 11px; border-radius:30px; background:var(--panel); box-shadow:var(--borde-fino); }
+.en-vivo-punto{ position:relative; width:9px; height:9px; border-radius:50%; background:var(--aviso); flex-shrink:0; }
+.en-vivo-vivo .en-vivo-punto{ background:var(--ok); }
+.en-vivo-error .en-vivo-punto{ background:var(--peligro); }
+.en-vivo-vivo .en-vivo-punto::after{ content:''; position:absolute; inset:-4px; border-radius:50%; border:2px solid var(--ok); opacity:0; animation:respira 2.2s ease-out infinite; }
+@keyframes respira{ 0%{ transform:scale(.5); opacity:.75; } 100%{ transform:scale(1.7); opacity:0; } }
+.en-vivo-destello{ animation:destello-dato 1s ease-out; }
+@keyframes destello-dato{ 0%{ box-shadow:0 0 0 0 rgba(52,163,90,.65); } 100%{ box-shadow:0 0 0 14px rgba(52,163,90,0); } }
+.en-vivo-texto{ display:flex; flex-direction:column; line-height:1.15; }
+.en-vivo-texto strong{ font-size:11.5px; font-weight:700; color:var(--text); }
+.en-vivo-texto small{ font-size:10px; color:var(--gray); }
+@media (max-width:1250px){ .en-vivo-texto small{ display:none; } }
+@media (max-width:1023px){ .en-vivo{ display:none; } }
+
+/* ---------- 3) BOTÓN DE DENSIDAD ---------- */
+.boton-densidad{ width:38px; height:38px; border-radius:12px; display:inline-flex; align-items:center; justify-content:center; font-size:14px; color:var(--text-soft); background:var(--panel); box-shadow:var(--elev-1), var(--borde-fino); transition:transform var(--mov-2) var(--ease-resorte), color var(--mov-1) ease, box-shadow var(--mov-2) var(--ease-salida); }
+.boton-densidad:hover{ transform:translateY(-1px); color:var(--primary); box-shadow:var(--elev-2), 0 0 0 1px var(--primary-light); }
+.boton-densidad:active{ transform:scale(.9); }
+@media (max-width:640px){ .boton-densidad{ display:none; } }
+
+/* ---------- 4) BARRA DE PROGRESO DE RUTA ---------- */
+.barra-ruta{ position:fixed; top:0; left:0; right:0; height:3px; z-index:1200; pointer-events:none; overflow:hidden; }
+.barra-ruta i{ display:block; height:100%; transform-origin:left; background:linear-gradient(90deg,var(--gold),var(--primary-light)); box-shadow:0 0 10px var(--primary-light); animation:barra-ruta 720ms var(--ease-salida) forwards; }
+@keyframes barra-ruta{ 0%{ transform:scaleX(0); opacity:1; } 70%{ transform:scaleX(.92); opacity:1; } 100%{ transform:scaleX(1); opacity:0; } }
+
+/* ---------- 5) MENÚ LATERAL: indicador deslizante + modo "riel" ---------- */
+.sidebar nav{ position:relative; }
+.sidebar nav::before{
+  content:''; position:absolute; left:0; top:0; width:var(--ind-w,0px); height:var(--ind-h,0px); opacity:var(--ind-op,0);
+  transform:translate(var(--ind-x,0px), var(--ind-y,0px)); border-radius:0 12px 12px 0; pointer-events:none;
+  background:rgba(255,255,255,.11); box-shadow:inset 3px 0 0 var(--gold), 0 8px 18px -12px rgba(0,0,0,.6);
+  transition:transform .42s var(--ease-resorte), width .3s var(--ease-salida), height .3s var(--ease-salida), opacity .2s ease;
+}
+.sidebar nav li a.nav-active{ background:transparent !important; box-shadow:none !important; border-left-color:transparent !important; }
+.sidebar nav li a{ position:relative; z-index:1; }
+.sidebar-colapsar{ display:none; }
+@media (min-width:1024px){
+  .sidebar-colapsar{ display:flex; align-items:center; justify-content:center; width:28px; height:28px; margin-left:auto; border-radius:9px; background:rgba(255,255,255,.08); color:rgba(255,255,255,.7); font-size:12px; transition:background-color var(--mov-1) ease, color var(--mov-1) ease, transform var(--mov-2) var(--ease-resorte); }
+  .sidebar-colapsar:hover{ background:rgba(255,255,255,.18); color:#fff; transform:scale(1.08); }
+  .sidebar-colapsar i{ transition:transform var(--mov-3) var(--ease-resorte); }
+  .sidebar{ transition:transform .3s ease, width .36s var(--ease-salida); }
+
+  html[data-menu="mini"] .sidebar{ width:78px; }
+  html[data-menu="mini"] .sidebar .logo{ flex-direction:column; justify-content:center; gap:10px; padding:16px 0; }
+  html[data-menu="mini"] .sidebar .logo > div{ display:none; }
+  html[data-menu="mini"] .sidebar-colapsar{ margin-left:0; }
+  html[data-menu="mini"] .sidebar-colapsar i{ transform:rotate(180deg); }
+  html[data-menu="mini"] .sidebar nav li a{ justify-content:center; gap:0; margin:0 10px; padding:11px 0; border-radius:12px; border-left:0; }
+  html[data-menu="mini"] .sidebar nav li a .nav-etq{ display:none; }
+  html[data-menu="mini"] .sidebar nav li a i{ width:auto; font-size:16px; }
+  html[data-menu="mini"] .sidebar nav::before{ border-radius:12px; }
+  html[data-menu="mini"] .sidebar .nav-group-label{ font-size:0; height:1px; padding:0; margin:12px 20px; background:rgba(255,255,255,.16); }
+  /* Etiqueta flotante al pasar el cursor, para no perder el nombre de cada pantalla */
+  html[data-menu="mini"] .sidebar nav li a::after{
+    content:attr(data-tip); position:absolute; left:calc(100% + 14px); top:50%; transform:translate(-6px,-50%); opacity:0; pointer-events:none; z-index:80;
+    padding:6px 11px; border-radius:9px; background:#0E1A13; color:#fff; font-size:12px; font-weight:600; white-space:nowrap; box-shadow:var(--elev-3);
+    transition:opacity var(--mov-2) ease, transform var(--mov-2) var(--ease-salida);
+  }
+  html[data-menu="mini"] .sidebar nav li a:hover::after, html[data-menu="mini"] .sidebar nav li a:focus-visible::after{ opacity:1; transform:translate(0,-50%); }
+}
+
+/* ---------- 6) ÍNDICE DE SECCIONES (Dashboard) ---------- */
+.indice-secciones{
+  position:sticky; top:var(--alto-topbar,0px); z-index:25; align-self:flex-start; max-width:100%; display:flex; gap:2px; padding:5px; margin-bottom:-8px;
+  overflow-x:auto; scrollbar-width:none; border-radius:15px; background:var(--vidrio); -webkit-backdrop-filter:var(--desenfoque); backdrop-filter:var(--desenfoque);
+  box-shadow:var(--elev-2), var(--borde-fino);
+}
+.indice-secciones::-webkit-scrollbar{ display:none; }
+.indice-secciones::before{
+  content:''; position:absolute; left:0; top:5px; bottom:5px; width:var(--desliz-w,0px); transform:translateX(var(--desliz-x,0px)); border-radius:11px; pointer-events:none;
+  background:linear-gradient(180deg,var(--primary-light) -40%,var(--primary) 50%,var(--primary-dark) 150%); box-shadow:0 8px 16px -8px color-mix(in srgb, var(--primary) 70%, transparent), inset 0 1px 0 rgba(255,255,255,.2);
+  transition:transform .42s var(--ease-resorte), width .32s var(--ease-salida);
+}
+.indice-secciones button{ position:relative; z-index:1; display:flex; align-items:center; gap:8px; padding:9px 15px; border-radius:11px; background:transparent; color:var(--text-soft); font-size:12.5px; font-weight:650; white-space:nowrap; transition:color var(--mov-2) ease; }
+.indice-secciones button i{ font-size:12px; opacity:.8; }
+.indice-secciones button:hover{ color:var(--text); }
+.indice-secciones button.activa{ color:#fff; }
+@media (max-width:640px){ .indice-secciones button span{ display:none; } .indice-secciones button.activa span{ display:inline; } }
+.dashboard-section-title{ scroll-margin-top:calc(var(--alto-topbar,0px) + 84px); }
+
+/* ---------- 7) ATAJOS DE TECLADO (hoja de ayuda) ---------- */
+.atajos-fondo{ position:fixed; inset:0; z-index:900; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(12,22,17,.5); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); animation:modal-fade-in .15s ease; }
+.atajos{ width:100%; max-width:660px; max-height:86vh; overflow:auto; border-radius:22px; background:var(--panel); box-shadow:var(--elev-4), var(--borde-fino); animation:modal-pop .28s var(--ease-resorte); }
+.atajos header{ display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--border); }
+.atajos header h3{ font-size:16px; font-weight:800; display:flex; align-items:center; gap:10px; } .atajos header h3 i{ color:var(--gold); }
+.atajos header button{ width:32px; height:32px; border-radius:10px; background:transparent; color:var(--gray); } .atajos header button:hover{ background:var(--superficie-3); color:var(--text); }
+.atajos-cuerpo{ display:grid; grid-template-columns:1fr 1fr; gap:6px 28px; padding:18px 22px 8px; }
+@media (max-width:640px){ .atajos-cuerpo{ grid-template-columns:1fr; } }
+.atajos h4{ font-size:10.5px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--gray); margin:12px 0 6px; }
+.atajos p{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:6px 0; font-size:13px; border-bottom:1px dashed var(--border); }
+.atajos-teclas{ display:flex; align-items:center; gap:5px; } .atajos-teclas em{ font-style:normal; font-size:10.5px; color:var(--gray); }
+.atajos kbd{ min-width:24px; text-align:center; padding:2px 7px; border-radius:7px; font-family:var(--fuente-mono); font-size:11.5px; font-weight:600; color:var(--text); background:var(--superficie-2); box-shadow:var(--borde-fino), 0 2px 0 var(--borde-fuerte); }
+.atajos footer{ padding:12px 22px 18px; font-size:11.5px; color:var(--gray); }
+
+/* ---------- 8) TABLAS: cabecera fija con scroll interno y densidad ajustable ---------- */
+@media (min-width:1024px){
+  .table-scroll{ max-height:min(70vh,780px); overflow:auto; }
+  .table-scroll thead th{ position:sticky; top:0; z-index:3; box-shadow:0 1px 0 var(--border); }
+}
+html[data-densidad="compacta"] tbody td{ padding-top:6px; padding-bottom:6px; }
+html[data-densidad="compacta"] thead th{ padding-top:8px; padding-bottom:8px; }
+html[data-densidad="compacta"] tbody td button{ width:26px; height:26px; }
+html[data-densidad="compacta"] .rk-fila{ padding-top:7px; padding-bottom:7px; }
+html[data-densidad="compacta"] .rk-barra{ height:20px; }
+html[data-densidad="compacta"] .fl2-cab{ padding-top:9px; padding-bottom:9px; }
+html[data-densidad="compacta"] .avx-fila{ padding-top:5px; padding-bottom:5px; }
+html[data-densidad="compacta"] .page{ gap:18px; }
+html[data-densidad="compacta"] .card{ padding-top:13px; padding-bottom:13px; }
+
+/* ---------- 9) CONTROLES SEGMENTADOS: la pastilla se desliza hasta la opción elegida ---------- */
+.fuente-toggle{ position:relative; }
+.fuente-toggle.con-thumb::before{
+  content:''; position:absolute; left:0; top:0; width:var(--thumb-w,0px); height:var(--thumb-h,0px); transform:translate(var(--thumb-x,0px), var(--thumb-y,0px));
+  border-radius:9px; background:var(--panel); box-shadow:var(--elev-1), var(--borde-fino); pointer-events:none;
+  transition:transform .38s var(--ease-resorte), width .3s var(--ease-salida), height .3s var(--ease-salida);
+}
+.fuente-toggle.con-thumb button{ position:relative; z-index:1; }
+.fuente-toggle.con-thumb button.activo{ background:transparent !important; box-shadow:none !important; }
+
+/* ---------- 10) CIFRAS: destello cuando llega un dato nuevo ---------- */
+.numero-cambio{ display:inline-block; animation:cifra-nueva 1.2s var(--ease-salida); }
+@keyframes cifra-nueva{ 0%{ transform:scale(1.07); text-shadow:0 0 18px rgba(52,163,90,.75); } 100%{ transform:scale(1); text-shadow:0 0 0 rgba(52,163,90,0); } }
+
+/* ---------- 11) ESQUELETOS DEL DASHBOARD ---------- */
+.tarjetas-esqueleto{ display:flex; flex-direction:column; gap:22px; }
+.card-esqueleto{ height:98px; border-radius:var(--radius); }
+.hero-esqueleto{ height:230px; border-radius:20px; }
+
+/* ---------- 12) PULSO DE LUZ EN LOS BOTONES (el punto exacto donde se toca) ---------- */
+.btn-primary, .btn-secondary{ position:relative; overflow:hidden; }
+.btn-primary::before, .btn-secondary::before{
+  content:''; position:absolute; left:var(--rx,50%); top:var(--ry,50%); width:240px; height:240px; margin:-120px 0 0 -120px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,255,255,.5), transparent 62%); transform:scale(0); opacity:0; pointer-events:none;
+}
+.btn-secondary::before{ background:radial-gradient(circle, color-mix(in srgb, var(--primary) 20%, transparent), transparent 62%); }
+.btn-primary.pulso::before, .btn-secondary.pulso::before{ animation:pulso-boton 520ms var(--ease-salida) forwards; }
+@keyframes pulso-boton{ 0%{ transform:scale(0); opacity:1; } 100%{ transform:scale(1.5); opacity:0; } }
+
+@media (prefers-reduced-motion:reduce){
+  .barra-ruta i, .en-vivo-vivo .en-vivo-punto::after, .en-vivo-destello, .numero-cambio, .btn-primary.pulso::before, .btn-secondary.pulso::before{ animation:none !important; }
+  .sidebar nav::before, .indice-secciones::before, .fuente-toggle.con-thumb::before{ transition:none; }
+}
+
+/* ---------- 13) CELULAR: nada se corta ni se sale de la pantalla ---------- */
+.page > *{ min-width:0; max-width:100%; }
+.alert, .alert-inline{ overflow-wrap:anywhere; }
+.alert code{ word-break:break-all; }
+@media (max-width:640px){
+  .performance-summary{ padding:24px 18px; gap:22px; }
+  .summary-left, .summary-right{ min-width:0; flex:1 1 100%; }
+  .summary-right{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .mini-card{ padding:12px; gap:8px; min-width:0; }
+  .mini-card h3{ font-size:16px; }
+  .summary-stat-numero{ font-size:36px; }
+}
+
+/* "Cuánto deberían llevar a esta hora": en celular las columnas se compactan y la barra de avance cede su lugar al porcentaje */
+@media (max-width:1000px){ .avx-grid{ grid-template-columns:minmax(0,1fr); } }
+.avx-card{ min-width:0; }
+.avx-filas{ overflow-x:auto; }
+@media (max-width:640px){
+  .avx-card{ padding:16px 14px; }
+  .avx-resumen{ grid-template-columns:1fr 1fr; }
+  .avx-resumen > div:last-child{ grid-column:1 / -1; }
+  .avx-fila{ grid-template-columns:minmax(84px,1.5fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,1.1fr) 44px; gap:6px; font-size:12px; }
+  .avx-avance .avx-barra{ display:none; }
+  .avx-avance b{ min-width:0; }
+}
+
+/* Avisos de una línea (ícono + texto con partes en negrita): el texto fluye normal en vez de partirse en columnas */
+.alert-inline{ display:block; line-height:1.55; }
+.alert-inline > i{ margin-right:8px; vertical-align:-1px; }

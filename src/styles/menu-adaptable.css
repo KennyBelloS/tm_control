@@ -1,0 +1,48 @@
+/* =====================================================================
+   MENÚ LATERAL ADAPTABLE — se ven TODOS los módulos con cualquier zoom o altura de pantalla.
+   1) El tamaño de cada botón se ajusta solo a la altura disponible (clamp con vh): normalmente caben todos sin desplazar.
+   2) Si aun así no caben, el menú se desplaza (barra fina + sombras que avisan) y siempre deja a la vista la pantalla activa.
+   Los colores y el diseño no cambian.
+   ===================================================================== */
+.sidebar{ height:100vh; height:100dvh; }                       /* 100dvh: en el celular descuenta la barra del navegador */
+.sidebar .logo{ flex-shrink:0; padding:clamp(10px,2.3vh,22px) 20px; }
+.sidebar .logo img{ width:clamp(30px,4.7vh,42px); height:clamp(30px,4.7vh,42px); }
+.sidebar .logo h2{ font-size:clamp(13px,1.75vh,15.5px); }
+
+.sidebar nav{
+  flex:1 1 auto; min-height:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; padding-bottom:12px;
+  scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.28) transparent;
+}
+.sidebar nav::-webkit-scrollbar{ width:6px; } .sidebar nav::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.26); border-radius:6px; } .sidebar nav::-webkit-scrollbar-thumb:hover{ background:rgba(255,255,255,.45); } .sidebar nav::-webkit-scrollbar-track{ background:transparent; }
+
+/* Cada botón se ajusta a la altura: 10,5 px de relleno con pantalla alta … 4 px con pantalla baja */
+/* --alto-item: relleno vertical de cada botón. 10,5 px con pantalla alta (lo de siempre), bajando en línea recta hasta 3 px con pantalla baja */
+.sidebar{ --alto-item:clamp(3px, calc((100vh - 440px) * .0275), 10.5px); }
+.sidebar nav li a{ padding:var(--alto-item) 14px var(--alto-item) 17px; font-size:clamp(12px,1.55vh,13.5px); }
+@media (max-height:700px){ .sidebar nav li a{ line-height:1.2; } }
+.sidebar nav li a i{ font-size:clamp(12.5px,1.65vh,14.5px); }
+.sidebar nav ul{ gap:clamp(0px,.25vh,2px); }
+/* Menú contraído (solo íconos): mismo ajuste */
+html[data-menu="mini"] .sidebar nav li a{ padding:calc(var(--alto-item) + 1px) 0; }
+.sidebar nav .nav-group-label{ padding:clamp(7px,1.9vh,16px) 17px clamp(3px,.8vh,6px); font-size:clamp(9px,1.15vh,10px); }
+@media (max-height:640px){ .sidebar .logo span{ display:none; } .sidebar .logo{ padding-top:8px; padding-bottom:8px; } .sidebar nav{ padding-bottom:6px; } }
+html[data-menu="mini"] .sidebar .nav-group-label{ margin-top:clamp(4px,1.2vh,12px); margin-bottom:clamp(4px,1.2vh,12px); }
+
+/* Sombras suaves arriba/abajo cuando hay más módulos para ver al desplazar */
+.sidebar nav.hay-mas-abajo{ -webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 34px),transparent); mask-image:linear-gradient(to bottom,#000 calc(100% - 34px),transparent); }
+.sidebar nav.hay-mas-arriba{ -webkit-mask-image:linear-gradient(to bottom,transparent,#000 30px); mask-image:linear-gradient(to bottom,transparent,#000 30px); }
+.sidebar nav.hay-mas-arriba.hay-mas-abajo{ -webkit-mask-image:linear-gradient(to bottom,transparent,#000 30px,#000 calc(100% - 34px),transparent); mask-image:linear-gradient(to bottom,transparent,#000 30px,#000 calc(100% - 34px),transparent); }
+
+/* Menú contraído: la etiqueta flotante se dibuja fuera del menú (ya no se corta al desplazar) */
+html[data-menu="mini"] .sidebar nav li a::after{ display:none !important; }
+.menu-tip{
+  position:fixed; left:86px; transform:translateY(-50%); z-index:90; padding:6px 11px; border-radius:9px; background:#0E1A13; color:#fff; font-size:12px; font-weight:600; white-space:nowrap;
+  box-shadow:var(--elev-3); pointer-events:none; animation:menu-tip-entra .16s var(--ease-salida);
+}
+.menu-tip::before{ content:''; position:absolute; left:-4px; top:50%; width:8px; height:8px; background:#0E1A13; transform:translateY(-50%) rotate(45deg); }
+@keyframes menu-tip-entra{ from{ opacity:0; transform:translate(-6px,-50%); } to{ opacity:1; transform:translate(0,-50%); } }
+@media (max-width:1023px){ .menu-tip{ display:none; } }
+
+/* Cada módulo ocupa UNA sola línea (la insignia "Nuevo" ya no empuja el texto a una segunda línea) */
+.sidebar nav li a .nav-etq{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.sidebar nav li a .nav-nuevo{ flex-shrink:0; margin-left:auto; padding:1px 6px; font-size:8.5px; letter-spacing:.05em; }

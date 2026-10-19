@@ -1,105 +1,50 @@
-import { createClient } from '@supabase/supabase-js';
+import { prepararRespuesta, origenValido, excedeTasa, crearClienteAdmin, exigirAdministrador, cuerpoObjeto, ROLES_VALIDOS } from './_comun.js';
+import { limpiarTexto, esCorreo, esUsuarioValido, esPasswordValida } from '../src/lib/seguridad.js';
+
 export default async function handler(req, res) {
-  // Con todo dentro de este try/catch, sin importar qué falle inesperadamente
-  // (base de datos, red, etc.), el cliente SIEMPRE recibe un JSON con un
-  // mensaje de error claro — nunca una respuesta vacía que rompa el
-  // "JSON.parse" del lado del navegador.
+  prepararRespuesta(res);
+  // Todo dentro de un try/catch: pase lo que pase, el navegador recibe un JSON claro y NUNCA detalles internos.
   try {
-    if (req.method !== 'POST') {
-      return res.status(405).json({
-        error: 'Método no permitido'
-      });
+    if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Método no permitido' }); }
+    if (!origenValido(req)) return res.status(403).json({ error: 'Origen no permitido.' });
+    if (excedeTasa(req, 'crear-usuario', 15)) return res.status(429).json({ error: 'Demasiadas solicitudes. Espera un minuto.' });
+
+    const admin = crearClienteAdmin();
+    if (!admin) return res.status(500).json({ error: 'Falta configurar SUPABASE_SERVICE_ROLE_KEY en Vercel.' });
+    const auth = await exigirAdministrador(req, admin);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+
+    const b = cuerpoObjeto(req);
+    if (!b) return res.status(400).json({ error: 'Datos inválidos.' });
+    const nombre = limpiarTexto(b.nombre, 80);
+    if (nombre.length < 2) return res.status(400).json({ error: 'El nombre debe tener al menos 2 caracteres.' });
+    if (!ROLES_VALIDOS.includes(b.rol)) return res.status(400).json({ error: 'Rol inválido.' });
+    if (!esPasswordValida(b.password)) return res.status(400).json({ error: 'La contraseña debe tener entre 8 y 72 caracteres.' });
+
+    let correo;
+    if (b.esAdmin === true) {
+      correo = String(b.email || '').trim().toLowerCase();
+      if (!esCorreo(correo)) return res.status(400).json({ error: 'El correo no es válido.' });
+    } else {
+      const usuario = String(b.usuario || '').trim().toLowerCase();
+      if (!esUsuarioValido(usuario)) return res.status(400).json({ error: 'El usuario debe tener de 3 a 30 caracteres: letras minúsculas, números, punto, guion o guion bajo.' });
+      correo = `${usuario}@torremolinos.local`;
     }
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      return res.status(500).json({
-        error: 'Falta configurar SUPABASE_SERVICE_ROLE_KEY en Vercel (ver MANUAL.md).'
-      });
+
+    const { data: nuevo, error: errorCrear } = await admin.auth.admin.createUser({ email: correo, password: b.password, email_confirm: true });
+    if (errorCrear) {
+      const yaExiste = /already|registered|exists/i.test(errorCrear.message || '');
+      return res.status(yaExiste ? 409 : 400).json({ error: yaExiste ? 'Ese usuario o correo ya existe.' : 'No se pudo crear el usuario.' });
     }
-    const {
-      tokenAdmin,
-      nombre,
-      rol,
-      esAdmin,
-      usuario,
-      email,
-      password
-    } = req.body || {};
-    if (!tokenAdmin) return res.status(401).json({
-      error: 'Falta el token de sesión del administrador.'
-    });
-    if (!nombre || !rol || !password) return res.status(400).json({
-      error: 'Faltan datos: nombre, rol o contraseña.'
-    });
-    if (!['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador'].includes(rol)) {
-      return res.status(400).json({
-        error: 'Rol inválido.'
-      });
-    }
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
-    const {
-      data: quienLlama,
-      error: errorToken
-    } = await supabaseAdmin.auth.getUser(tokenAdmin);
-    if (errorToken || !quienLlama?.user) {
-      return res.status(401).json({
-        error: 'Sesión inválida.'
-      });
-    }
-    const {
-      data: perfilQuienLlama
-    } = await supabaseAdmin.from('perfiles').select('rol, activo').eq('id', quienLlama.user.id).single();
-    if (!perfilQuienLlama || perfilQuienLlama.rol !== 'administrador' || !perfilQuienLlama.activo) {
-      return res.status(403).json({
-        error: 'Solo un Administrador puede crear usuarios.'
-      });
-    }
-    const correoFinal = esAdmin ? String(email || '').trim().toLowerCase() : `${String(usuario || '').trim().toLowerCase()}@torremolinos.local`;
-    if (!esAdmin && !usuario) return res.status(400).json({
-      error: 'Falta el nombre de usuario.'
-    });
-    if (esAdmin && !email) return res.status(400).json({
-      error: 'Falta el correo.'
-    });
-    const {
-      data: nuevo,
-      error: errorCrear
-    } = await supabaseAdmin.auth.admin.createUser({
-      email: correoFinal,
-      password,
-      email_confirm: true
-    });
-    if (errorCrear) return res.status(400).json({
-      error: errorCrear.message
-    });
-    const {
-      error: errorPerfil
-    } = await supabaseAdmin.from('perfiles').insert({
-      id: nuevo.user.id,
-      nombre,
-      rol
-    });
+    const { error: errorPerfil } = await admin.from('perfiles').insert({ id: nuevo.user.id, nombre, rol: b.rol });
     if (errorPerfil) {
-      await supabaseAdmin.auth.admin.deleteUser(nuevo.user.id);
-      // Si la base de datos todavía no acepta este rol nuevo (falta correr
-      // el SQL que permite "profesional"/"digitador"), este mensaje lo dice
-      // clarito en vez de romperse en silencio.
-      const pista = errorPerfil.message?.includes('check') || errorPerfil.code === '23514'
-        ? ' — probablemente falta correr en Supabase el SQL que agrega los roles "profesional" y "digitador" a la restricción de la tabla perfiles.'
-        : '';
-      return res.status(400).json({
-        error: errorPerfil.message + pista
-      });
+      await admin.auth.admin.deleteUser(nuevo.user.id);          // no dejar una cuenta sin perfil
+      const faltaSql = errorPerfil.code === '23514' || /check/i.test(errorPerfil.message || '');
+      return res.status(400).json({ error: faltaSql ? 'La base de datos aún no acepta este rol: falta correr el SQL que agrega los roles nuevos a la tabla perfiles.' : 'No se pudo guardar el perfil.' });
     }
-    return res.status(200).json({
-      ok: true,
-      id: nuevo.user.id,
-      correo: correoFinal
-    });
+    return res.status(200).json({ ok: true, id: nuevo.user.id, correo });
   } catch (e) {
-    return res.status(500).json({
-      error: `Error inesperado del servidor: ${e.message || e}`
-    });
+    console.error('crear-usuario:', e);                          // el detalle queda en el registro del servidor, no en la respuesta
+    return res.status(500).json({ error: 'Error inesperado del servidor.' });
   }
 }

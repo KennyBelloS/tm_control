@@ -15,6 +15,8 @@ import Indirectos from './pages/Indirectos';
 import Gerencia from './pages/Gerencia';
 import Tableros from './pages/Tableros';
 import Clasificacion from './pages/Clasificacion';
+import Devoluciones from './pages/Devoluciones';
+import TableroColaborador from './pages/TableroColaborador';
 import Usuarios from './pages/Usuarios';
 import Auditoria from './pages/Auditoria';
 import { useSesion } from './lib/useSesion';
@@ -42,6 +44,8 @@ export default function App() {
         <Route path="/indirectos" element={<ProtectedRoute modulo="indirectos"><Indirectos /></ProtectedRoute>} />
         <Route path="/gerencia" element={<ProtectedRoute modulo="gerencia"><Gerencia /></ProtectedRoute>} />
         <Route path="/clasificacion" element={<ProtectedRoute modulo="clasificacion"><Clasificacion /></ProtectedRoute>} />
+        <Route path="/colaborador" element={<ProtectedRoute modulo="colaborador"><TableroColaborador /></ProtectedRoute>} />
+        <Route path="/devoluciones" element={<ProtectedRoute modulo="devoluciones"><Devoluciones /></ProtectedRoute>} />
         <Route path="/tableros" element={<ProtectedRoute modulo="tableros"><Tableros /></ProtectedRoute>} />
         <Route path="/configuracion" element={<ProtectedRoute modulo="configuracion"><Configuracion /></ProtectedRoute>} />
         <Route path="/usuarios" element={<ProtectedRoute modulo="usuarios"><Usuarios /></ProtectedRoute>} />

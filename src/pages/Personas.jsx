@@ -5,6 +5,8 @@ import { puedeEditar } from '../lib/roles';
 import { listarPersonasModulo, insertarPersonasDesdeExcel, agregarPersonaManual, actualizarPersonaModulo, cambiarActivoPersona, getHorasTotalesPorPersona } from '../lib/db';
 import { parsearReportePersonas } from '../lib/excel';
 import { esFilaMesaLegada, coincidePersona } from '../lib/personasUtil';
+import { validarArchivoExcel, limpiarTexto } from '../lib/seguridad';
+import { EstadoVacio, FilasEsqueleto } from '../components/Estados';
 
 const UMBRAL_POCA_ACTIVIDAD_HORAS = 10;
 
@@ -62,6 +64,7 @@ export default function Personas() {
     setProcesando(true);
     setMensaje(null);
     try {
+      await validarArchivoExcel(file);
       const lista = parsearReportePersonas(await file.arrayBuffer());
       const { insertados } = await insertarPersonasDesdeExcel(lista);
       const aviso = lista.sinCodigo ? ` (${lista.sinCodigo} fila(s) sin Emp.Cod se ignoraron)` : '';
@@ -84,7 +87,7 @@ export default function Personas() {
     setProcesando(true);
     setMensaje(null);
     try {
-      await agregarPersonaManual({ id, nombre: nuevoNombre.trim(), mesa: nuevaMesa ? Number(nuevaMesa) : null, rol: nuevoRol.trim() });
+      await agregarPersonaManual({ id, nombre: limpiarTexto(nuevoNombre, 120), mesa: nuevaMesa ? Number(nuevaMesa) : null, rol: limpiarTexto(nuevoRol, 60) });
       setMensaje({ tipo: 'ok', texto: `${nuevoNombre} agregado(a) correctamente.` });
       setNuevoEmpCod(''); setNuevaMesa(''); setNuevoNombre(''); setNuevoRol('');
       setMostrarFormManual(false);
@@ -153,7 +156,7 @@ export default function Personas() {
                 <div><label>Nombre completo *</label><input type="text" value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)} /></div>
                 <div><label>Rol</label><input type="text" value={nuevoRol} onChange={e => setNuevoRol(e.target.value)} placeholder="Bonchador" /></div>
                 <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                  <button className="btn-primary" disabled={procesando} onClick={agregarManual}><i className="fa-solid fa-check"></i> Guardar</button>
+                  <button className={`btn-primary ${procesando ? 'btn-cargando' : ''}`} disabled={procesando} onClick={agregarManual}><i className="fa-solid fa-check"></i> Guardar</button>
                 </div>
               </div>
             )}
@@ -200,8 +203,8 @@ export default function Personas() {
             <table>
               <thead><tr><th>Código (mesa)</th><th>Nombre</th><th>Emp.Cod</th><th>Rol</th><th>Horas trabajadas</th><th>Estado</th>{puedeModificar && <th>Acciones</th>}</tr></thead>
               <tbody>
-                {cargando && <tr><td colSpan={7}><div className="empty-state">Cargando...</div></td></tr>}
-                {!cargando && personasFiltradas.length === 0 && <tr><td colSpan={7}><div className="empty-state"><i className="fa-solid fa-users"></i>Sin personas para este filtro. Sube el Excel de Activos para empezar.</div></td></tr>}
+                {cargando && <FilasEsqueleto columnas={7} />}
+                {!cargando && personasFiltradas.length === 0 && <tr><td colSpan={7}><EstadoVacio icono="fa-users" titulo="Sin personas para mostrar" texto="Ajusta la búsqueda o los filtros. Si todavía no hay catálogo, sube arriba el Excel de Activos (columnas Mesa, Nombre, Emp.Cod y Rol)." /></td></tr>}
                 {personasFiltradas.map(p => {
                   const editando = editandoId === p.id;
                   const horas = horasPorPersona.get(p.id) || 0;

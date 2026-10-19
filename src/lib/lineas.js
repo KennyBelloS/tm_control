@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { getHistorico, getActual, getConfig, getDescansosDiariosRango } from './db';
+import { devolucionesParaTablero } from './devoluciones';
 import { agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from './calculos';
 import { getComparacionClasificacion, getHistoricoClasificacion, minutosAHora, LINEA_SUPPORT } from './clasificacion';
 
@@ -316,12 +317,16 @@ export async function getRendimientoPorFormadora(fechaInicio, fechaFin) {
  * los campos manuales que sí están guardados (meta, resultado, devoluciones).
  */
 export async function getTableroFormadoras(fechaInicio, fechaFin) {
-  const { data: asignaciones, error: e1 } = await supabase
+  const consultaAsig = campos => supabase
     .from('asignaciones_diarias')
-    .select('fecha, colaborador_id, formadora_id, formadoras(nombre), linea_id, lineas(nombre)')
+    .select(`fecha, colaborador_id, formadora_id, formadoras(nombre), linea_id, lineas(nombre), personas(${campos})`)
     .gte('fecha', fechaInicio)
     .lte('fecha', fechaFin);
+  let { data: asignaciones, error: e1 } = await consultaAsig('nombre, mesa');
+  if (e1) ({ data: asignaciones, error: e1 } = await consultaAsig('nombre'));      // aún sin la columna "mesa" en Personas
   if (e1) throw e1;
+
+
 
   // Misma fuente que la pantalla de Rendimientos: así el número del tablero
   // siempre coincide con el que ves allá (incluye los descuentos de cada día).
@@ -381,7 +386,7 @@ export async function getTableroFormadoras(fechaInicio, fechaFin) {
   const lineasLista = await listarLineas();
   const nombrePorId = new Map(lineasLista.map(l => [l.id, l.nombre]));
 
-  return [...porFilaDia.values()].map(f => {
+  const filasTablero = [...porFilaDia.values()].map(f => {
     const m = mapaManual.get(`${f.fecha}_${f.formadora_id}`);
     const lineasOrdenadas = [...f.lineas.entries()].sort((x, y) => y[1].n - x[1].n);
     // Todas las líneas que lleva esa formadora ese día: la que se le asignó a mano, o donde tiene más gente
@@ -405,9 +410,20 @@ export async function getTableroFormadoras(fechaInicio, fechaFin) {
       metaClasificacion: m?.meta_clasificacion ?? '',
       resultadoClasificacion: m?.resultado_clasificacion ?? '',
       resultadoAuto: hayAuto ? resultadoAuto : null,
-      devoluciones: m?.devoluciones ?? ''
+      devoluciones: m?.devoluciones ?? '',
+      devolucionesAuto: null, devolucionesSemana: null, devolucionesMes: null, devolucionesUltima: null      // se completan abajo con el módulo de Devoluciones
     };
   }).sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : a.formadora.localeCompare(b.formadora));
+
+  // Devoluciones de la gente que tenía asignada cada formadora (día, semana y mes de cada fila), tomadas del módulo de Devoluciones.
+  // Si el módulo todavía no está listo o no tiene datos, simplemente no hay valor automático.
+  const { mapa: dev, ultima: devUltima } = await devolucionesParaTablero(filasTablero.map(f => ({ fecha: f.fecha, formadora_id: f.formadora_id }))).catch(() => ({ mapa: new Map(), ultima: null }));
+  for (const f of filasTablero) {
+    const d = dev.get(`${f.fecha}_${f.formadora_id}`);
+    f.devolucionesUltima = devUltima;                                  // hasta qué día hay devoluciones cargadas
+    if (d) { f.devolucionesAuto = d.dia; f.devolucionesSemana = d.semana; f.devolucionesMes = d.mes; }
+  }
+  return filasTablero;
 }
 
 /**

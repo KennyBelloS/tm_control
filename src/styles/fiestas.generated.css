@@ -1,0 +1,41 @@
+/* GENERADO por src/scripts/generar-fiestas-css.mjs desde src/lib/fiestas.js — no editar a mano. */
+
+/* 🥂 Año Nuevo */
+html[data-fiesta="ano_nuevo"]{ --primary:#1E293B; --primary-dark:#0B1020; --primary-light:#64748B; --accent:#F59E0B; --gold:#FBBF24; --secondary:#334155; --primary-soft:color-mix(in srgb, #1E293B 10%, #fff); --fiesta-brillo:#64748B; }
+html[data-tema="oscuro"][data-fiesta="ano_nuevo"]{ --primary:color-mix(in srgb, #1E293B 78%, #fff); --primary-light:color-mix(in srgb, #64748B 88%, #fff); --primary-soft:color-mix(in srgb, #1E293B 18%, #0B120E); --fiesta-brillo:#64748B; }
+
+/* 💘 San Valentín */
+html[data-fiesta="san_valentin"]{ --primary:#BE123C; --primary-dark:#6B0F2A; --primary-light:#FB7185; --accent:#EC4899; --gold:#F4A6B7; --secondary:#E11D48; --primary-soft:color-mix(in srgb, #BE123C 10%, #fff); --fiesta-brillo:#FB7185; }
+html[data-tema="oscuro"][data-fiesta="san_valentin"]{ --primary:color-mix(in srgb, #BE123C 78%, #fff); --primary-light:color-mix(in srgb, #FB7185 88%, #fff); --primary-soft:color-mix(in srgb, #BE123C 18%, #0B120E); --fiesta-brillo:#FB7185; }
+
+/* 🌷 Día de la Mujer */
+html[data-fiesta="mujer"]{ --primary:#7E22CE; --primary-dark:#3B0F6B; --primary-light:#C084FC; --accent:#16A34A; --gold:#F5B83D; --secondary:#9333EA; --primary-soft:color-mix(in srgb, #7E22CE 10%, #fff); --fiesta-brillo:#C084FC; }
+html[data-tema="oscuro"][data-fiesta="mujer"]{ --primary:color-mix(in srgb, #7E22CE 78%, #fff); --primary-light:color-mix(in srgb, #C084FC 88%, #fff); --primary-soft:color-mix(in srgb, #7E22CE 18%, #0B120E); --fiesta-brillo:#C084FC; }
+
+/* 💐 Día de la Madre */
+html[data-fiesta="madre"]{ --primary:#BE185D; --primary-dark:#6D0E3A; --primary-light:#F472B6; --accent:#F97316; --gold:#FBBF24; --secondary:#DB2777; --primary-soft:color-mix(in srgb, #BE185D 10%, #fff); --fiesta-brillo:#F472B6; }
+html[data-tema="oscuro"][data-fiesta="madre"]{ --primary:color-mix(in srgb, #BE185D 78%, #fff); --primary-light:color-mix(in srgb, #F472B6 88%, #fff); --primary-soft:color-mix(in srgb, #BE185D 18%, #0B120E); --fiesta-brillo:#F472B6; }
+
+/* 🏆 Día del Padre */
+html[data-fiesta="padre"]{ --primary:#1D4ED8; --primary-dark:#0F2A6B; --primary-light:#60A5FA; --accent:#0EA5E9; --gold:#F59E0B; --secondary:#2563EB; --primary-soft:color-mix(in srgb, #1D4ED8 10%, #fff); --fiesta-brillo:#60A5FA; }
+html[data-tema="oscuro"][data-fiesta="padre"]{ --primary:color-mix(in srgb, #1D4ED8 78%, #fff); --primary-light:color-mix(in srgb, #60A5FA 88%, #fff); --primary-soft:color-mix(in srgb, #1D4ED8 18%, #0B120E); --fiesta-brillo:#60A5FA; }
+
+/* 🎊 Fiestas patrias */
+html[data-fiesta="patria"]{ --primary:#1E40AF; --primary-dark:#0F1F5C; --primary-light:#5B82E6; --accent:#DC2626; --gold:#FACC15; --secondary:#2549B8; --primary-soft:color-mix(in srgb, #1E40AF 10%, #fff); --fiesta-brillo:#5B82E6; }
+html[data-tema="oscuro"][data-fiesta="patria"]{ --primary:color-mix(in srgb, #1E40AF 78%, #fff); --primary-light:color-mix(in srgb, #5B82E6 88%, #fff); --primary-soft:color-mix(in srgb, #1E40AF 18%, #0B120E); --fiesta-brillo:#5B82E6; }
+
+/* 💛 Amor y Amistad */
+html[data-fiesta="amor_amistad"]{ --primary:#A21CAF; --primary-dark:#59125F; --primary-light:#E879F9; --accent:#FB923C; --gold:#FBBF24; --secondary:#C026D3; --primary-soft:color-mix(in srgb, #A21CAF 10%, #fff); --fiesta-brillo:#E879F9; }
+html[data-tema="oscuro"][data-fiesta="amor_amistad"]{ --primary:color-mix(in srgb, #A21CAF 78%, #fff); --primary-light:color-mix(in srgb, #E879F9 88%, #fff); --primary-soft:color-mix(in srgb, #A21CAF 18%, #0B120E); --fiesta-brillo:#E879F9; }
+
+/* 🎃 Halloween */
+html[data-fiesta="halloween"]{ --primary:#B45309; --primary-dark:#2E1250; --primary-light:#F59E0B; --accent:#7C3AED; --gold:#FBBF24; --secondary:#C2570C; --primary-soft:color-mix(in srgb, #B45309 10%, #fff); --fiesta-brillo:#F59E0B; }
+html[data-tema="oscuro"][data-fiesta="halloween"]{ --primary:color-mix(in srgb, #B45309 78%, #fff); --primary-light:color-mix(in srgb, #F59E0B 88%, #fff); --primary-soft:color-mix(in srgb, #B45309 18%, #0B120E); --fiesta-brillo:#F59E0B; }
+
+/* 🦃 Acción de Gracias */
+html[data-fiesta="accion_gracias"]{ --primary:#C2410C; --primary-dark:#5A260B; --primary-light:#FB923C; --accent:#B45309; --gold:#EAB308; --secondary:#D9560F; --primary-soft:color-mix(in srgb, #C2410C 10%, #fff); --fiesta-brillo:#FB923C; }
+html[data-tema="oscuro"][data-fiesta="accion_gracias"]{ --primary:color-mix(in srgb, #C2410C 78%, #fff); --primary-light:color-mix(in srgb, #FB923C 88%, #fff); --primary-soft:color-mix(in srgb, #C2410C 18%, #0B120E); --fiesta-brillo:#FB923C; }
+
+/* 🎄 Navidad */
+html[data-fiesta="navidad"]{ --primary:#B91C1C; --primary-dark:#0F4423; --primary-light:#4ADE80; --accent:#16A34A; --gold:#FBBF24; --secondary:#15803D; --primary-soft:color-mix(in srgb, #B91C1C 10%, #fff); --fiesta-brillo:#4ADE80; }
+html[data-tema="oscuro"][data-fiesta="navidad"]{ --primary:color-mix(in srgb, #B91C1C 78%, #fff); --primary-light:color-mix(in srgb, #4ADE80 88%, #fff); --primary-soft:color-mix(in srgb, #B91C1C 18%, #0B120E); --fiesta-brillo:#4ADE80; }

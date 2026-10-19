@@ -9,6 +9,7 @@ import { getRankingDia, getRankingHoraAHora, getRankingRango, getConfig, getMeta
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { calcularPorcentajeMeta, clasificarEstado } from '../lib/calculos';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
+import { EstadoVacio } from '../components/Estados';
 
 function hoyISO() {
   return fechaLocalISO();
@@ -210,16 +211,15 @@ export default function Ranking() {
 
         <section className="panel">
           {!cargando && lista.length === 0 ? (
-            <div className="empty-state">
-              <i className="fa-solid fa-ranking-star"></i>
-              {fuente === 'actual'
+            <EstadoVacio icono="fa-ranking-star" titulo="Todavía no hay ranking para mostrar"
+              texto={fuente === 'actual'
                 ? 'No hay registros en el Turno Actual para esa fecha.'
                 : periodo === 'semana'
                   ? 'No hay tiempo trabajado registrado para ningún día de esa semana en el Histórico.'
                   : periodo === 'mes'
                     ? 'No hay tiempo trabajado registrado para ningún día de ese mes en el Histórico.'
                     : 'No hay tiempo trabajado registrado para esa fecha en el Histórico (edita el tiempo en Rendimientos para que aparezca aquí).'}
-            </div>
+              accion={{ texto: 'Ir a Rendimientos', to: '/rendimientos' }} />
           ) : (
             <RankingExcelTable lista={lista} metaHora={metaHora} titulo={tituloTabla} topInicial={5} />
           )}

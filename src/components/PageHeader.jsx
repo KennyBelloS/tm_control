@@ -1,27 +1,29 @@
+import { useLocation } from 'react-router-dom';
 import { useMenuToggle } from './Layout';
-import { useSesion } from '../lib/useSesion';
-import { ROL_LABEL, cerrarSesion } from '../lib/roles';
+import { MODULOS_PRINCIPALES, MODULOS_GESTION, MODULOS_TECNICOS } from './Sidebar';
+import EnVivo from './EnVivo';
 import NotificationBell from './NotificationBell';
+import MenuUsuario from './MenuUsuario';
+import FiestaChip from './efectos/FiestaChip';
 
-function fechaHoy() {
-  return new Date().toLocaleDateString('es-CO');
-}
-function iniciales(nombre) {
-  return String(nombre || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
-}
 
 /**
- * Encabezado de cada pantalla.
- * - Computador: título a la izquierda; a la derecha los botones de la pantalla, la persona
- *   (avatar + nombre + rol), la campana y cerrar sesión.
- * - Celular: arriba título + campana + cerrar sesión; la persona con su rol queda debajo del
- *   título; y los botones de la pantalla bajan a su propia fila para que nada se corte.
+ * Encabezado de cada pantalla, en UNA fila: grupo y título (con el subtítulo si cabe), los botones de la pantalla,
+ * el indicador en vivo, la búsqueda, la campana y el menú de la persona (usuario, tema, densidad, atajos, cerrar sesión).
+ * En celular los botones de la pantalla bajan a su propia fila para que nada se corte.
  */
 export default function PageHeader({ title, subtitle, children }) {
   const toggleMenu = useMenuToggle();
-  const { sesion } = useSesion();
-  const rolTexto = ROL_LABEL[sesion?.rol] || sesion?.rol;
   const hayAcciones = !!children;
+  const { pathname } = useLocation();
+  // Dónde estoy: "Operación › Rendimientos" (el grupo del menú y el módulo), arriba del título
+  const ubicacion = (() => {
+    for (const [grupo, lista] of [['Operación', MODULOS_PRINCIPALES], ['Gestión', MODULOS_GESTION], ['Técnico', MODULOS_TECNICOS]]) {
+      const m = lista.find(x => (x.end ? pathname === x.to : pathname === x.to || pathname.startsWith(`${x.to}/`)));
+      if (m) return { grupo, modulo: m.label };
+    }
+    return null;
+  })();
   return (
     <header className={`topbar ${hayAcciones ? 'topbar-con-acciones' : ''}`}>
       <div className="topbar-title-group">
@@ -29,40 +31,22 @@ export default function PageHeader({ title, subtitle, children }) {
           <i className="fa-solid fa-bars"></i>
         </button>
         <div className="topbar-titulos">
+          {ubicacion && <span className="topbar-grupo">{ubicacion.grupo}</span>}
           <h1>{title}</h1>
-          {subtitle && <p>{subtitle}</p>}
-          {sesion && (
-            <div className="usuario-linea-movil">
-              <span className="usuario-avatar usuario-avatar-mini">{iniciales(sesion.nombre)}</span>
-              <strong>{sesion.nombre}</strong>
-              <span className={`rol-pill rol-${sesion.rol}`}>{rolTexto}</span>
-            </div>
-          )}
+          {subtitle && <p className="topbar-sub" title={subtitle}>{subtitle}</p>}
         </div>
       </div>
 
       {hayAcciones && <div className="topbar-acciones">{children}</div>}
 
       <div className="topbar-herramientas">
-        <button className="topbar-buscar" onClick={() => window.dispatchEvent(new Event('tm-abrir-paleta'))} title="Búsqueda rápida (Ctrl + K)">
-          <i className="fa-solid fa-magnifying-glass"></i><span>Buscar</span><kbd>Ctrl K</kbd>
+        <FiestaChip />
+        <EnVivo />
+        <button className="cab-icono topbar-buscar" onClick={() => window.dispatchEvent(new Event('tm-abrir-paleta'))} title="Búsqueda rápida (Ctrl + K  o  /)" aria-label="Búsqueda rápida">
+          <i className="fa-solid fa-magnifying-glass"></i>
         </button>
-        {sesion && (
-          <div className="usuario-chip" title={`${sesion.nombre} · ${rolTexto}`}>
-            <span className="usuario-avatar">{iniciales(sesion.nombre)}</span>
-            <span className="usuario-datos">
-              <strong>{sesion.nombre}</strong>
-              <span className="usuario-sub">
-                <span className={`rol-pill rol-${sesion.rol}`}>{rolTexto}</span>
-                <em>{fechaHoy()}</em>
-              </span>
-            </span>
-          </div>
-        )}
         <NotificationBell />
-        <button className="btn-secondary btn-cerrar-sesion" onClick={() => { if (confirm('¿Cerrar sesión?')) cerrarSesion(); }}>
-          <i className="fa-solid fa-right-from-bracket"></i> <span className="btn-texto">Cerrar sesión</span>
-        </button>
+        <MenuUsuario />
       </div>
     </header>
   );

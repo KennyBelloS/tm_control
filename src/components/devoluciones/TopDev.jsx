@@ -1,0 +1,65 @@
+import { useState } from 'react';
+import { fmt, fFecha, fCorta } from './util';
+import { BarrasVerticales, COLORES } from './Graficos';
+import { NombreCodigo, etiquetaGrafico } from './NombreCodigo';
+
+const NOMBRES = { dia: 'Día', semana: 'Semana', mes: 'Mes', historico: 'Histórico' };
+const TITULO = { dia: 'día seleccionado', semana: 'semana seleccionada', mes: 'mes seleccionado', historico: 'histórico' };
+
+function Tabla({ filas, tipo, vacio, modo, onVer }) {
+  if (!filas.length) return <p className="dev-vacio-mini">{vacio}</p>;
+  return (
+    <div className="dev-tabla-scroll"><table className="dev-tabla dev-top">
+      <thead><tr><th>#</th>{modo !== 'codigo' && <th>Colaborador</th>}{modo !== 'nombre' && <th className="num">Código</th>}<th className="num">Devol.</th>{tipo === 'menos' && <th className="num">Días</th>}</tr></thead>
+      <tbody>
+        {filas.map((e, i) => (
+          <tr key={e.id} className={onVer ? 'fila-clic' : ''} onClick={onVer ? () => onVer(e) : undefined} title={onVer ? 'Clic para ver el seguimiento de esta persona' : undefined}>
+            <td><span className={`dev-puesto dev-puesto-${tipo}`}>{i + 1}</span></td>
+            {modo !== 'codigo' && <td className="dev-nombre">{e.nombre}</td>}
+            {modo !== 'nombre' && <td className="num"><NombreCodigo codigo={e.codigo} modo="codigo" copiable={false} /></td>}
+            <td className="num"><b>{fmt(e.devol)}</b></td>
+            {tipo === 'menos' && <td className="num">{e.diasTrab}</td>}
+          </tr>
+        ))}
+      </tbody>
+    </table></div>
+  );
+}
+
+/** Quién más y quién menos devuelve, por período: la barra de cada uno (como en el Excel) y su tabla. */
+export default function TopDev({ rankings, periodos, minimos, diaSinCargar, ultima, modo = 'ambos', onVer }) {
+  const [p, setP] = useState('semana');
+  const r = rankings[p];
+  const P = periodos[p];
+  const rango = p === 'dia' ? fFecha(P.desde) : p === 'historico' ? 'todo el historial' : `${fCorta(P.desde)} al ${fCorta(P.hasta)}`;
+  const datos = lista => lista.map(e => ({ ...etiquetaGrafico(e.nombre, e.codigo, modo), valor: e.devol, titulo: `${e.nombre} (código ${e.codigo ?? '—'})` }));
+  return (
+    <div className="dev-panel">
+      <div className="dev-sub">
+        <div className="fuente-toggle" role="tablist" aria-label="Período">
+          {Object.entries(NOMBRES).map(([k, n]) => <button key={k} className={p === k ? 'activo' : ''} onClick={() => setP(k)} role="tab" aria-selected={p === k}>{n}</button>)}
+        </div>
+        <span className="dev-rango">{rango} · en las barras: {modo === 'codigo' ? 'el código' : modo === 'nombre' ? 'el nombre' : 'el código y el nombre'} de cada persona</span>
+      </div>
+      {p === 'dia' && diaSinCargar
+        ? <p className="dev-vacio-mini"><i className="fa-solid fa-calendar-xmark"></i> El {fFecha(P.desde)} todavía no tiene devoluciones cargadas (último día cargado: {fFecha(ultima)}). Elige otro día o el período «Semana», «Mes» o «Histórico».</p>
+        : <div className="dev-dos">
+        <section className="dev-caja dev-caja-mas">
+          <h4><i className="fa-solid fa-arrow-trend-up"></i> Más devoluciones</h4>
+          {r.mas.length > 0 && <BarrasVerticales titulo={`MÁS — ${TITULO[p]}`} datos={datos(r.mas)} color={COLORES.mas} />}
+          <Tabla filas={r.mas} tipo="mas" modo={modo} onVer={onVer} vacio="Nadie tuvo devoluciones en este período." />
+          <p className="dev-pie">Personas con devoluciones: <b>{r.personasConDevoluciones}</b></p>
+        </section>
+        <section className="dev-caja dev-caja-menos">
+          <h4><i className="fa-solid fa-arrow-trend-down"></i> Menos devoluciones</h4>
+          {r.menos.length > 0 && <BarrasVerticales titulo={`MENOS — ${TITULO[p]}`} datos={datos(r.menos)} color={COLORES.menos} />}
+          <Tabla filas={r.menos} tipo="menos" modo={modo} onVer={onVer} vacio={`Nadie cumple el mínimo de ${minimos[p]} día(s) trabajados en este período.`} />
+          <p className="dev-pie">
+            Elegibles: <b>{r.elegibles}</b> (mínimo {minimos[p]} día{minimos[p] === 1 ? '' : 's'} trabajados y fuera del Top 5 de “más”)
+            {r.empatadosFuera > 0 && <> · <b>{r.empatadosFuera}</b> más empatan con {r.quintoDevol} devol. en el 5.º puesto (desempate: más días trabajados, luego código)</>}
+          </p>
+        </section>
+      </div>}
+    </div>
+  );
+}

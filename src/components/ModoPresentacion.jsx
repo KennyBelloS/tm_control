@@ -4,6 +4,10 @@ import logo from '../assets/logo-icon.png';
 import Top3Podium from './Top3Podium';
 import CarruselLista from './CarruselLista';
 import AnilloProgreso from './AnilloProgreso';
+import FlorMeta from './FlorMeta';
+import { CapaFestiva, IntroFestiva, CelebracionHito } from './presentacion/FestivoPresentacion';
+import { useEfectos } from '../lib/efectos';
+import { hitoAlcanzado, hitoNuevo, leerHito, guardarHito } from '../lib/hitos';
 import { getRankingRango, getUltimaFechaHistorico } from '../lib/db';
 import { getDetalleRendimientoTurnoActual, getDetalleRendimientoAsignaciones } from '../lib/lineas';
 import { etiquetaHora, nombreLineaClasificacion, etiquetaCortaLinea, LINEA_SUPPORT } from '../lib/clasificacionCalculos';
@@ -16,6 +20,11 @@ import { entrarPantallaCompleta, salirPantallaCompleta, enPantallaCompleta } fro
 const MINUTOS_POR_VISTA = { podio: 5, hora: 10, lineas: 5, formadoras: 5, 'hist-dia': 10, 'hist-semana': 10, 'hist-mes': 10 };
 // El lienzo se dibuja siempre en 1600 x 900 y se escala para llenar la pantalla (TV, zoom, lo que sea).
 const LIENZO_ANCHO = 1600, LIENZO_ALTO = 900;
+// "Tamaño": cuánto se agranda todo. El lienzo lógico mide 1600x900 dividido entre este factor, así que con 1,35 todo se ve
+// 35 % más grande en la pantalla (lo que importa en un televisor). Se recuerda por navegador y se cambia con A−/A+ o las teclas + y −.
+const PASOS_TAMANO = [1, 1.15, 1.35, 1.55];
+const TAMANO_DEFECTO = 1.35;
+const leerTamano = () => { try { const v = Number(localStorage.getItem('tm_pres_tamano')); return PASOS_TAMANO.includes(v) ? v : TAMANO_DEFECTO; } catch { return TAMANO_DEFECTO; } };
 
 function colorProgreso(pct) {
   if (pct >= 100) return '#22C55E';
@@ -128,11 +137,9 @@ function SlidePodio({ totalTallos, metaHoy, cumplimiento, rendimientoPromedio, r
 function SlidePodioOscuro({ totalTallos, metaHoy, cumplimiento, rendimientoPromedio, ranking }) {
   return (
     <div className="slide-oscuro">
-      <AnilloProgreso pct={cumplimiento} tamano={220} grosor={16}>
-        <span className="anillo-emoji">{emojiCumplimiento(cumplimiento)}</span>
-        <span className="anillo-pct">{cumplimiento}%</span>
-        <span className="anillo-label">de la meta</span>
-      </AnilloProgreso>
+      <FlorMeta pct={cumplimiento} tamano={250} className="flor-oscuro">
+        <span className="flor-oscuro-centro"><b>{cumplimiento}%</b><small>de la meta</small></span>
+      </FlorMeta>
       <div className="oscuro-stats-fila">
         <div className="oscuro-stat">
           <span className="oscuro-stat-label">Total de Tallos</span>
@@ -215,7 +222,12 @@ const inicialesDe = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(p 
 const MEDALLAS = ['🥇', '🥈', '🥉'];
 
 /* ---------- Línea líder en clasificación (con su formadora) ---------- */
-function SlideLineas({ datos, etiquetas }) {
+const SEGUNDOS_POR_PAGINA = 15;
+/** Cuántos elementos caben GRANDES a la vez: con tamaño grande, menos por página (y rotan solos). */
+const porPaginaLineas = tamano => (tamano > 1.1 ? 4 : 6);
+const porPaginaFormadoras = tamano => (tamano > 1.1 ? 3 : 6);
+
+function SlideLineas({ datos, etiquetas, porPagina }) {
   const t = datos.total;
   const hayAyer = !!datos.fechaAyer;
   const hayBase = datos.ultimaCompletaHora >= datos.horas[0];
@@ -225,6 +237,14 @@ function SlideLineas({ datos, etiquetas }) {
   const segunda = competidoras[1] || null;
   const nombre = n => (etiquetas[n]?.nombre || nombreLineaClasificacion(n));
   const maxTallos = Math.max(1, ...ranking.map(l => l.totalHoy));
+  const paginas = Math.max(1, Math.ceil(ranking.length / porPagina));
+  const [pagina, setPagina] = useState(0);
+  useEffect(() => {
+    if (paginas <= 1) { setPagina(0); return; }
+    const t = setInterval(() => setPagina(p => (p + 1) % paginas), SEGUNDOS_POR_PAGINA * 1000);
+    return () => clearInterval(t);
+  }, [paginas]);
+  const visibles = ranking.slice(pagina * porPagina, (pagina + 1) * porPagina);
   return (
     <div className="pres-lineas">
       <h2 className="slide-titulo"><i className="fa-solid fa-boxes-stacked"></i> Clasificación por línea</h2>
@@ -248,7 +268,8 @@ function SlideLineas({ datos, etiquetas }) {
           </div>
         ) : <div className="pres-lider pres-lider-vacio">Todavía no hay tallos en las líneas</div>}
         <div className="pres-lineas-lista">
-          {ranking.map((l, i) => {
+          {visibles.map((l, k) => {
+            const i = pagina * porPagina + k;
             const esLider = lider && l.linea === lider.linea;
             return (
               <div key={l.linea} className={`pres-linea-fila ${esLider ? 'pres-linea-lider' : ''}`}>
@@ -260,6 +281,7 @@ function SlideLineas({ datos, etiquetas }) {
               </div>
             );
           })}
+          {paginas > 1 && <div className="pres-paginas">{Array.from({ length: paginas }, (_, k) => <i key={k} className={k === pagina ? 'activo' : ''}></i>)}</div>}
         </div>
       </div>
       <TarjetasResumen items={[
@@ -273,22 +295,21 @@ function SlideLineas({ datos, etiquetas }) {
 }
 
 /* ---------- Resumen por formadora: quién lidera, con barras ---------- */
-const FORMADORAS_POR_PAGINA = 6;
-function SlideFormadoras({ datos, metaHora }) {
+function SlideFormadoras({ datos, metaHora, porPagina }) {
   const etiquetaFuente = datos.modo === 'turno' ? 'Turno actual' : 'Histórico';
   const grupos = useMemo(() => [...datos.porFormadora].sort((a, b) => ((b.clasif?.disponible ? b.clasif.tallos : -1) - (a.clasif?.disponible ? a.clasif.tallos : -1)) || (b.rendPromedio - a.rendPromedio)), [datos]);
-  const paginas = Math.max(1, Math.ceil(grupos.length / FORMADORAS_POR_PAGINA));
+  const paginas = Math.max(1, Math.ceil(grupos.length / porPagina));
   const [pagina, setPagina] = useState(0);
   useEffect(() => {
     if (paginas <= 1) return;
-    const t = setInterval(() => setPagina(p => (p + 1) % paginas), 20000);
+    const t = setInterval(() => setPagina(p => (p + 1) % paginas), SEGUNDOS_POR_PAGINA * 1000);
     return () => clearInterval(t);
   }, [paginas]);
   const lider = grupos.find(g => g.clasif?.disponible && g.clasif.tallos > 0) || null;
   const segundo = lider ? grupos.filter(g => g.clasif?.disponible && g.id !== lider.id)[0] : null;
   const maxTallos = lider ? lider.clasif.tallos : 1;
   const escalaRend = metaHora * 1.3;
-  const visibles = grupos.slice(pagina * FORMADORAS_POR_PAGINA, (pagina + 1) * FORMADORAS_POR_PAGINA);
+  const visibles = grupos.slice(pagina * porPagina, (pagina + 1) * porPagina);
   return (
     <div className="pres-slide-lista">
       <h2 className="slide-titulo"><i className="fa-solid fa-chalkboard-user"></i> Resumen por Formadora</h2>
@@ -301,9 +322,9 @@ function SlideFormadoras({ datos, metaHora }) {
           {segundo && <div className="pres-form-lider-dato"><b>+{fmtN(lider.clasif.tallos - segundo.clasif.tallos)}</b><span>sobre {segundo.nombre}</span></div>}
         </div>
       )}
-      <div className="pres-form-grid">
+      <div className="pres-form-grid" style={{ gridTemplateColumns: `repeat(${Math.min(3, Math.max(1, visibles.length))}, minmax(0, 1fr))` }}>
         {visibles.map((g, k) => {
-          const i = pagina * FORMADORAS_POR_PAGINA + k;
+          const i = pagina * porPagina + k;
           const u = g.clasif?.ultima;
           const cumple = g.rendPromedio >= metaHora;
           const esLider = lider && g.id === lider.id;
@@ -345,27 +366,28 @@ function SlideFormadoras({ datos, metaHora }) {
   );
 }
 
-/* ---------- Escala el lienzo 1600x900 para llenar la pantalla, sin importar su tamaño ni el zoom ---------- */
-function useEscalaLienzo() {
+/* ---------- Escala el lienzo para llenar la pantalla, sin importar su tamaño ni el zoom del navegador ---------- */
+function useEscalaLienzo(tamano) {
+  const ancho = LIENZO_ANCHO / tamano, alto = LIENZO_ALTO / tamano;
   const [m, setM] = useState({ escala: 1, x: 0, y: 0, vertical: false });
   useLayoutEffect(() => {
     const calcular = () => {
       const w = window.innerWidth, h = window.innerHeight;
-      const escala = Math.min(w / LIENZO_ANCHO, h / LIENZO_ALTO);
-      setM({ escala, x: (w - LIENZO_ANCHO * escala) / 2, y: (h - LIENZO_ALTO * escala) / 2, vertical: w / h < 0.9 });
+      const escala = Math.min(w / ancho, h / alto);
+      setM({ escala, x: (w - ancho * escala) / 2, y: (h - alto * escala) / 2, vertical: w / h < 0.9 });
     };
     calcular();
     window.addEventListener('resize', calcular);
     document.addEventListener('fullscreenchange', calcular);
     return () => { window.removeEventListener('resize', calcular); document.removeEventListener('fullscreenchange', calcular); };
-  }, []);
-  return m;
+  }, [ancho, alto]);
+  return { ...m, ancho, alto };
 }
 
 /*
- * Ajusta el contenido de cada vista a la pantalla:
- *  - si es más alto que el espacio, lo achica lo justo para que NUNCA quede cortado;
- *  - si sobra espacio y la vista lo permite ("crecer"), lo agranda (hasta 1,3 veces) para aprovechar el televisor.
+ * Ajusta el contenido de cada vista al espacio disponible, para que SE VEA TODO:
+ *  - si es más alto o más ancho que el espacio, lo achica lo justo (nunca queda cortado);
+ *  - si sobra espacio y la vista lo permite ("crecer"), lo agranda (hasta 1,6 veces) para aprovechar el televisor.
  */
 function AjusteVertical({ children, reinicio, crecer = false }) {
   const caja = useRef(null);
@@ -376,19 +398,21 @@ function AjusteVertical({ children, reinicio, crecer = false }) {
       const c = caja.current, el = interno.current;
       if (!c || !el) return;
       const est = getComputedStyle(c);
-      const disponible = c.clientHeight - parseFloat(est.paddingTop) - parseFloat(est.paddingBottom);
+      const alto = c.clientHeight - parseFloat(est.paddingTop) - parseFloat(est.paddingBottom);
+      const ancho = c.clientWidth - parseFloat(est.paddingLeft) - parseFloat(est.paddingRight);
       const transformPrevio = el.style.transform, anchoPrevio = el.style.width;
       el.style.transform = 'none'; el.style.width = '100%';
-      const natural = el.scrollHeight;
+      const naturalAlto = el.scrollHeight, naturalAncho = el.scrollWidth;
       let f = 1, dy = 0;
-      if (natural > disponible + 1) f = Math.max(disponible / natural, 0.5);
-      else if (crecer && natural > 0) f = Math.min(1.3, disponible / natural);
-      if (f > 1.02) {                                   // al agrandar el ancho de trabajo se achica: se comprueba que no se pase de alto
+      const reduccion = Math.min(naturalAlto > alto + 1 ? alto / naturalAlto : 1, naturalAncho > ancho + 1 ? ancho / naturalAncho : 1);
+      if (reduccion < 1) f = Math.max(reduccion, 0.4);
+      else if (crecer && naturalAlto > 0) f = Math.min(1.6, alto / naturalAlto);
+      if (f > 1.02) {                                   // al agrandar, el ancho de trabajo se achica: se comprueba que no se pase de alto ni de ancho
         el.style.width = `${100 / f}%`;
-        const alto = el.scrollHeight * f;
-        if (alto > disponible) f = Math.max(1, f * disponible / alto);
+        const pasoAlto = el.scrollHeight * f, pasoAncho = el.scrollWidth * f;
+        f = Math.max(1, f * Math.min(pasoAlto > alto ? alto / pasoAlto : 1, pasoAncho > ancho + 1 ? ancho / pasoAncho : 1));
         el.style.width = `${100 / f}%`;
-        dy = Math.max(0, (disponible - el.scrollHeight * f) / 2);   // centrado vertical ya con el tamaño final
+        dy = Math.max(0, (alto - el.scrollHeight * f) / 2);   // centrado vertical ya con el tamaño final
       }
       el.style.transform = transformPrevio; el.style.width = anchoPrevio;
       setAjuste(prev => (Math.abs(prev.f - f) > 0.004 || Math.abs(prev.dy - dy) > 1 ? { f, dy } : prev));
@@ -409,12 +433,54 @@ function AjusteVertical({ children, reinicio, crecer = false }) {
 
 export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaHoy, cumplimiento, onCerrar }) {
   const [estilo, setEstilo] = useState('clasico');
+  const { ajustes, fiesta } = useEfectos();
+  const quieto = ajustes.efectos === 'apagado';
+  // Decoración festiva de Presentar: se puede apagar con el botón o con la tecla F (se recuerda)
+  const [festivo, setFestivo] = useState(() => { try { return localStorage.getItem('tm_pres_festivo') !== '0'; } catch { return true; } });
+  const alternarFestivo = () => setFestivo(f => { const n = !f; try { localStorage.setItem('tm_pres_festivo', n ? '1' : '0'); } catch { /* sin almacenamiento */ } return n; });
+  const [intro, setIntro] = useState(() => !!fiesta && !quieto && !(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches));
+  const [hito, setHito] = useState(null);
+  const [guiaTeclas, setGuiaTeclas] = useState(true);
+  useEffect(() => { const t = setTimeout(() => setGuiaTeclas(false), 7600); return () => clearTimeout(t); }, []);
+  // Hitos de la meta (25 · 50 · 75 · 100 %): se celebran EN VIVO al cruzarlos. Al abrir no se celebra lo que ya estaba (sería viejo).
+  const refHito = useRef(null);
+  useEffect(() => {
+    const hoy = fechaLocal(new Date()), h = hitoAlcanzado(cumplimiento);
+    if (refHito.current === null) { refHito.current = h; guardarHito('pres', hoy, Math.max(leerHito('pres', hoy), h)); return; }
+    const nuevo = hitoNuevo(cumplimiento, Math.max(refHito.current, leerHito('pres', hoy)));
+    refHito.current = h;
+    if (nuevo) { guardarHito('pres', hoy, nuevo); setHito(nuevo); }
+  }, [cumplimiento]);
   const [ultimaFechaHistorico, setUltimaFechaHistorico] = useState(null);
   const [formadorasDatos, setFormadorasDatos] = useState(null);
   const [clasif, setClasif] = useState(null);
   const [completa, setCompleta] = useState(enPantallaCompleta());
   const rankingConPromedio = useMemo(() => ranking.map(p => ({ ...p, promedioRend: p.promedioRend ?? p.rendimiento })), [ranking]);
-  const lienzo = useEscalaLienzo();
+  const [tamano, setTamano] = useState(leerTamano);
+  const [avisoTamano, setAvisoTamano] = useState(false);
+  const lienzo = useEscalaLienzo(tamano);
+  function cambiarTamano(delta) {
+    setTamano(actual => {
+      const i = PASOS_TAMANO.indexOf(actual);
+      const nuevo = PASOS_TAMANO[Math.min(Math.max(i + delta, 0), PASOS_TAMANO.length - 1)];
+      try { localStorage.setItem('tm_pres_tamano', String(nuevo)); } catch { /* sin almacenamiento */ }
+      return nuevo;
+    });
+    setAvisoTamano(true);
+  }
+  useEffect(() => {
+    if (!avisoTamano) return;
+    const t = setTimeout(() => setAvisoTamano(false), 1600);
+    return () => clearTimeout(t);
+  }, [avisoTamano, tamano]);
+  useEffect(() => {
+    const tecla = e => {
+      if (e.key === '+' || e.key === '=') cambiarTamano(1);
+      else if (e.key === '-' || e.key === '_') cambiarTamano(-1);
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, []);
 
   useEffect(() => { entrarPantallaCompleta(); }, []);
   useEffect(() => {
@@ -469,8 +535,8 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
       id: 'hora', nombre: 'Hora a hora',
       render: () => <SlideHoraAHora ranking={rankingConPromedio} metaHora={metaHora} />
     },
-    clasif && { id: 'lineas', nombre: 'Líneas', render: () => <SlideLineas datos={clasif.datos} etiquetas={clasif.etiquetas} /> },
-    formadorasDatos && { id: 'formadoras', nombre: 'Formadoras', render: () => <SlideFormadoras datos={formadorasDatos} metaHora={metaHora} /> },
+    clasif && { id: 'lineas', nombre: 'Líneas', render: () => <SlideLineas datos={clasif.datos} etiquetas={clasif.etiquetas} porPagina={porPaginaLineas(tamano)} /> },
+    formadorasDatos && { id: 'formadoras', nombre: 'Formadoras', render: () => <SlideFormadoras datos={formadorasDatos} metaHora={metaHora} porPagina={porPaginaFormadoras(tamano)} /> },
     ultimaFechaHistorico && {
       id: 'hist-dia', nombre: 'Histórico diario',
       render: () => <SlideHistorico titulo="Histórico del Día" subtitulo={formatoLargo(ultimaFechaHistorico)} icono="fa-calendar-day" desde={ultimaFechaHistorico} hasta={ultimaFechaHistorico} metaHora={metaHora} />
@@ -501,12 +567,24 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
     return () => clearTimeout(t);
   }, [indice, pausado, slides.length, minutos]);
 
+  useEffect(() => {
+    const tecla = e => {
+      if (e.target?.closest?.('input, textarea, select')) return;
+      if (e.key === 'ArrowRight') setIndice(i => (i + 1) % slides.length);
+      else if (e.key === 'ArrowLeft') setIndice(i => (i - 1 + slides.length) % slides.length);
+      else if (e.key === ' ') { e.preventDefault(); setPausado(p => !p); }
+      else if ((e.key === 'f' || e.key === 'F') && fiesta) alternarFestivo();
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, [slides.length, fiesta]);                                  // eslint-disable-line react-hooks/exhaustive-deps
+
   const fondoOscuro = estilo === 'oscuro' && slideActual.id === 'podio';
   function alternarPantallaCompleta() { if (enPantallaCompleta()) salirPantallaCompleta(); else entrarPantallaCompleta(); }
 
   return (
     <div className={`presentacion-overlay ${fondoOscuro ? 'presentacion-tema-oscuro' : ''}`}>
-      <div className="pres-lienzo" style={{ transform: `translate(${lienzo.x}px, ${lienzo.y}px) scale(${lienzo.escala})` }}>
+      <div className="pres-lienzo" style={{ width: lienzo.ancho, height: lienzo.alto, '--pres-alto': `${lienzo.alto}px`, transform: `translate(${lienzo.x}px, ${lienzo.y}px) scale(${lienzo.escala})` }}>
         <header className="presentacion-marca">
           <div className="presentacion-marca-id">
             <img src={logo} alt="Torremolinos" />
@@ -521,6 +599,9 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
                 <i className="fa-solid fa-arrows-rotate"></i><span> Cambiar vista</span>
               </button>
             )}
+            <button className="presentacion-pausa" onClick={() => cambiarTamano(-1)} disabled={tamano === PASOS_TAMANO[0]} title="Hacer todo más pequeño (tecla −)"><b className="pres-aa">A−</b></button>
+            <button className="presentacion-pausa" onClick={() => cambiarTamano(1)} disabled={tamano === PASOS_TAMANO[PASOS_TAMANO.length - 1]} title="Hacer todo más grande (tecla +)"><b className="pres-aa">A+</b></button>
+            {fiesta && <button className={`presentacion-pausa pf-boton ${festivo ? 'activo' : ''}`} onClick={alternarFestivo} aria-pressed={festivo} title={`Decoración de ${fiesta.nombre} (tecla F)`}><span aria-hidden="true">{fiesta.emoji}</span></button>}
             <button className="presentacion-pausa" onClick={() => setEstilo(e => e === 'clasico' ? 'oscuro' : 'clasico')} title="Cambiar estilo">
               <i className="fa-solid fa-palette"></i>
             </button>
@@ -542,6 +623,7 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
           <AjusteVertical reinicio={`${slideActual.id}-${estilo}`} crecer={['podio', 'lineas', 'formadoras'].includes(slideActual.id)}>{slideActual.render()}</AjusteVertical>
         </main>
 
+        {fiesta && festivo && <CapaFestiva fiesta={fiesta} quieto={quieto} ancho={Math.round(lienzo.ancho)} />}
         {slides.length > 1 && (
           <nav className="presentacion-puntos-slides">
             {slides.map((s, i) => (
@@ -550,6 +632,10 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
           </nav>
         )}
       </div>
+      {intro && fiesta && festivo && <IntroFestiva fiesta={fiesta} onFin={() => setIntro(false)} />}
+      {hito && <CelebracionHito hito={hito} tallos={totalTallos} meta={metaHoy} fiesta={fiesta && festivo ? fiesta : null} conConfeti={!quieto} onFin={() => setHito(null)} />}
+      {guiaTeclas && !intro && <div className="pf-atajos" aria-hidden="true"><span><kbd>←</kbd><kbd>→</kbd>cambiar vista</span><span><kbd>Espacio</kbd>pausa</span><span><kbd>+</kbd><kbd>−</kbd>tamaño</span>{fiesta && <span><kbd>F</kbd>decoración</span>}</div>}
+      {avisoTamano && <div className="pres-aviso-tamano">Tamaño {Math.round(tamano * 100)} %</div>}
       {lienzo.vertical && <div className="pres-aviso-giro"><i className="fa-solid fa-rotate"></i> Gira el celular para ver mejor la presentación</div>}
     </div>
   );

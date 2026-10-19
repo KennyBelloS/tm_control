@@ -1,0 +1,43 @@
+/* TEMA OSCURO — tokens + ajustes manuales (se carga después de tema-oscuro.generated.css) */
+html[data-tema="oscuro"]{
+  color-scheme:dark;
+  --background:#0B120E; --panel:#121B16; --superficie-2:#16211B; --superficie-3:#1C2922;
+  --text:#E9F0EB; --text-soft:#BBC8C0; --gray:#8D9C94;
+  --border:#22302A; --borde-fuerte:#33463C;
+  --primary:#1F8A4C; --primary-light:#3DB468; --primary-soft:#14281D;
+  --gold:#D9A93F; --gold-soft:#2B2410;
+  --ok:#4ADE80; --ok-soft:#10261A; --aviso:#FBBF24; --aviso-soft:#2B2210; --peligro:#FB7185; --peligro-soft:#2C1218; --info:#60A5FA; --info-soft:#101E33;
+  --elev-1:0 1px 2px rgba(0,0,0,.4), 0 1px 1px rgba(0,0,0,.3);
+  --elev-2:0 1px 2px rgba(0,0,0,.45), 0 8px 18px -8px rgba(0,0,0,.7);
+  --elev-3:0 2px 4px rgba(0,0,0,.5), 0 16px 32px -12px rgba(0,0,0,.85);
+  --elev-4:0 4px 8px rgba(0,0,0,.55), 0 30px 60px -20px rgba(0,0,0,.95);
+  --brillo:inset 0 1px 0 rgba(255,255,255,.045);
+  --vidrio:rgba(14,22,18,.72); --vidrio-borde:rgba(255,255,255,.05);
+  --anillo:0 0 0 3px rgba(61,180,104,.35);
+}
+html[data-tema="oscuro"] body{ background:var(--background); color:var(--text); }
+html[data-tema="oscuro"] thead th{ color:var(--gray); }
+html[data-tema="oscuro"] input::placeholder, html[data-tema="oscuro"] textarea::placeholder{ color:#5F7068; }
+html[data-tema="oscuro"] .topbar{ border-bottom-color:rgba(255,255,255,.05); }
+html[data-tema="oscuro"] .card{ background:linear-gradient(180deg, var(--panel), var(--superficie-2)); }
+html[data-tema="oscuro"] .btn-secondary{ background:var(--superficie-2); color:var(--text); }
+html[data-tema="oscuro"] .btn-secondary:hover:not(:disabled){ background:var(--superficie-3); color:#fff; box-shadow:var(--elev-2), 0 0 0 1px var(--primary-light); }
+html[data-tema="oscuro"] .panel-header h2, html[data-tema="oscuro"] .step-panel h3, html[data-tema="oscuro"] .topbar h1{ color:var(--text); }
+html[data-tema="oscuro"] .esqueleto{ background:linear-gradient(100deg, var(--superficie-3) 30%, #243229 50%, var(--superficie-3) 70%); background-size:300% 100%; }
+html[data-tema="oscuro"] .estado-vacio-icono{ background:var(--superficie-3); color:var(--primary-light); }
+html[data-tema="oscuro"] .nota-clave{ background:linear-gradient(135deg,#2B2410,#231D0D); border-color:#5C4A17; }
+html[data-tema="oscuro"] .nota-clave-texto strong{ color:#F5D78A; } html[data-tema="oscuro"] .nota-clave-texto small{ color:#C9AE63; }
+html[data-tema="oscuro"] .nota-clave-valor, html[data-tema="oscuro"] .nota-clave-btn{ background:#1A160A; color:#F5D78A; border-color:#5C4A17; }
+/* Gráficas (ApexCharts): texto, líneas y globos legibles */
+html[data-tema="oscuro"] .apexcharts-text, html[data-tema="oscuro"] .apexcharts-legend-text{ fill:var(--gray) !important; color:var(--gray) !important; }
+html[data-tema="oscuro"] .apexcharts-gridline, html[data-tema="oscuro"] .apexcharts-xaxis-tick, html[data-tema="oscuro"] .apexcharts-xcrosshairs, html[data-tema="oscuro"] .apexcharts-ycrosshairs{ stroke:var(--border) !important; }
+html[data-tema="oscuro"] .apexcharts-tooltip{ background:var(--superficie-2) !important; color:var(--text) !important; border-color:var(--border) !important; box-shadow:var(--elev-3) !important; }
+html[data-tema="oscuro"] .apexcharts-tooltip-title{ background:var(--superficie-3) !important; border-color:var(--border) !important; }
+/* Tablero de clasificación: texto de las celdas con color propio */
+html[data-tema="oscuro"] .cls-n{ color:var(--text); }
+html[data-tema="oscuro"] .cls-acum-ayer strong, html[data-tema="oscuro"] .cls-ayer{ color:var(--text-soft); }
+html[data-tema="oscuro"] .fuente-toggle button.activo{ background:var(--superficie-3); color:#A7E3BE; box-shadow:var(--elev-1), 0 0 0 1px var(--borde-fuerte); }
+html[data-tema="oscuro"] .status.success{ color:var(--ok); background:var(--ok-soft); }
+html[data-tema="oscuro"] .status.warning{ color:var(--aviso); background:var(--aviso-soft); }
+html[data-tema="oscuro"] .status.danger{ color:var(--peligro); background:var(--peligro-soft); }
+html[data-tema="oscuro"] .status.info{ color:var(--info); background:var(--info-soft); }

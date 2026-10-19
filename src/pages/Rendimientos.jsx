@@ -9,6 +9,8 @@ import { useSesion } from '../lib/useSesion';
 import { puedeEditar } from '../lib/roles';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
 import { coincideFila } from '../lib/personasUtil';
+import { validarArchivoExcel } from '../lib/seguridad';
+import { EstadoVacio } from '../components/Estados';
 function hoyISO() {
   return fechaLocalISO();
 }
@@ -110,6 +112,7 @@ export default function Rendimientos() {
     }
     setProcesando(true);
     try {
+      await validarArchivoExcel(file);
       const buffer = await file.arrayBuffer();
       const {
         registros,
@@ -526,9 +529,12 @@ function TablaHistorico({
             </tr>
           </thead>
           <tbody>
-            {filas.length === 0 && <tr><td colSpan={11}><div className="empty-state"><i className="fa-solid fa-inbox"></i>
-              {avisoVacio || 'Sin registros para el filtro actual.'}
-            </div></td></tr>}
+            {filas.length === 0 && <tr><td colSpan={11}>
+              <EstadoVacio icono="fa-inbox" titulo={avisoVacio ? 'Hoy todavía no hay Histórico cargado' : 'Sin registros para el filtro actual'}
+                texto={avisoVacio ? undefined : 'Cambia la fecha o la búsqueda, o sube un reporte arriba.'}>
+                {avisoVacio}
+              </EstadoVacio>
+            </td></tr>}
             {filas.map(r => {
             const editando = editandoId === r.id;
             const porcentaje = calcularPorcentajeMeta(r.rendimiento, metaHora);
@@ -661,7 +667,7 @@ function TablaActual({
             </tr>
           </thead>
           <tbody>
-            {filas.length === 0 && <tr><td colSpan={11}><div className="empty-state"><i className="fa-solid fa-inbox"></i>Sin registros para el filtro actual.</div></td></tr>}
+            {filas.length === 0 && <tr><td colSpan={11}><EstadoVacio icono="fa-inbox" titulo="Sin registros para el filtro actual" /></td></tr>}
             {filas.map(r => {
             const editando = editandoId === r.id;
             const porcentaje = calcularPorcentajeMeta(r.rendimiento, metaHora);

@@ -1,0 +1,11 @@
+/* La Flor de la meta: cada pétalo se abre desde el centro; los colores salen de la marca o de la festividad activa. */
+.flor-meta{ position:relative; flex-shrink:0; display:inline-block; }
+.flor-svg{ width:100%; height:100%; display:block; overflow:visible; filter:drop-shadow(0 6px 10px rgba(0,0,0,.18)); }
+.flor-petalo{ stroke:rgba(255,255,255,.42); stroke-width:1.5; transform-origin:100px 100px; transform-box:view-box; transition:transform .9s cubic-bezier(.34,1.45,.64,1), opacity .6s ease; }
+.flor-centro{ fill:var(--primary-dark); } .flor-aro{ fill:none; stroke:var(--gold); stroke-width:5; }
+.flor-contenido{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; color:#fff; font-weight:900; line-height:1; text-shadow:0 1px 3px rgba(0,0,0,.45); pointer-events:none; }
+.flor-meta.plena .flor-giro{ transform-origin:100px 100px; transform-box:view-box; animation:flor-gira 40s linear infinite; }
+.flor-meta.plena .flor-svg{ filter:drop-shadow(0 0 14px color-mix(in srgb, var(--gold) 70%, transparent)) drop-shadow(0 6px 10px rgba(0,0,0,.2)); animation:flor-late 2.8s ease-in-out infinite; }
+@keyframes flor-gira{ to{ transform:rotate(360deg); } } @keyframes flor-late{ 50%{ transform:scale(1.045); } }
+@media (prefers-reduced-motion:reduce){ .flor-petalo{ transition:none; } .flor-meta.plena .flor-giro, .flor-meta.plena .flor-svg{ animation:none; } }
+html[data-efectos="apagado"] .flor-petalo{ transition:none; } html[data-efectos="apagado"] .flor-meta.plena .flor-giro, html[data-efectos="apagado"] .flor-meta.plena .flor-svg{ animation:none; }

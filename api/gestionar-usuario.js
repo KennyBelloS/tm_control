@@ -1,69 +1,47 @@
-import { createClient } from '@supabase/supabase-js';
+import { prepararRespuesta, origenValido, excedeTasa, crearClienteAdmin, exigirAdministrador, cuerpoObjeto } from './_comun.js';
+import { limpiarTexto, esUuid, esPasswordValida } from '../src/lib/seguridad.js';
+
+const ACCIONES = ['eliminar', 'cambiar_password', 'cambiar_nombre'];
 
 export default async function handler(req, res) {
+  prepararRespuesta(res);
   try {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Método no permitido' });
-    }
+    if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); return res.status(405).json({ error: 'Método no permitido' }); }
+    if (!origenValido(req)) return res.status(403).json({ error: 'Origen no permitido.' });
+    if (excedeTasa(req, 'gestionar-usuario', 30)) return res.status(429).json({ error: 'Demasiadas solicitudes. Espera un minuto.' });
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!supabaseUrl || !serviceKey) {
-      return res.status(500).json({ error: 'Falta configurar SUPABASE_SERVICE_ROLE_KEY en Vercel.' });
-    }
+    const admin = crearClienteAdmin();
+    if (!admin) return res.status(500).json({ error: 'Falta configurar SUPABASE_SERVICE_ROLE_KEY en Vercel.' });
+    const auth = await exigirAdministrador(req, admin);
+    if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
 
-    const { tokenAdmin, accion, idObjetivo, nuevaPassword, nuevoNombre } = req.body || {};
-    if (!tokenAdmin || !accion || !idObjetivo) {
-      return res.status(400).json({ error: 'Faltan datos.' });
-    }
+    const b = cuerpoObjeto(req);
+    if (!b || !ACCIONES.includes(b.accion)) return res.status(400).json({ error: 'Acción desconocida.' });
+    if (!esUuid(b.idObjetivo)) return res.status(400).json({ error: 'Identificador inválido.' });
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    const { data: objetivo } = await admin.from('perfiles').select('id, es_super_admin').eq('id', b.idObjetivo).single();
+    if (!objetivo) return res.status(404).json({ error: 'No existe ese usuario.' });
+    if (objetivo.es_super_admin) return res.status(403).json({ error: 'Esta cuenta es el Super Administrador: no se puede modificar ni eliminar.' });
 
-    const { data: quienLlama, error: errorToken } = await supabaseAdmin.auth.getUser(tokenAdmin);
-    if (errorToken || !quienLlama?.user) {
-      return res.status(401).json({ error: 'Sesión inválida.' });
-    }
-    const { data: perfilQuienLlama } = await supabaseAdmin
-      .from('perfiles')
-      .select('rol, activo')
-      .eq('id', quienLlama.user.id)
-      .single();
-    if (!perfilQuienLlama || perfilQuienLlama.rol !== 'administrador' || !perfilQuienLlama.activo) {
-      return res.status(403).json({ error: 'Solo un Administrador puede gestionar usuarios.' });
-    }
-
-    const { data: perfilObjetivo } = await supabaseAdmin
-      .from('perfiles')
-      .select('es_super_admin')
-      .eq('id', idObjetivo)
-      .single();
-    if (perfilObjetivo?.es_super_admin) {
-      return res.status(403).json({ error: 'Esta cuenta es el Super Administrador — no se puede modificar ni eliminar.' });
-    }
-
-    if (accion === 'eliminar') {
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(idObjetivo);
-      if (error) return res.status(400).json({ error: error.message });
+    if (b.accion === 'eliminar') {
+      if (b.idObjetivo === auth.usuario.id) return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta.' });
+      const { error } = await admin.auth.admin.deleteUser(b.idObjetivo);
+      if (error) return res.status(400).json({ error: 'No se pudo eliminar el usuario.' });
       return res.status(200).json({ ok: true });
     }
-
-    if (accion === 'cambiar_password') {
-      if (!nuevaPassword || nuevaPassword.length < 6) {
-        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres.' });
-      }
-      const { error } = await supabaseAdmin.auth.admin.updateUserById(idObjetivo, { password: nuevaPassword });
-      if (error) return res.status(400).json({ error: error.message });
+    if (b.accion === 'cambiar_password') {
+      if (!esPasswordValida(b.nuevaPassword)) return res.status(400).json({ error: 'La contraseña debe tener entre 8 y 72 caracteres.' });
+      const { error } = await admin.auth.admin.updateUserById(b.idObjetivo, { password: b.nuevaPassword });
+      if (error) return res.status(400).json({ error: 'No se pudo cambiar la contraseña.' });
       return res.status(200).json({ ok: true });
     }
-
-    if (accion === 'cambiar_nombre') {
-      const { error } = await supabaseAdmin.from('perfiles').update({ nombre: nuevoNombre }).eq('id', idObjetivo);
-      if (error) return res.status(400).json({ error: error.message });
-      return res.status(200).json({ ok: true });
-    }
-
-    return res.status(400).json({ error: 'Acción desconocida.' });
+    const nombre = limpiarTexto(b.nuevoNombre, 80);
+    if (nombre.length < 2) return res.status(400).json({ error: 'El nombre debe tener al menos 2 caracteres.' });
+    const { error } = await admin.from('perfiles').update({ nombre }).eq('id', b.idObjetivo);
+    if (error) return res.status(400).json({ error: 'No se pudo cambiar el nombre.' });
+    return res.status(200).json({ ok: true });
   } catch (e) {
-    return res.status(500).json({ error: `Error inesperado del servidor: ${e.message || e}` });
+    console.error('gestionar-usuario:', e);
+    return res.status(500).json({ error: 'Error inesperado del servidor.' });
   }
 }

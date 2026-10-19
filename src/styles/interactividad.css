@@ -1,0 +1,40 @@
+/* =====================================================================
+   INTERACTIVIDAD — avisos, tooltips de gráficos, filas marcables, volver arriba. Usa los mismos colores/tokens de la app.
+   ===================================================================== */
+
+/* ---------- Avisos flotantes ---------- */
+.toasts{ position:fixed; left:22px; bottom:22px; z-index:1300; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+.toast{ display:flex; align-items:center; gap:10px; padding:11px 16px; border-radius:14px; font-size:13px; font-weight:600; color:#fff; background:#0E1A13; box-shadow:var(--elev-4); animation:toast-entra .35s var(--ease-resorte); max-width:340px; }
+.toast i{ font-size:15px; color:#5BD08A; } .toast-error{ background:#8F1D33; } .toast-error i{ color:#FFB4C0; } .toast-info i{ color:#9CC7FF; }
+@keyframes toast-entra{ from{ transform:translateY(14px) scale(.96); opacity:0; } to{ transform:none; opacity:1; } }
+
+/* ---------- Volver arriba ---------- */
+.volver-arriba{ position:fixed; right:22px; bottom:22px; z-index:55; width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:15px; color:#fff; background:linear-gradient(135deg,var(--primary-dark),var(--primary)); box-shadow:var(--elev-3); opacity:0; transform:translateY(12px) scale(.9); pointer-events:none; transition:opacity var(--mov-3) ease, transform var(--mov-3) var(--ease-resorte); }
+.volver-arriba.visible{ opacity:1; transform:none; pointer-events:auto; } .volver-arriba:hover{ transform:translateY(-3px); } .volver-arriba:active{ transform:scale(.92); }
+@media print{ .volver-arriba, .toasts{ display:none; } }
+
+/* ---------- Tooltip de los gráficos ---------- */
+.gx{ position:relative; }
+.gx-tip{ position:absolute; z-index:6; transform:translate(-50%, calc(-100% - 12px)); padding:6px 11px; border-radius:9px; font-size:12px; font-weight:600; white-space:nowrap; color:#fff; background:#0E1A13; box-shadow:var(--elev-3); pointer-events:none; animation:modal-fade-in .12s ease; }
+.gx-tip::after{ content:''; position:absolute; left:50%; bottom:-4px; width:8px; height:8px; background:#0E1A13; transform:translateX(-50%) rotate(45deg); }
+.gx-hover .gx-barra, .gx-hover .gx-barra-h{ opacity:.5; } .gx-hover .gx-barra:hover, .gx-hover .gx-barra-h:hover{ opacity:1; }
+.gx [data-tip]{ cursor:crosshair; }
+
+/* ---------- Tablas: filas que se pueden marcar o abrir ---------- */
+.fila-clic{ cursor:pointer; } .fila-clic:hover > td{ background:var(--primary-soft,#EAF5EE) !important; }
+tbody tr.fila-marcada > td{ background:var(--primary-soft,#EAF5EE) !important; }
+tbody tr.fila-marcada > td:first-child{ box-shadow:inset 3px 0 0 var(--gold); }
+
+/* ---------- Insignia "Nuevo" del menú y enlaces a un colaborador ---------- */
+.nav-nuevo{ margin-left:auto; padding:1px 7px; border-radius:20px; font-style:normal; font-size:9.5px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; color:var(--primary-dark); background:linear-gradient(135deg,#F5E7B5,var(--gold)); animation:nuevo-brilla 2.4s ease-in-out infinite; }
+@keyframes nuevo-brilla{ 0%,100%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--gold) 55%, transparent); } 50%{ box-shadow:0 0 0 5px color-mix(in srgb, var(--gold) 0%, transparent); } }
+html[data-menu="mini"] .nav-nuevo{ display:none; } @media (prefers-reduced-motion:reduce){ .nav-nuevo{ animation:none; } }
+.enlace-colab{ color:inherit; font-weight:600; border-bottom:1px dashed var(--borde-fuerte); transition:color var(--mov-1) ease, border-color var(--mov-1) ease; } .enlace-colab:hover{ color:var(--primary); border-bottom-color:var(--primary); }
+
+.menu-usuario-panel .menu-estado{ margin-left:auto; font-size:11px; font-weight:700; color:var(--gray); }
+
+/* ---------- Celular: los selectores segmentados nunca ensanchan la página (si no caben, se desplazan por dentro) ---------- */
+@media (max-width:640px){
+  .fuente-toggle{ max-width:100%; overflow-x:auto; scrollbar-width:none; }
+  .fuente-toggle::-webkit-scrollbar{ display:none; }
+}

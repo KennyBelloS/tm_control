@@ -1,5 +1,6 @@
 import Chart from 'react-apexcharts';
 import { calcularPorcentajeMeta, clasificarEstado } from '../../lib/calculos';
+import { EstadoVacio } from '../Estados';
 const COLOR_EXCELENTE = '#166534';
 const COLOR_CUMPLE = '#2F9E4F';
 const COLOR_APUNTO = '#D97706';
@@ -29,7 +30,7 @@ export default function EstadoDonutChart({
     return COLOR_BAJO;
   });
   if (valores.length === 0) {
-    return <div className="empty-state"><i className="fa-solid fa-chart-pie"></i>Sin datos para graficar.</div>;
+    return <EstadoVacio icono="fa-chart-pie" titulo="Sin datos para graficar" />;
   }
   return <Chart type="donut" height={height} series={valores} options={{
     chart: {

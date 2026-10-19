@@ -5,8 +5,12 @@ export default function NumeroAnimado({ valor, duracion = 900, formato = n => n.
   const destino = Number(valor);
   const [mostrado, setMostrado] = useState(Number.isFinite(destino) ? 0 : valor);
   const previo = useRef(0);
+  const yaMostro = useRef(false);
+  const [cambio, setCambio] = useState(0);
   useEffect(() => {
     if (!Number.isFinite(destino)) return;
+    if (yaMostro.current && previo.current !== destino) setCambio(c => c + 1);   // un dato nuevo llegó: destello
+    yaMostro.current = true;
     const reducir = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reducir) { setMostrado(destino); previo.current = destino; return; }
     const desde = previo.current;
@@ -22,5 +26,5 @@ export default function NumeroAnimado({ valor, duracion = 900, formato = n => n.
     raf = requestAnimationFrame(paso);
     return () => cancelAnimationFrame(raf);
   }, [destino, duracion]);
-  return <span className="numero-animado">{Number.isFinite(destino) ? formato(mostrado) : valor}</span>;
+  return <span key={cambio} className={`numero-animado ${cambio ? 'numero-cambio' : ''}`}>{Number.isFinite(destino) ? formato(mostrado) : valor}</span>;
 }

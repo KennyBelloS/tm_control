@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import { ROLES, ROL_LABEL, listarPerfiles, crearUsuario, cambiarEstadoPerfil, cambiarRolPerfil, eliminarUsuario, cambiarPasswordUsuario, cambiarNombreUsuario } from '../lib/roles';
+import { EstadoVacio, FilasEsqueleto } from '../components/Estados';
 export default function Usuarios() {
   const [perfiles, setPerfiles] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -196,8 +197,8 @@ export default function Usuarios() {
             <table>
               <thead><tr><th>Nombre</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
               <tbody>
-                {cargando && <tr><td colSpan={5}><div className="empty-state">Cargando...</div></td></tr>}
-                {!cargando && perfiles.length === 0 && <tr><td colSpan={5}><div className="empty-state"><i className="fa-solid fa-users"></i>Todavía no hay cuentas creadas.</div></td></tr>}
+                {cargando && <FilasEsqueleto columnas={5} />}
+                {!cargando && perfiles.length === 0 && <tr><td colSpan={5}><EstadoVacio icono="fa-users" titulo="Todavía no hay cuentas creadas" /></td></tr>}
                 {perfiles.map(p => {
                   const protegido = p.es_super_admin;
                   const editando = editandoId === p.id;

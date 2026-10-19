@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas';
 import { calcularPorcentajeMeta, clasificarEstado, agregarRankingPorPersona } from './calculos';
 import logoUrl from '../assets/logo-icon.png';
+import { escaparHtml } from './seguridad.js';
 const VERDE = '#166534';
 const VERDE_OSCURO = '#0F3D22';
 const VERDE_CLARO = '#DCFCE7';
@@ -36,8 +37,8 @@ function filaHtml(p, i, metaHora) {
   return `
     <tr style="background:${fondoFila};">
       <td style="padding:9px 12px; font-weight:700; color:#6B7280; border-bottom:1px solid #EEEDE7;">${i + 1}</td>
-      <td style="padding:9px 12px; color:#6B7280; border-bottom:1px solid #EEEDE7;">${p.codigo ?? '—'}</td>
-      <td style="padding:9px 12px; font-weight:600; border-bottom:1px solid #EEEDE7;">${p.colaborador}</td>
+      <td style="padding:9px 12px; color:#6B7280; border-bottom:1px solid #EEEDE7;">${escaparHtml(p.codigo ?? '—')}</td>
+      <td style="padding:9px 12px; font-weight:600; border-bottom:1px solid #EEEDE7;">${escaparHtml(p.colaborador)}</td>
       <td style="padding:9px 12px; text-align:right; border-bottom:1px solid #EEEDE7;">${p.totalTallos.toLocaleString('es-CO')}</td>
       <td style="padding:9px 12px; text-align:right; font-weight:700; border-bottom:1px solid #EEEDE7;">${p.promedioRend}</td>
       <td style="padding:9px 12px; border-bottom:1px solid #EEEDE7; min-width:110px;">
@@ -87,7 +88,7 @@ export async function exportarImagenProfesional({
         <div style="color:#fff; font-size:20px; font-weight:800; letter-spacing:.02em;">TORREMOLINOS · TMCONTROL</div>
         <div style="color:#fff; font-size:14px; margin-top:2px;">${titulo}</div>
         <div style="color:rgba(255,255,255,.75); font-size:11.5px; margin-top:4px;">
-          Generado el ${generado} ${fecha ? `· Fecha: ${fecha}` : '· Todas las fechas'} · Meta: ${metaHora} tallos/h
+          Generado el ${generado} ${fecha ? `· Fecha: ${escaparHtml(fecha)}` : '· Todas las fechas'} · Meta: ${metaHora} tallos/h
         </div>
       </div>
     </div>

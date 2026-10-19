@@ -8,6 +8,7 @@ import {
   parsearMovimientosClasificacion, resumirMovimientos,
   getCargaDia, guardarClasificacionDia, getHistoricoClasificacion
 } from '../lib/clasificacion';
+import { validarArchivoExcel } from '../lib/seguridad';
 
 const fmt = n => (n ?? 0).toLocaleString('es-CO');
 
@@ -52,6 +53,7 @@ export default function Clasificacion() {
     setMensaje(null); setParseado(null); setArchivo(null);
     if (!file) return;
     try {
+      await validarArchivoExcel(file);
       setParseado(parsearMovimientosClasificacion(await file.arrayBuffer()));
       setArchivo(file);
       setModoCorte('todo');

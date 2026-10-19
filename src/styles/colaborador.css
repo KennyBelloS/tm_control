@@ -1,0 +1,118 @@
+/* =====================================================================
+   TABLERO INTEGRADO DEL COLABORADOR — mismos colores de la app; tarjetas, anillo de índice, calendario de calor y comparaciones.
+   ===================================================================== */
+.colab-pagina{ gap:16px; }
+
+/* ---------- Barra: buscador + período + fecha ---------- */
+.colab-barra{ display:flex; flex-wrap:wrap; align-items:center; gap:12px 14px; }
+.colab-selector{ position:relative; flex:1 1 320px; max-width:460px; }
+.colab-buscar{ width:100%; } .colab-buscar input{ font-weight:600; }
+.colab-lista{ position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:40; padding:6px; border-radius:16px; background:var(--panel); box-shadow:var(--elev-4), var(--borde-fino); animation:modal-pop .18s var(--ease-resorte); transform-origin:top; }
+.colab-lista small{ display:block; padding:6px 10px 4px; font-size:10.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--gray); }
+.colab-lista button{ width:100%; display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:11px; background:transparent; text-align:left; color:var(--text-soft); font-size:13px; transition:background-color var(--mov-1) ease, transform var(--mov-2) var(--ease-salida); }
+.colab-lista button.activo{ background:var(--primary-soft,#EAF5EE); color:var(--text); transform:translateX(2px); } .colab-lista strong{ flex:1; font-weight:650; } .colab-lista em{ font-style:normal; font-size:11px; color:var(--gray); }
+.colab-sin{ padding:14px 10px; font-size:12.5px; color:var(--gray); }
+.colab-ref{ display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:var(--gray); text-transform:uppercase; letter-spacing:.05em; } .colab-ref input{ padding:6px 9px; font-size:13px; font-weight:600; color:var(--text); text-transform:none; letter-spacing:0; }
+
+/* ---------- Inicio (sin nadie elegido) ---------- */
+.colab-inicio{ display:flex; flex-direction:column; gap:16px; }
+.colab-atajos{ display:flex; flex-wrap:wrap; gap:18px 36px; padding:0 8px; } .colab-atajos > div{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; } .colab-atajos small{ flex:1 1 100%; font-size:10.5px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--gray); }
+.colab-atajo{ display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:30px; font-size:12.5px; font-weight:600; color:var(--text-soft); background:var(--panel); box-shadow:var(--elev-1), var(--borde-fino); transition:transform var(--mov-2) var(--ease-resorte), box-shadow var(--mov-2) var(--ease-salida), color var(--mov-1) ease; }
+.colab-atajo:hover{ transform:translateY(-2px); box-shadow:var(--elev-2), 0 0 0 1px var(--primary-light); color:var(--primary-dark); } .colab-atajo b{ color:var(--primary); }
+
+/* ---------- Tablero ---------- */
+.colab-tablero{ display:flex; flex-direction:column; gap:16px; transition:opacity var(--mov-3) ease; } .colab-tablero.recargando{ opacity:.55; pointer-events:none; }
+.colab-tablero > *{ animation:entrada-pagina .45s var(--ease-salida) backwards; } .colab-tablero > *:nth-child(2){ animation-delay:60ms; } .colab-tablero > *:nth-child(3){ animation-delay:120ms; } .colab-tablero > *:nth-child(4){ animation-delay:180ms; } .colab-tablero > *:nth-child(5){ animation-delay:240ms; }
+.colab-hero{ display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:16px; } @media (max-width:1100px){ .colab-hero{ grid-template-columns:1fr; } }
+.colab-identidad, .colab-indice, .colab-grafico, .colab-lectura, .colab-mapa, .colab-detalle, .colab-comp, .colab-causas{ background:var(--panel); border-radius:var(--radius); box-shadow:var(--elev-1), var(--borde-fino); padding:16px 18px; min-width:0; }
+
+/* ---------- Identidad ---------- */
+.colab-identidad{ display:flex; gap:16px; align-items:flex-start; background:linear-gradient(135deg,var(--primary-dark),var(--primary) 70%,var(--primary-light)); color:#fff; position:relative; overflow:hidden; }
+.colab-identidad::after{ content:''; position:absolute; right:-60px; top:-60px; width:220px; height:220px; border-radius:50%; background:radial-gradient(circle, color-mix(in srgb, var(--gold) 35%, transparent), transparent 70%); pointer-events:none; }
+.colab-avatar{ width:68px; height:68px; flex-shrink:0; border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:900; letter-spacing:-.02em; color:var(--primary-dark); background:linear-gradient(135deg,#F5E7B5,var(--gold)); box-shadow:0 10px 24px -10px rgba(0,0,0,.5); }
+.colab-id-info{ min-width:0; position:relative; z-index:1; } .colab-id-info h2{ font-size:clamp(18px,2vw,26px); font-weight:900; letter-spacing:-.02em; line-height:1.15; margin-bottom:8px; }
+.colab-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+.colab-identidad .dev-codigo{ background:rgba(255,255,255,.18); color:#fff; font-size:12px; padding:3px 10px; }
+.colab-chip{ display:inline-flex; align-items:center; gap:6px; padding:3px 11px; border-radius:20px; font-size:12px; font-weight:600; background:rgba(255,255,255,.14); color:#fff; } .colab-chip i{ font-size:11px; opacity:.85; }
+a.colab-chip-enlace:hover{ background:rgba(255,255,255,.28); } .colab-chip-gris{ opacity:.65; }
+.colab-vivo{ display:inline-flex; align-items:center; gap:8px; margin-top:10px; padding:5px 12px; border-radius:20px; font-size:12.5px; background:rgba(0,0,0,.22); } .colab-vivo .en-vivo-punto{ background:#5BD08A; } .colab-vivo .en-vivo-punto::after{ content:''; position:absolute; inset:-4px; border-radius:50%; border:2px solid #5BD08A; opacity:0; animation:respira 2.2s ease-out infinite; }
+.colab-periodo{ margin-top:10px; font-size:12px; opacity:.85; }
+
+/* ---------- Índice integral (anillo) ---------- */
+.colab-indice{ display:flex; gap:18px; align-items:center; }
+.colab-gauge{ position:relative; width:150px; flex-shrink:0; } .colab-gauge svg{ width:100%; display:block; transform:rotate(135deg); }
+.colab-gauge circle{ fill:none; stroke-width:12; stroke-linecap:round; } .colab-gauge-fondo{ stroke:var(--superficie-3); }
+.colab-gauge-arco{ transition:stroke-dasharray .9s var(--ease-salida); animation:colab-arco 1.1s var(--ease-salida); } @keyframes colab-arco{ from{ stroke-dasharray:0 600; } }
+.colab-gauge-centro{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding-bottom:4px; } .colab-gauge-centro strong{ font-size:38px; font-weight:900; letter-spacing:-.04em; line-height:1; font-variant-numeric:tabular-nums; } .colab-gauge-centro span{ font-size:11px; color:var(--gray); }
+.colab-indice-info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+.colab-etiqueta{ font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--gray); }
+.colab-nivel{ display:inline-block; padding:3px 12px; border-radius:20px; font-size:12px; font-weight:800; } .colab-nivel-ok{ background:var(--ok-soft,#DCFCE7); color:#14532D; } .colab-nivel-aviso{ background:var(--aviso-soft,#FEF3C7); color:#78350F; } .colab-nivel-mal{ background:var(--peligro-soft,#FFE4E6); color:#881337; } .colab-nivel-neutro{ background:var(--superficie-3); color:var(--gray); }
+.colab-partes{ width:100%; display:flex; flex-direction:column; gap:7px; margin-top:4px; }
+.colab-parte{ display:grid; grid-template-columns:118px 1fr 28px; align-items:center; gap:8px; font-size:12px; cursor:help; } .colab-parte small{ color:var(--gray); } .colab-parte.sin-dato{ opacity:.45; }
+.colab-parte-barra{ height:8px; border-radius:8px; background:var(--superficie-3); overflow:hidden; } .colab-parte-barra i{ display:block; height:100%; border-radius:8px; background:linear-gradient(90deg,var(--primary),var(--primary-light)); transition:width .8s var(--ease-salida); } .colab-parte b{ text-align:right; font-variant-numeric:tabular-nums; }
+.colab-como{ margin-top:2px; font-size:12px; font-weight:700; color:var(--primary); background:none; padding:2px 0; } .colab-como:hover{ text-decoration:underline; } .colab-como i{ font-size:10px; margin-right:4px; }
+.colab-pesos{ width:100%; display:flex; flex-direction:column; gap:7px; padding:10px 12px; border-radius:12px; background:var(--superficie-2); animation:entrada-pagina .3s var(--ease-salida); } .colab-pesos p{ font-size:11.5px; color:var(--gray); line-height:1.45; margin:0; }
+.colab-pesos label{ display:grid; grid-template-columns:100px 1fr 28px; align-items:center; gap:8px; font-size:12px; font-weight:600; } .colab-pesos input[type=range]{ accent-color:var(--primary); padding:0; box-shadow:none; background:none; } .colab-pesos b{ text-align:right; }
+@media (max-width:560px){ .colab-indice{ flex-direction:column; align-items:center; } .colab-indice-info{ width:100%; } .colab-parte{ grid-template-columns:96px 1fr 26px; } }
+
+/* ---------- KPIs ---------- */
+.colab-kpis{ display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:12px; } @media (max-width:1300px){ .colab-kpis{ grid-template-columns:repeat(3,minmax(0,1fr)); } } @media (max-width:640px){ .colab-kpis{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+.colab-kpi{ position:relative; padding:13px 15px 12px 18px; border-radius:16px; background:var(--panel); box-shadow:var(--elev-1), var(--borde-fino); display:flex; flex-direction:column; gap:2px; overflow:hidden; transition:transform var(--mov-2) var(--ease-resorte), box-shadow var(--mov-2) var(--ease-salida); }
+.colab-kpi::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--acento); } .colab-kpi:hover{ transform:translateY(-3px); box-shadow:var(--elev-2), var(--borde-fino); }
+.colab-kpi > span{ font-size:10.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--gray); }
+.colab-kpi strong{ font-size:clamp(22px,2.1vw,30px); font-weight:900; letter-spacing:-.03em; line-height:1.15; font-variant-numeric:tabular-nums; } .colab-kpi strong em{ font-style:normal; font-size:12px; font-weight:700; color:var(--gray); letter-spacing:0; }
+.colab-delta{ font-size:11.5px; color:var(--gray); line-height:1.35; } .colab-delta b{ color:var(--text); } .colab-delta i{ font-size:10px; }
+.colab-delta-ok{ color:var(--ok) !important; font-weight:700; } .colab-delta-mal{ color:var(--peligro) !important; font-weight:700; } .colab-delta-aviso{ color:#B45309 !important; font-weight:700; } .colab-delta-neutro{ color:var(--gray); }
+
+/* ---------- Dos columnas ---------- */
+.colab-dos{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; } .colab-dos-grafico{ grid-template-columns:minmax(0,1.7fr) minmax(0,1fr); }
+@media (max-width:1100px){ .colab-dos, .colab-dos-grafico{ grid-template-columns:1fr; } }
+.colab-tres{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:start; } @media (max-width:1200px){ .colab-tres{ grid-template-columns:1fr; } }
+
+/* ---------- Gráfico de días ---------- */
+.colab-grafico figcaption{ font-size:13px; }
+.colab-col.clicable{ cursor:pointer; } .colab-col.clicable:hover .gx-barra{ filter:brightness(1.1); }
+.colab-sel{ fill:var(--primary-soft,#EAF5EE); opacity:.7; stroke:var(--primary-light); stroke-width:1.5; } .colab-col.sel .gx-barra{ filter:drop-shadow(0 4px 8px rgba(0,0,0,.25)); }
+.colab-meta{ stroke:var(--gold); stroke-width:1.6; stroke-dasharray:6 5; } .colab-meta-texto{ font-size:10.5px; font-weight:800; fill:var(--gold); }
+.colab-prom{ stroke:var(--primary); stroke-width:1.3; stroke-dasharray:2 4; opacity:.8; } .colab-prom-texto{ font-size:10px; font-weight:700; fill:var(--primary); }
+.colab-punto-dev{ font-size:9px; font-weight:900; fill:#fff; }
+
+/* ---------- Lectura ---------- */
+.colab-lectura h4{ font-size:13px; font-weight:800; margin-bottom:10px; } .colab-lectura h4 i{ color:var(--gold); margin-right:7px; }
+.colab-lectura ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; }
+.colab-lectura li{ display:flex; gap:10px; align-items:flex-start; padding:8px 11px; border-radius:11px; font-size:12.5px; line-height:1.45; background:var(--superficie-2); animation:entrada-pagina .4s var(--ease-salida) backwards; } .colab-lectura li i{ margin-top:2px; font-size:13px; width:16px; text-align:center; flex-shrink:0; }
+.colab-lec-ok{ box-shadow:inset 3px 0 0 var(--ok); } .colab-lec-ok i{ color:var(--ok); } .colab-lec-aviso{ box-shadow:inset 3px 0 0 var(--aviso); } .colab-lec-aviso i{ color:#B45309; } .colab-lec-mal{ box-shadow:inset 3px 0 0 var(--peligro); } .colab-lec-mal i{ color:var(--peligro); } .colab-lec-info{ box-shadow:inset 3px 0 0 var(--borde-fuerte); } .colab-lec-info i{ color:var(--gray); }
+
+/* ---------- Mapa del mes ---------- */
+.colab-mapa header, .colab-detalle header{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:10px; } .colab-mapa h4, .colab-detalle h4{ font-size:13px; font-weight:800; } .colab-mapa header span{ font-size:12px; color:var(--gray); text-transform:capitalize; }
+.colab-mapa-cab, .colab-mapa-grilla{ display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:5px; } .colab-mapa-cab span{ text-align:center; font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--gray); padding-bottom:4px; }
+.colab-celda{ position:relative; aspect-ratio:1.15; min-height:44px; border-radius:11px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; background:var(--superficie-2); color:var(--text-soft); transition:transform var(--mov-2) var(--ease-resorte), box-shadow var(--mov-2) var(--ease-salida); }
+.colab-celda.vacia{ background:transparent; } .colab-celda b{ font-size:13px; font-weight:800; line-height:1.1; } .colab-celda small{ font-size:9.5px; font-weight:700; opacity:.9; line-height:1; }
+.colab-celda.fuera{ opacity:.4; background:transparent; box-shadow:inset 0 0 0 1px var(--border); }
+.colab-celda.trabajo{ color:#fff; cursor:pointer; box-shadow:0 4px 10px -6px rgba(0,0,0,.45); } .colab-celda.trabajo:hover{ transform:translateY(-3px) scale(1.06); box-shadow:0 10px 18px -8px rgba(0,0,0,.5); z-index:2; }
+.colab-celda.sel{ outline:3px solid var(--text); outline-offset:2px; z-index:3; } .colab-celda.hoy::after{ content:''; position:absolute; top:4px; left:4px; width:6px; height:6px; border-radius:50%; background:var(--gold); box-shadow:0 0 0 2px #fff; }
+.colab-celda-dev{ position:absolute; right:3px; bottom:3px; min-width:16px; height:16px; padding:0 4px; border-radius:9px; font-style:normal; font-size:9.5px; font-weight:900; line-height:16px; text-align:center; color:#fff; background:#C0392B; box-shadow:0 0 0 2px #fff; }
+.colab-mapa-leyenda{ display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:12px; font-size:11px; color:var(--gray); } .colab-mapa-leyenda i{ display:inline-block; width:11px; height:11px; border-radius:4px; margin-right:5px; vertical-align:-1px; } .colab-mapa-leyenda i.gris{ background:var(--superficie-3); box-shadow:inset 0 0 0 1px var(--borde-fuerte); } .colab-mapa-leyenda i.dev{ background:#C0392B; border-radius:50%; }
+
+/* ---------- Detalle del día ---------- */
+.colab-detalle{ display:flex; flex-direction:column; gap:12px; animation:entrada-pagina .35s var(--ease-salida); } .colab-detalle.vacio{ align-items:center; justify-content:center; text-align:center; min-height:200px; color:var(--gray); } .colab-detalle.vacio i{ font-size:28px; color:var(--primary); opacity:.6; margin-bottom:8px; }
+.colab-detalle-cifra{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; padding:10px 14px; border-radius:14px; background:var(--superficie-2); border-left:5px solid var(--c); } .colab-detalle-cifra strong{ font-size:34px; font-weight:900; letter-spacing:-.03em; color:var(--c); font-variant-numeric:tabular-nums; } .colab-detalle-cifra span{ font-size:12px; color:var(--gray); }
+.colab-detalle dl{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:0; } .colab-detalle dl div{ padding:8px 10px; border-radius:11px; background:var(--superficie-2); } .colab-detalle dt{ font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--gray); } .colab-detalle dd{ margin:2px 0 0; font-size:15px; font-weight:800; font-variant-numeric:tabular-nums; }
+.colab-detalle-msg{ margin:0; font-size:12.5px; color:var(--text-soft); }
+.colab-detalle-dev{ padding-top:10px; border-top:1px solid var(--border); } .colab-detalle-dev h5{ font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--gray); margin-bottom:6px; } .colab-detalle-dev h5 i{ color:var(--peligro); margin-right:6px; } .colab-detalle-dev p{ margin:0 0 6px; font-size:13px; }
+.colab-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+
+/* ---------- Comparativas ---------- */
+.colab-comp h4{ font-size:13px; font-weight:800; margin-bottom:12px; }
+.colab-comp-fila{ display:grid; grid-template-columns:116px 1fr auto; align-items:center; gap:10px; margin-bottom:9px; font-size:12px; } .colab-comp-fila span{ color:var(--text-soft); } .colab-comp-fila.persona span{ font-weight:800; color:var(--text); }
+.colab-comp-barra{ height:14px; border-radius:9px; background:var(--superficie-3); overflow:hidden; } .colab-comp-barra i{ display:block; height:100%; border-radius:9px; transition:width .9s var(--ease-salida); } .colab-comp-fila b{ min-width:62px; text-align:right; font-variant-numeric:tabular-nums; } .colab-comp-fila small{ font-weight:600; color:var(--gray); }
+.colab-comp footer{ display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); font-size:12px; font-weight:700; }
+.colab-causas .dev-cero{ font-size:12px; margin-top:4px; }
+@media print{ .colab-barra, .colab-selector{ display:none; } }
+
+/* ---------- Tema oscuro: etiquetas legibles ---------- */
+html[data-tema="oscuro"] .colab-nivel-ok{ background:rgba(34,160,90,.22); color:#8BE8B1; }
+html[data-tema="oscuro"] .colab-nivel-aviso{ background:rgba(224,164,58,.2); color:#F4CE82; }
+html[data-tema="oscuro"] .colab-nivel-mal{ background:rgba(220,76,94,.22); color:#FFB3BF; }
+html[data-tema="oscuro"] .colab-delta-aviso{ color:#F4CE82 !important; }
+html[data-tema="oscuro"] .colab-lec-aviso i{ color:#F4CE82; }

@@ -239,8 +239,8 @@
 .presentacion-tema-oscuro .pres-lienzo{ background:#0B1512; }
 .pres-lienzo .slide-titulo{ font-size:40px; margin-bottom:4px; }
 .pres-lienzo .pres-slide-sub{ font-size:18px; margin-bottom:16px; }
-.pres-slide-hora .carrusel-ventana{ height:560px; }
-.pres-slide-hist .carrusel-ventana{ height:380px; }
+.pres-slide-hora .carrusel-ventana{ height:max(260px, calc(var(--pres-alto) - 340px)); }
+.pres-slide-hist .carrusel-ventana{ height:max(220px, calc(var(--pres-alto) - 500px)); }
 
 /* ---- Vista: clasificación por línea (con la líder) ---- */
 .pres-lineas-cuerpo{ display:grid; grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr); gap:26px; margin-bottom:20px; align-items:stretch; }
@@ -304,3 +304,26 @@
 .pres-ajuste-caja{ padding:8px 14px; box-sizing:border-box; }
 .pres-lienzo .slide-titulo{ margin-bottom:14px; line-height:1.2; }
 .pres-lienzo .pres-slide-sub{ margin-top:-8px; }
+
+.pres-aa{ font-size:15px; font-weight:900; letter-spacing:-.02em; }
+.presentacion-pausa:disabled{ opacity:.35; cursor:not-allowed; }
+.pres-aviso-tamano{ position:fixed; top:90px; left:50%; transform:translateX(-50%); z-index:20; background:rgba(15,31,22,.88); color:#fff; font-size:22px; font-weight:800; padding:10px 26px; border-radius:30px; box-shadow:0 12px 30px rgba(0,0,0,.35); }
+
+/* ---- Vista de líneas: compacta, para que quepa GRANDE en un televisor ---- */
+.pres-lineas .pres-lineas-cuerpo{ margin-bottom:12px; gap:20px; }
+.pres-lineas .pres-lider{ padding:16px 26px; }
+.pres-lineas .pres-lider h3{ font-size:46px; }
+.pres-lineas .pres-lider-cifra{ font-size:72px; }
+.pres-lineas .pres-lider-formadora{ font-size:20px; margin:2px 0 6px; }
+.pres-lineas .pres-lider-etq{ font-size:16px; margin-bottom:6px; }
+.pres-lineas .pres-chip{ font-size:15px; padding:4px 12px; }
+.pres-lineas .pres-linea-fila{ grid-template-columns:40px minmax(110px,1.3fr) minmax(30px,.9fr) 96px 104px; gap:12px; padding:9px 6px; }
+.pres-lineas .pres-linea-nombre strong{ font-size:21px; }
+.pres-lineas .pres-linea-tallos{ font-size:24px; }
+.pres-lineas .pres-lineas-lista .pres-chip{ font-size:14px; padding:3px 10px; white-space:nowrap; }
+.pres-lineas .pres-lineas-lista{ min-width:0; overflow:hidden; }
+.pres-lineas .pres-tarjetas{ margin-bottom:6px; gap:14px; }
+.pres-lineas .pres-tarjeta{ padding:12px 16px; }
+.pres-lineas .pres-tarjeta-numero{ font-size:38px; }
+.pres-lineas .pres-tarjeta-label{ font-size:12px; }
+.pres-lineas .pres-tarjeta-sub{ font-size:13px; }

@@ -1,7 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getDetalleRendimientoAsignaciones, getDetalleRendimientoTurnoActual } from '../lib/lineas';
 import { formatoFecha, etiquetaHora, etiquetaCortaLinea } from '../lib/clasificacionCalculos';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
+import { cargarDatosDevoluciones, cargarAtribuidor } from '../lib/devoluciones';
+import { usePeriodoDev } from '../lib/periodoDev';
+import { FiltroDevoluciones } from './devoluciones/PiezasDevLineas';
+import { periodos as periodosDev, devolucionesPorFormadora } from '../lib/devolucionesCalculos';
+import { fechaLocalISO } from '../lib/clasificacionCalculos';
+import { EstadoVacio } from './Estados';
 
 const fmt = n => (n ?? 0).toLocaleString('es-CO');
 const flecha = n => (n > 0 ? `▲ +${fmt(n)}` : n < 0 ? `▼ −${fmt(Math.abs(n))}` : '＝ igual');
@@ -23,6 +29,23 @@ export default function FormadoresLineasPanel({ metaHora = 470 }) {
   const [orden, setOrden] = useState('clasif');
   const [abierto, setAbierto] = useState(null);
   const [oculto, setOculto] = useState(false);
+  // Devoluciones (calidad) de la gente de cada formadora: semana y mes en curso. Si el módulo aún no está listo, simplemente no se muestra.
+  const [dev, setDev] = useState(null);
+  const [periodoDev, setPeriodoDev] = usePeriodoDev();
+  const cargarDev = useCallback(async () => {
+    try {
+      const d = await cargarDatosDevoluciones();
+      if (!d.dias.length) { setDev(null); return; }
+      const P = periodosDev(fechaLocalISO());
+      const desde = P.semana.desde < P.mes.desde ? P.semana.desde : P.mes.desde, hasta = P.semana.hasta > P.mes.hasta ? P.semana.hasta : P.mes.hasta;
+      const atr = await cargarAtribuidor(d.personas, desde, hasta);
+      // Solo cuenta lo que ya está CARGADO: si hoy es posterior al último día subido, el día de hoy no muestra números.
+      const ultima = d.meta?.ultima_fecha_registro || null;
+      setDev({ hoy: P.dia.desde, ultima, hoyCargado: !!ultima && P.dia.desde <= ultima, dia: devolucionesPorFormadora(d, d.personas, P.dia, atr.quien), sem: devolucionesPorFormadora(d, d.personas, P.semana, atr.quien), mes: devolucionesPorFormadora(d, d.personas, P.mes, atr.quien), razones: Object.fromEntries((d.meta.razones || []).map(r => [r.k, r.n])) });
+    } catch { setDev(null); }
+  }, []);
+  useEffect(() => { cargarDev(); }, [cargarDev]);
+  useRealtimeRefresco(['devoluciones_dia', 'devoluciones_meta', 'asignaciones_diarias'], cargarDev);
 
   async function cargar() {
     try {
@@ -70,6 +93,14 @@ export default function FormadoresLineasPanel({ metaHora = 470 }) {
   const topRend = [...grupos].sort((a, b) => b.rendPromedio - a.rendPromedio)[0];
   const escalaRend = metaHora * 1.3;
   const claveAbierto = g => `${fuenteActual}-${vista}-${g.id}`;
+  const verDev = vista === 'formadora' && !!dev;
+  // Solo se muestra el período elegido (Día por defecto): un día sin cargar NO muestra número; la semana y el mes van aparte.
+  const mapaDev = verDev ? (periodoDev === 'dia' ? dev.dia : periodoDev === 'semana' ? dev.sem : dev.mes) : null;
+  const sinCargarHoy = verDev && periodoDev === 'dia' && !dev.hoyCargado;
+  const valorDev = g => (!verDev || sinCargarHoy ? null : (mapaDev.get(g.id)?.total || 0));
+  const maxDev = verDev && !sinCargarHoy ? Math.max(1, ...[...mapaDev.entries()].filter(([k]) => k !== 'sin').map(([, v]) => v.total)) : 1;
+  const fcorta = iso => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : '');
+  const textoDev = periodoDev === 'dia' ? (sinCargarHoy ? 'hoy sin cargar' : 'hoy') : `${periodoDev === 'semana' ? 'semana' : 'mes'} · hasta ${fcorta(dev?.ultima)}`;
 
   return (
     <section className="panel fl2-panel">
@@ -94,6 +125,7 @@ export default function FormadoresLineasPanel({ metaHora = 470 }) {
             <button className={orden === 'clasif' ? 'activo' : ''} onClick={() => setOrden('clasif')}><i className="fa-solid fa-boxes-stacked"></i> Clasificación</button>
             <button className={orden === 'rend' ? 'activo' : ''} onClick={() => setOrden('rend')}><i className="fa-solid fa-gauge-high"></i> Rendimiento</button>
           </div>
+          {verDev && <FiltroDevoluciones periodo={periodoDev} onCambio={setPeriodoDev} className="dev-filtro-panel" />}
           {fuenteActual === 'historico' && historico?.fechasDisponibles?.length > 1 && (
             <select value={datos.fecha} onChange={e => { setFechaHist(e.target.value); setAbierto(null); }} style={{ maxWidth: 150 }}>
               {historico.fechasDisponibles.map(f => <option key={f} value={f}>{formatoFecha(f)}</option>)}
@@ -127,7 +159,7 @@ export default function FormadoresLineasPanel({ metaHora = 470 }) {
         </div>
       )}
 
-      {grupos.length === 0 && <div className="empty-state">Sin datos para mostrar.</div>}
+      {grupos.length === 0 && <EstadoVacio titulo="Sin datos para mostrar" />}
       <div className="fl2-lista">
         {grupos.map((g, i) => {
           const abiertoAhora = abierto === claveAbierto(g);
@@ -159,12 +191,25 @@ export default function FormadoresLineasPanel({ metaHora = 470 }) {
                     </span>
                     <b className={cumple ? 'fl-ok' : 'fl-mal'}>{g.rendPromedio.toLocaleString('es-CO', { minimumFractionDigits: 1 })}<small>/h · {Math.round((g.rendPromedio / metaHora) * 100)}%</small></b>
                   </span>
+                  {verDev && (
+                    <span className="fl2-barra-fila" title={sinCargarHoy ? `Hoy todavía no tiene devoluciones cargadas (último día cargado: ${fcorta(dev.ultima)}). Elige Semana o Mes para verlas aparte.` : 'Devoluciones de la gente de esta formadora (módulo de Devoluciones)'}>
+                      <em>Devoluciones</em>
+                      <span className="fl2-barra">{valorDev(g) != null && <i className="fl2-relleno fl2-relleno-dev" style={{ width: `${(valorDev(g) / maxDev) * 100}%` }}></i>}</span>
+                      <b className="fl-dev">{valorDev(g) == null ? '—' : fmt(valorDev(g))}<small> {textoDev}</small></b>
+                    </span>
+                  )}
                 </span>
                 <i className={`fa-solid fa-chevron-${abiertoAhora ? 'up' : 'down'} fl-flecha`}></i>
               </button>
 
               {abiertoAhora && (
                 <div className="fl2-detalle">
+                  {verDev && !sinCargarHoy && mapaDev.get(g.id) && (
+                    <p className="fl2-dev-detalle"><i className="fa-solid fa-rotate-left"></i> Devoluciones ({textoDev}): <b>{fmt(mapaDev.get(g.id).total)}</b>
+                      {mapaDev.get(g.id).top && <> · más: <b>{mapaDev.get(g.id).top.nombre}</b> <span className="dev-codigo">{mapaDev.get(g.id).top.codigo ?? '—'}</span> ({fmt(mapaDev.get(g.id).top.devol)})</>}
+                      {mapaDev.get(g.id).razonPrincipal && <> · razón principal: <b>{dev.razones[mapaDev.get(g.id).razonPrincipal[0]] || mapaDev.get(g.id).razonPrincipal[0]}</b> ({fmt(mapaDev.get(g.id).razonPrincipal[1])})</>}
+                    </p>
+                  )}
                   {g.clasif?.disponible && g.clasif.ultima && (
                     <div className="fl2-ultima-fila">
                       <span className="fl-horas-titulo">Hasta la última hora</span>

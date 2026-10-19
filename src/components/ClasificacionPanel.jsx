@@ -5,6 +5,7 @@ import { getComparacionClasificacion, getHistoricoClasificacion, limpiarClasific
 import { getContextoLineas } from '../lib/lineas';
 import { exportarElemento } from '../lib/exportarElemento';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
+import { EstadoVacio } from './Estados';
 
 const ClasificacionChart = lazy(() => import('./ClasificacionChart'));
 let limpiezaHecha = false;
@@ -67,17 +68,9 @@ export default function ClasificacionPanel({ fecha, refresco = 0 }) {
 
   if (datos.vacio) {
     return (
-      <div className="empty-state" style={{ padding: 30 }}>
-        <i className="fa-solid fa-boxes-stacked"></i>
-        {respaldo.length > 0 ? (
-          <>
-            <p style={{ marginBottom: 10 }}><strong>{formatoFecha(fecha)}</strong> ya no tiene el detalle hora a hora (el detalle por hora se conserva 4 días). Esto quedó en el histórico diario:</p>
-            {respaldo.map(r => <div key={r.linea}>Línea {r.linea}: <strong>{fmt(r.total_tallos)}</strong> tallos</div>)}
-          </>
-        ) : (
-          <p>Todavía no hay clasificación cargada para {formatoFecha(fecha)}.</p>
-        )}
-      </div>
+      <EstadoVacio icono="fa-boxes-stacked"
+        titulo={respaldo.length > 0 ? `${formatoFecha(fecha)} ya no tiene el detalle hora a hora` : `Todavía no hay clasificación cargada para ${formatoFecha(fecha)}`}
+        texto={respaldo.length > 0 ? `El detalle por hora se conserva 4 días. Esto quedó en el histórico diario: ${respaldo.map(r => `Línea ${r.linea}: ${fmt(r.total_tallos)} tallos`).join(' · ')}` : 'Sube el reporte de movimiento de clasificación para ver aquí la tabla hora a hora.'} />
     );
   }
 

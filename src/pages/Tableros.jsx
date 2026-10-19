@@ -59,7 +59,7 @@ export default function Tableros() {
           <div className="app-embed-spinner"></div>
           <span>Cargando Tableros…</span>
         </div>}
-      <iframe key={claveRecarga} src={URL_TABLEROS} title="Tableros" className="app-embed-iframe" onLoad={alCargar} />
+      <iframe key={claveRecarga} src={URL_TABLEROS} sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals" referrerPolicy="no-referrer" loading="lazy" title="Tableros" className="app-embed-iframe" onLoad={alCargar} />
     </div>;
   return <>
       <PageHeader title="Tableros" subtitle="Tableros conectados de toda la operación, integrados dentro de Torremolinos Control." />
