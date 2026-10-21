@@ -664,3 +664,177 @@ do $$ begin
   end if;
 end $$;
 NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 25. El FORMADOR ve lo mismo que el SUPERVISOR, pero SOLO PARA VISUALIZAR.
+--     - Escribir/cargar/borrar ya lo impide puede_editar() (solo Administrador, Ingeniero, Profesional y Digitador).
+--     - Leer los módulos ya está abierto a cualquier usuario con sesión.
+--     - Lo único que faltaba: que el Formador pueda leer la contraseña de los Tableros (igual que el Supervisor).
+--       La de Gerencia sigue siendo solo para Administrador e Ingeniero.
+-- =====================================================================
+drop policy if exists "notas_leer_roles" on notas_modulo;
+create policy "notas_leer_roles" on notas_modulo for select using (
+  exists (
+    select 1 from perfiles p
+    where p.id = auth.uid() and p.activo and (
+      (notas_modulo.clave = 'tableros_clave' and p.rol in ('administrador', 'ingeniero', 'supervisor', 'formador'))
+      or (notas_modulo.clave = 'gerencia_clave' and p.rol in ('administrador', 'ingeniero'))
+    )
+  )
+);
+NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 26. DEVOLUCIONES: los "mínimos de días" (lo que antes se guardaba solo en cada navegador) ahora se guardan EN LA BASE y quedan
+--     como predeterminados para todos. Todos los usuarios con sesión los LEEN; solo el ADMINISTRADOR los puede cambiar.
+-- =====================================================================
+create table if not exists devoluciones_ajustes (
+  id             smallint primary key default 1 check (id = 1),
+  minimos        jsonb not null default '{"semana": 5, "mes": 22, "historico": 25}'::jsonb,
+  actualizado_en timestamptz not null default now()
+);
+insert into devoluciones_ajustes (id) values (1) on conflict (id) do nothing;
+alter table devoluciones_ajustes enable row level security;
+do $$ declare pol record; begin
+  for pol in select policyname from pg_policies where schemaname = 'public' and tablename = 'devoluciones_ajustes' loop
+    execute format('drop policy %I on public.devoluciones_ajustes', pol.policyname);
+  end loop;
+end $$;
+create policy "leer_devoluciones_ajustes" on devoluciones_ajustes for select to authenticated using (true);
+create policy "insertar_devoluciones_ajustes" on devoluciones_ajustes for insert to authenticated with check (es_administrador());
+create policy "actualizar_devoluciones_ajustes" on devoluciones_ajustes for update to authenticated using (es_administrador()) with check (es_administrador());
+create policy "borrar_devoluciones_ajustes" on devoluciones_ajustes for delete to authenticated using (es_administrador());
+revoke all on devoluciones_ajustes from anon;
+NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 27. DEVOLUCIONES: la carga SOLO ESCRIBE LO NUEVO O LO QUE CAMBIÓ (antes reescribía personas y el último día completos en cada carga,
+--     y cada reescritura deja versiones muertas de las filas que ocupan espacio en la base).
+--       · Personas: solo si es nueva o cambió de nombre/código.
+--       · Registro: se borra únicamente lo que YA NO está en el archivo (desde el último día guardado) y se escribe solo lo nuevo o distinto.
+--       · Asistencia: solo los meses cuyos días cambiaron.
+--     Si el archivo no trae nada nuevo, no se escribe NADA (la respuesta trae todo en cero).
+-- =====================================================================
+create or replace function devoluciones_importar(
+  p_personas jsonb, p_dias jsonb, p_asistencia jsonb, p_razones jsonb,
+  p_desde_reg date, p_desde_asis date, p_reemplazar boolean default false
+) returns jsonb
+language plpgsql security invoker set search_path = public, pg_temp
+as $$
+declare n_dias int := 0; n_borrados int := 0; n_asis int := 0; n_pers int := 0; max_reg date; max_asis date;
+begin
+  if not puede_editar() then raise exception 'No tienes permiso para cargar devoluciones.' using errcode = '42501'; end if;
+
+  if p_reemplazar then
+    delete from devoluciones_dia where true;
+    delete from devoluciones_asistencia where true;
+    p_desde_reg := null; p_desde_asis := null;
+  end if;
+
+  -- Personas: solo la que es nueva o cambió
+  insert into devoluciones_personas (colaborador_id, nombre, codigo)
+  select (x->>'i')::bigint, left(x->>'n', 160), nullif(x->>'c', '')::int from jsonb_array_elements(coalesce(p_personas, '[]'::jsonb)) x
+  on conflict (colaborador_id) do update set nombre = excluded.nombre, codigo = coalesce(excluded.codigo, devoluciones_personas.codigo)
+  where (devoluciones_personas.nombre, devoluciones_personas.codigo) is distinct from (excluded.nombre, coalesce(excluded.codigo, devoluciones_personas.codigo));
+  get diagnostics n_pers = row_count;
+
+  -- Registro: se borra lo que ya no está en el archivo (desde el último día guardado) …
+  if p_desde_reg is not null then
+    delete from devoluciones_dia d
+    where d.fecha >= p_desde_reg
+      and not exists (select 1 from jsonb_array_elements(coalesce(p_dias, '[]'::jsonb)) x where (x->>'f')::date = d.fecha and (x->>'i')::bigint = d.colaborador_id);
+    get diagnostics n_borrados = row_count;
+  end if;
+  -- … y se escribe solo lo nuevo o distinto
+  insert into devoluciones_dia (fecha, colaborador_id, codigo, razones, total, filas)
+  select (x->>'f')::date, (x->>'i')::bigint, nullif(x->>'c', '')::int, coalesce(x->'r', '{}'::jsonb), (x->>'t')::int, coalesce((x->>'n')::smallint, 1)
+  from jsonb_array_elements(coalesce(p_dias, '[]'::jsonb)) x
+  on conflict (fecha, colaborador_id) do update set codigo = excluded.codigo, razones = excluded.razones, total = excluded.total, filas = excluded.filas
+  where (devoluciones_dia.codigo, devoluciones_dia.razones, devoluciones_dia.total, devoluciones_dia.filas) is distinct from (excluded.codigo, excluded.razones, excluded.total, excluded.filas);
+  get diagnostics n_dias = row_count;
+
+  -- Asistencia: los meses anteriores al de "desde" no se tocan; en el mes de "desde" se conservan los días anteriores a esa fecha; solo se escribe si cambió
+  insert into devoluciones_asistencia (colaborador_id, mes, dias)
+  select (x->>'i')::bigint, (x->>'m')::date, (x->>'d')::int from jsonb_array_elements(coalesce(p_asistencia, '[]'::jsonb)) x
+  on conflict (colaborador_id, mes) do update set dias = case
+      when p_desde_asis is not null and excluded.mes = date_trunc('month', p_desde_asis)::date
+        then (devoluciones_asistencia.dias & ((1 << (extract(day from p_desde_asis)::int - 1)) - 1)) | excluded.dias
+      else excluded.dias end
+  where devoluciones_asistencia.dias is distinct from (case
+      when p_desde_asis is not null and excluded.mes = date_trunc('month', p_desde_asis)::date
+        then (devoluciones_asistencia.dias & ((1 << (extract(day from p_desde_asis)::int - 1)) - 1)) | excluded.dias
+      else excluded.dias end);
+  get diagnostics n_asis = row_count;
+
+  select max(fecha) into max_reg from devoluciones_dia;
+  select max(mes + floor(log(2::numeric, dias::numeric))::int) into max_asis from devoluciones_asistencia where dias > 0;
+  if n_dias + n_borrados + n_asis + n_pers > 0 or jsonb_array_length(coalesce(p_razones, '[]'::jsonb)) > 0 then
+    update devoluciones_meta set
+      ultima_fecha_registro = max_reg,
+      ultima_fecha_asistencia = max_asis,
+      razones = case when jsonb_array_length(coalesce(p_razones, '[]'::jsonb)) > 0 then p_razones else razones end,
+      actualizado_en = now()
+    where id = 1
+      and (ultima_fecha_registro, ultima_fecha_asistencia, razones) is distinct from (max_reg, max_asis, case when jsonb_array_length(coalesce(p_razones, '[]'::jsonb)) > 0 then p_razones else razones end);
+  end if;
+  return jsonb_build_object('dias', n_dias, 'borrados', n_borrados, 'asistencia', n_asis, 'personas', n_pers);
+end $$;
+revoke all on function devoluciones_importar(jsonb, jsonb, jsonb, jsonb, date, date, boolean) from public, anon;
+grant execute on function devoluciones_importar(jsonb, jsonb, jsonb, jsonb, date, date, boolean) to authenticated;
+NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 28. RESPALDO GLOBAL: vaciar los datos OPERATIVOS de la base (lo que se acumula día a día y la llena).
+--     · SOLO el Administrador puede ejecutarla, y exige la confirmación literal (la app además pide transcribir una frase y
+--       haber descargado antes el respaldo en Excel).
+--     · Se CONSERVAN: usuarios y roles, configuración, personas, líneas, formadoras, el código de las personas de devoluciones,
+--       los mínimos de devoluciones y las notas/contraseñas. Todo lo demás se vacía con TRUNCATE (devuelve el espacio de inmediato).
+--     · Sin CASCADE a propósito: si alguna tabla que se conserva dependiera de una que se vacía, la función se detiene en vez de borrarla.
+--     · Deja un registro (quién y cuándo) en respaldo_eventos, que no se borra nunca.
+-- =====================================================================
+create table if not exists respaldo_eventos (
+  id             bigint generated always as identity primary key,
+  fecha          timestamptz not null default now(),
+  usuario        uuid,
+  usuario_nombre text,
+  accion         text not null,
+  detalle        jsonb not null default '{}'::jsonb
+);
+alter table respaldo_eventos enable row level security;
+drop policy if exists "leer_respaldo_eventos" on respaldo_eventos;
+create policy "leer_respaldo_eventos" on respaldo_eventos for select to authenticated using (es_administrador());
+revoke all on respaldo_eventos from anon;
+
+create or replace function vaciar_datos_operativos(p_confirmacion text)
+returns jsonb
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  tablas text[] := array['rendimiento_historico', 'historico_bloques', 'rendimiento_actual', 'metas_diarias', 'descansos_diarios',
+    'clasificacion_cargas', 'clasificacion_hora', 'clasificacion_historico', 'devoluciones_dia', 'devoluciones_asistencia',
+    'asignaciones_diarias', 'tablero_formadoras', 'lineas_dia', 'formadora_linea', 'metas_linea_mes'];
+  t text; n bigint; conteos jsonb := '{}'::jsonb; total bigint := 0; existentes text[] := '{}'; quien text;
+begin
+  if not es_administrador() then raise exception 'Solo un administrador puede vaciar la base de datos.' using errcode = '42501'; end if;
+  if p_confirmacion is distinct from 'VACIAR_DATOS_OPERATIVOS' then raise exception 'Confirmación inválida: no se eliminó nada.' using errcode = '22023'; end if;
+
+  foreach t in array tablas loop
+    if to_regclass('public.' || t) is null then continue; end if;          -- una tabla que aún no existe se omite
+    execute format('select count(*) from public.%I', t) into n;
+    conteos := conteos || jsonb_build_object(t, n); total := total + n; existentes := existentes || t;
+  end loop;
+
+  if array_length(existentes, 1) is not null then
+    execute 'truncate table ' || (select string_agg(format('public.%I', x), ', ') from unnest(existentes) x) || ' restart identity';
+  end if;
+  if to_regclass('public.devoluciones_meta') is not null then
+    update devoluciones_meta set ultima_fecha_registro = null, ultima_fecha_asistencia = null, actualizado_en = now() where id = 1;
+  end if;
+
+  select nombre into quien from perfiles where id = auth.uid();
+  insert into respaldo_eventos (usuario, usuario_nombre, accion, detalle) values (auth.uid(), quien, 'vaciar_datos_operativos', jsonb_build_object('filas', total, 'tablas', conteos));
+  return jsonb_build_object('filas', total, 'tablas', conteos);
+end $$;
+revoke all on function vaciar_datos_operativos(text) from public, anon;
+grant execute on function vaciar_datos_operativos(text) to authenticated;
+NOTIFY pgrst, 'reload schema';

@@ -1,5 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
+import { useSesion } from '../lib/useSesion';
+import { puedeEditar } from '../lib/roles';
 import PageHeader from '../components/PageHeader';
 import { getConfig, getHistorico, getActual, getMetaDia, getTendenciaHistorico, getUltimaFechaHistorico, getDescansosDiariosRango } from '../lib/db';
 import { agregarTurnoActualPorPersona } from '../lib/calculos';
@@ -34,6 +36,7 @@ function colorProgreso(pct) {
   return '#EF4444';
 }
 export default function Dashboard() {
+  const { sesion } = useSesion();                // quien solo visualiza (Supervisor, Formador) no ve el botón de subir
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
@@ -126,9 +129,9 @@ export default function Dashboard() {
         <button className="btn-secondary" onClick={() => { entrarPantallaCompleta(); setPresentando(true); }}>
           <i className="fa-solid fa-expand"></i> Presentar
         </button>
-        <Link to="/rendimientos" className="btn-primary">
+        {puedeEditar(sesion?.rol) && <Link to="/rendimientos" className="btn-primary">
           <i className="fa-solid fa-upload"></i> Subir Reporte Boncheo
-        </Link>
+        </Link>}
       </PageHeader>
 
       <div className="page">

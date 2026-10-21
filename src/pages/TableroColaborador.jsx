@@ -26,7 +26,11 @@ export default function TableroColaborador() {
   const [personas, setPersonas] = useState([]);
   const [ref, setRef] = useState('');
   const [tipo, setTipo] = useState(() => (leer('tm_colab_tipo', 'mes') in TIPOS_PERIODO ? leer('tm_colab_tipo', 'mes') : 'mes'));
-  const [pesos, setPesos] = useState(() => ({ ...PESOS_DEFECTO, ...leer('tm_colab_pesos', {}) }));
+  const [pesos, setPesos] = useState(() => {
+    const g = leer('tm_colab_pesos', {});
+    if (g.constancia != null && g.presentismo == null) g.presentismo = g.constancia;       // el peso que alguien ya había puesto a "constancia" pasa a "presentismo"
+    return { ...PESOS_DEFECTO, ...g };
+  });
   const [t, setT] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -79,7 +83,7 @@ export default function TableroColaborador() {
 
   return (
     <>
-      <PageHeader title="Tablero Integrado del Colaborador" subtitle="TIC · productividad, calidad y constancia de una persona, juntas en un solo lugar">
+      <PageHeader title="Tablero Integrado del Colaborador" subtitle="TIC · productividad, calidad y presentismo de una persona, juntas en un solo lugar">
         {persona && t?.devolucion.enModulo && <Link className="btn-secondary" to={`/devoluciones?buscar=${encodeURIComponent(t.devolucion.codigoDev ?? persona.nombre)}`}><i className="fa-solid fa-rotate-left"></i> Sus devoluciones</Link>}
       </PageHeader>
       <div className="page colab-pagina">
@@ -87,9 +91,9 @@ export default function TableroColaborador() {
           <div className="tic-sigla" aria-hidden="true">TIC</div>
           <div>
             <h2>Tablero <em>Integrado</em> del Colaborador</h2>
-            <p>Productividad, calidad y constancia de una persona, juntas en un solo lugar.</p>
+            <p>Productividad, calidad y presentismo de una persona, juntas en un solo lugar.</p>
           </div>
-          <div className="tic-claves" aria-hidden="true"><span>Rendimiento</span><span>Devoluciones</span><span>Constancia</span><span>Equipo</span></div>
+          <div className="tic-claves" aria-hidden="true"><span>Rendimiento</span><span>Devoluciones</span><span>Presentismo</span><span>Equipo</span></div>
         </section>
         <div className="colab-barra">
           <SelectorColab personas={personas} elegido={persona} onElegir={elegir} enfocar={!idParam} />
@@ -103,11 +107,11 @@ export default function TableroColaborador() {
 
         {!persona && !error && (
           <div className="colab-inicio">
-            <EstadoVacio icono="fa-id-card-clip" titulo="Elige a un colaborador" texto="Busca por código o por nombre. El tablero junta su rendimiento, sus devoluciones, su constancia y cómo le va frente a su equipo." />
+            <EstadoVacio icono="fa-id-card-clip" titulo="Elige a un colaborador" texto="Busca por código o por nombre. El tablero junta su rendimiento, sus devoluciones, su presentismo y cómo le va frente a su equipo." />
             {(recientes.length > 0 || sugeridos.length > 0) && (
               <div className="colab-atajos">
-                {recientes.length > 0 && <div><small>Consultados recientemente</small>{recientes.map(r => <button key={r.id} className="colab-atajo" onClick={() => elegir(r)}><span className="dev-codigo">{r.mesa ?? '—'}</span>{r.nombre}</button>)}</div>}
-                {sugeridos.length > 0 && <div><small>Mejor rendimiento del período</small>{sugeridos.map(s => { const p = personas.find(x => x.id === s.id) || { id: s.id, nombre: s.nombre, mesa: null }; return <button key={s.id} className="colab-atajo" onClick={() => elegir(p)}><b>{s.rend}</b> t/h · {s.nombre}</button>; })}</div>}
+                {recientes.length > 0 && <div><small>Consultados recientemente</small>{recientes.map(r => <button key={r.id} className="colab-atajo" onClick={() => elegir(r)}><span className="dev-codigo">{r.codigo ?? r.mesa ?? '—'}</span>{r.nombre}</button>)}</div>}
+                {sugeridos.length > 0 && <div><small>Mejor rendimiento del período</small>{sugeridos.map(s => { const p = personas.find(x => x.id === s.id) || { id: s.id, nombre: s.nombre, mesa: null, codigo: null }; return <button key={s.id} className="colab-atajo" onClick={() => elegir(p)}><b>{s.rend}</b> t/h · {s.nombre}</button>; })}</div>}
               </div>
             )}
           </div>
@@ -123,7 +127,7 @@ export default function TableroColaborador() {
                 <div className="colab-id-info">
                   <h2>{persona.nombre}</h2>
                   <div className="colab-chips">
-                    <span className="dev-codigo codigo-copiable" title="Clic para copiar el código" data-copiar={persona.mesa ?? ''}>Código {persona.mesa ?? '—'}</span>
+                    <span className="dev-codigo codigo-copiable" title="Clic para copiar el código" data-copiar={persona.codigo ?? persona.mesa ?? ''}>Código {persona.codigo ?? persona.mesa ?? '—'}</span>
                     {persona.rol && <span className="colab-chip"><i className="fa-solid fa-user-tag"></i> {persona.rol}</span>}
                     {t.asignacion ? <Link className="colab-chip colab-chip-enlace" to="/lineas" title={`Asignación del ${t.asignacion.fecha.slice(8)}/${t.asignacion.fecha.slice(5, 7)}`}><i className="fa-solid fa-people-group"></i> {t.asignacion.formadora}{t.asignacion.linea ? ` · ${t.asignacion.linea}` : ''}</Link> : <span className="colab-chip colab-chip-gris">Sin formadora asignada</span>}
                     <span className={`colab-chip ${t.devolucion.enModulo ? '' : 'colab-chip-gris'}`}><i className="fa-solid fa-rotate-left"></i> {t.devolucion.enModulo ? `En Devoluciones (código ${t.devolucion.codigoDev ?? '—'})` : 'No está en Devoluciones'}</span>

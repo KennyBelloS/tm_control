@@ -5,13 +5,16 @@
  */
 import { supabase } from './supabaseClient';
 import { getHistorico, getRankingRango, getConfig, getActual, listarPersonasModulo } from './db';
-import { cargarDatosDevoluciones, emparejarConDevoluciones } from './devoluciones';
+import { cargarDatosDevoluciones, emparejarConDevoluciones, listarPersonasDevoluciones } from './devoluciones';
 import { estadoPeriodo, resumenPeriodo, asistioEl, diasEnRango, primerDiaMes, popcount } from './devolucionesCalculos';
 import * as K from './colaboradorCalculos';
 
 export async function listarColaboradores() {
-  const todas = await listarPersonasModulo();
-  return todas.filter(p => p.activo !== false).map(p => ({ id: p.id, nombre: p.nombre, mesa: p.mesa ?? null, rol: p.rol || null, activo: p.activo !== false }));
+  const activas = (await listarPersonasModulo()).filter(p => p.activo !== false);
+  // El CÓDIGO corto de cada persona (ej. 15) sale del módulo de Devoluciones; si la base tiene la columna "mesa", también se usa. No es el ID.
+  let codigos = new Map();
+  try { codigos = emparejarConDevoluciones(activas.map(p => ({ id: p.id, nombre: p.nombre, mesa: p.mesa ?? null })), await listarPersonasDevoluciones()); } catch { /* sin módulo de devoluciones: solo "mesa" */ }
+  return activas.map(p => ({ id: p.id, nombre: p.nombre, mesa: p.mesa ?? null, codigo: codigos.get(p.id)?.codigo ?? p.mesa ?? null, rol: p.rol || null, activo: true }));
 }
 
 /** Asignación más reciente de la persona (formadora y línea) y quiénes más tenía esa formadora ese día. */
@@ -31,7 +34,7 @@ async function asignacionReciente(persona, hasta) {
 function devolucionesDe(persona, datosDev, P, equipo) {
   if (!datosDev?.dias?.length) return null;
   const devPersonas = [...datosDev.personas.values()];
-  const mapa = emparejarConDevoluciones([{ id: persona.id, nombre: persona.nombre, mesa: persona.mesa }, ...(equipo || [])], devPersonas);
+  const mapa = emparejarConDevoluciones([{ id: persona.id, nombre: persona.nombre, mesa: persona.codigo ?? persona.mesa }, ...(equipo || [])], devPersonas);
   const yo = mapa.get(persona.id);
   const ultima = datosDev.meta?.ultima_fecha_registro || null;
   // referencia GENERAL: devoluciones por día trabajado de toda la finca en el período
@@ -48,7 +51,10 @@ function devolucionesDe(persona, datosDev, P, equipo) {
   const filas = datosDev.dias.filter(d => d.id === yo.id);
   const dias = new Map(filas.map(d => [d.fecha, { total: d.total, razones: d.razones }]));
   const mascaras = new Map(datosDev.asistencia.filter(a => a.id === yo.id).map(a => [a.mes, a.dias]));
-  return { persona: yo, ultima, refGeneral, refEquipo, dias, asistio: f => asistioEl(mascaras.get(primerDiaMes(f)) ?? 0, f), razonesNombre: Object.fromEntries((datosDev.meta?.razones || []).map(r => [r.k, r.n])) };
+  // Días en que la finca TRABAJÓ = días en que al menos una persona tiene asistencia en el registro de devoluciones.
+  const finca = new Map();
+  for (const a of datosDev.asistencia) finca.set(a.mes, (finca.get(a.mes) || 0) | a.dias);
+  return { persona: yo, ultima, refGeneral, refEquipo, dias, asistio: f => asistioEl(mascaras.get(primerDiaMes(f)) ?? 0, f), laborado: f => asistioEl(finca.get(primerDiaMes(f)) ?? 0, f), razonesNombre: Object.fromEntries((datosDev.meta?.razones || []).map(r => [r.k, r.n])) };
 }
 
 /**
@@ -93,7 +99,7 @@ export async function cargarTableroColaborador({ persona, ref, tipo = 'mes', pes
   };
 
   const calidad = K.calidadScore(resumen.devolPorDia, dev?.refGeneral);
-  const indice = K.indiceIntegral({ pct: resumen.diasTrabajados ? resumen.pct : null, calidad, constancia: resumen.constancia }, pesos);
+  const indice = K.indiceIntegral({ pct: resumen.diasTrabajados ? resumen.pct : null, calidad, presentismo: resumen.presentismo }, pesos);
   const miTurno = (actual || []).filter(r => r.colaborador_id === persona.id);
   const turno = miTurno.length ? (() => {
     const minutos = miTurno.reduce((s, r) => s + (r.tiempo_trabajado_min || 0), 0), tallos = miTurno.reduce((s, r) => s + (r.total_tallos || 0), 0);
@@ -105,7 +111,7 @@ export async function cargarTableroColaborador({ persona, ref, tipo = 'mes', pes
     asignacion: asignacion ? { formadora: asignacion.formadora, linea: asignacion.linea, fecha: asignacion.fecha, equipo: asignacion.equipo.length } : null,
     devolucion: { enModulo: !!devUsable, ultima: dev?.ultima ?? null, codigoDev: dev?.persona?.codigo ?? null, razonesNombre: dev?.razonesNombre || {} },
     calidad, indice, turno,
-    componentes: { pct: resumen.diasTrabajados ? resumen.pct : null, calidad, constancia: resumen.constancia },      // para recalcular el índice si cambian los pesos, sin volver a cargar
+    componentes: { pct: resumen.diasTrabajados ? resumen.pct : null, calidad, presentismo: resumen.presentismo },      // para recalcular el índice si cambian los pesos, sin volver a cargar
     lecturas: K.lecturas({ resumen, metaHora, ranking: rank, previo: previo.diasTrabajados ? previo : null, refDev: dev?.refGeneral, razonesNombre: dev?.razonesNombre })
   };
 }

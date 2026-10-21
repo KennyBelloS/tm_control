@@ -1,0 +1,19 @@
+/* Vista de devoluciones en Presentar. Las medidas son del LIENZO (que se escala a cualquier pantalla). */
+.pres-dev{ display:flex; flex-direction:column; gap:12px; height:100%; }
+.pres-dev-cols{ flex:1; min-height:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.pres-dev-col{ display:flex; flex-direction:column; gap:9px; padding:16px 20px 14px; border-radius:22px; background:#fff; box-shadow:0 10px 30px -14px rgba(0,0,0,.25); border-top:6px solid var(--c); }
+.pres-dev-col.mas{ --c:#C0392B; background:linear-gradient(180deg,#FFF5F4,#fff 38%); } .pres-dev-col.menos{ --c:#1E8449; background:linear-gradient(180deg,#F1FAF4,#fff 38%); }
+.pres-dev-col header{ display:flex; align-items:center; gap:12px; margin-bottom:4px; } .pres-dev-col header > i{ width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:18px; color:#fff; background:var(--c); }
+.pres-dev-col header b{ display:block; font-size:22px; font-weight:900; color:var(--c); letter-spacing:-.01em; } .pres-dev-col header small{ display:block; font-size:12px; font-weight:700; color:#6B7C71; text-transform:uppercase; letter-spacing:.06em; }
+.pres-dev-fila{ display:flex; align-items:center; gap:12px; padding:7px 4px; border-bottom:1px solid #EEF1EE; animation:pres-dev-entra .55s cubic-bezier(.34,1.3,.64,1) backwards; } .pres-dev-fila:last-of-type{ border-bottom:none; }
+.pres-dev-puesto{ flex-shrink:0; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:900; color:#fff; background:var(--c); }
+.pres-dev-codigo{ flex-shrink:0; min-width:118px; display:flex; align-items:baseline; gap:7px; font-size:34px; font-weight:900; letter-spacing:-.03em; color:#1A2A20; font-variant-numeric:tabular-nums; } .pres-dev-codigo small{ font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:#8A9A90; }
+.pres-dev-barra{ flex:1; height:16px; border-radius:10px; background:#F3E3E1; overflow:hidden; } .pres-dev-barra i{ display:block; height:100%; border-radius:10px; background:linear-gradient(90deg,#E0695C,#C0392B); animation:pres-dev-crece .9s cubic-bezier(.22,1,.36,1) backwards; }
+.pres-dev-num{ flex-shrink:0; min-width:48px; text-align:right; font-size:30px; font-weight:900; letter-spacing:-.03em; color:#C0392B; font-variant-numeric:tabular-nums; } .pres-dev-num.ok{ color:#1E8449; }
+.pres-dev-nombre{ flex:1; min-width:0; display:flex; flex-direction:column; } .pres-dev-nombre b{ font-size:21px; font-weight:800; color:#1A2A20; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .pres-dev-nombre small{ font-size:13px; font-weight:600; color:#7A8A80; }
+.pres-dev-vacio{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; text-align:center; font-size:20px; font-weight:700; color:#6B7C71; } .pres-dev-vacio span{ font-size:44px; }
+.pres-dev-empate{ margin:2px 0 0; font-size:13px; font-weight:700; color:#5E7A68; text-align:center; }
+.pres-dev-pie{ margin:0; text-align:center; font-size:16px; color:#5E6F65; } .pres-dev-pie b{ color:#1A2A20; font-size:19px; }
+@keyframes pres-dev-entra{ from{ opacity:0; transform:translateX(-16px); } to{ opacity:1; transform:none; } } @keyframes pres-dev-crece{ from{ width:0 !important; } }
+html[data-tema="oscuro"] .pres-dev-col{ background:#16221C !important; } html[data-tema="oscuro"] .pres-dev-codigo, html[data-tema="oscuro"] .pres-dev-nombre b, html[data-tema="oscuro"] .pres-dev-pie b{ color:#F1F4F2; } html[data-tema="oscuro"] .pres-dev-barra{ background:#2A1E1D; } html[data-tema="oscuro"] .pres-dev-fila{ border-color:#243229; }
+@media (prefers-reduced-motion:reduce){ .pres-dev-fila, .pres-dev-barra i{ animation:none; } }

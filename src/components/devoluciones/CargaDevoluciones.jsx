@@ -1,3 +1,4 @@
+import { iniciarTarea } from '../../lib/actualizacionApp';
 import { useRef, useState } from 'react';
 import { validarArchivoExcel } from '../../lib/seguridad';
 import { parsearDevoluciones, prepararCarga } from '../../lib/devolucionesExcel';
@@ -42,13 +43,17 @@ export default function CargaDevoluciones({ meta, hayDatos, puedeCargar, onGuard
   }
   async function guardar(reemplazar = false) {
     setFase('guardando'); setError('');
+    const liberar = iniciarTarea();                       // mientras guarda, la app no se actualiza sola
     try {
       const c = reemplazar ? prepararCarga(parseado, meta, { reemplazar: true }) : carga;
-      await importarDevoluciones(c);
-      setOk(reemplazar ? `Se recargó todo desde cero: ${fmt(c.dias.length)} registros.` : `Listo: ${fmt(c.dias.length)} registros guardados${c.resumen.hasta ? `, datos hasta el ${fFecha(c.resumen.hasta)}` : ''}.`);
+      const r = await importarDevoluciones(c);
+      const cambios = r && typeof r === 'object' ? (r.dias || 0) + (r.borrados || 0) + (r.asistencia || 0) + (r.personas || 0) : null;     // lo que de verdad se escribió
+      setOk(reemplazar ? `Se recargó todo desde cero: ${fmt(c.dias.length)} registros.`
+        : cambios === 0 ? 'Sin cambios: el archivo no trae información nueva, así que no se escribió nada en la base de datos.'
+        : `Listo: ${fmt(r?.dias ?? c.dias.length)} registro${(r?.dias ?? c.dias.length) === 1 ? '' : 's'} nuevo${(r?.dias ?? c.dias.length) === 1 ? '' : 's'} o con cambios${r?.borrados ? `, ${fmt(r.borrados)} eliminado${r.borrados === 1 ? '' : 's'} (ya no estaban en el archivo)` : ''}${c.resumen.hasta ? `, datos hasta el ${fFecha(c.resumen.hasta)}` : ''}. Solo se escribió lo nuevo o distinto.`);
       setParseado(null); setCarga(null); setFase('inactiva');
       await onGuardado?.();
-    } catch (e) { setError(e.message || 'No se pudo guardar.'); setFase('vista'); }
+    } catch (e) { setError(e.message || 'No se pudo guardar.'); setFase('vista'); } finally { liberar(); }
   }
   const cancelar = () => { setParseado(null); setCarga(null); setFase('inactiva'); setError(''); };
   const r = carga?.resumen;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
+import VaciarBaseDatos from '../components/auditoria/VaciarBaseDatos';
 import { getConfig, getAlmacenamientoUsadoMB, getHistoricoCompleto, getActualCompleto, getPersonasCompleto, getMetasDiariasCompleto, limpiarBloquesAntiguos } from '../lib/db';
 export default function Auditoria() {
   const [cargando, setCargando] = useState(true);
@@ -30,6 +31,7 @@ export default function Auditoria() {
       activo = false;
     };
   }, []);
+  const recargarUso = async () => { try { setUsoMB(await getAlmacenamientoUsadoMB()); } catch { /* se mantiene lo anterior */ } };
   const porcentaje = limiteMB > 0 ? Math.round(usoMB / limiteMB * 1000) / 10 : 0;
   const critico = porcentaje >= 90;
   const advertencia = porcentaje >= 80 && porcentaje < 90;
@@ -128,6 +130,8 @@ export default function Auditoria() {
               </p>
             </>}
         </section>
+
+        <VaciarBaseDatos porcentaje={porcentaje} usoMB={usoMB} limiteMB={limiteMB} onVaciada={recargarUso} />
 
         <section className="panel">
           <div className="panel-header">

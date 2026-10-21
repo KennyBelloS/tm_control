@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+import { iniciarActualizacionAutomatica } from './lib/actualizacionApp';
 import '@fontsource-variable/inter';                      // tipografía propia (se sirve desde la app)
 import '@fortawesome/fontawesome-free/css/all.min.css';   // íconos servidos desde la propia app (sin depender de un sitio externo)
 import './index.css';
@@ -11,6 +12,7 @@ import './styles/devoluciones.css';          // módulo de devoluciones
 import './styles/colaborador.css';           // tablero integrado del colaborador
 import './styles/flor-meta.css';             // la flor de la meta
 import './styles/presentacion-festiva.css';  // Presentar festivo, hitos
+import './styles/presentacion-devoluciones.css';   // devoluciones en Presentar
 import './styles/interactividad.css';        // avisos, tooltips de gráficos, filas marcables
 import './styles/menu-adaptable.css';          // menú lateral: todos los módulos a la vista con cualquier zoom
 import './styles/encabezado.css';            // encabezado en una fila + índice lateral        // navegación, tablas, atajos, indicador en vivo (usa los mismos colores)
@@ -18,6 +20,8 @@ import './styles/tema-oscuro.generated.css';   // equivalentes oscuros de los co
 import './styles/tema-oscuro.css';             // tokens y ajustes del tema oscuro
 import './styles/fiestas.generated.css';     // paletas de las festividades (generado)
 import './styles/efectos.css';               // capa ambiental, 3D, saludo, panel y adornos festivos
+import './styles/auditoria-respaldo.css';    // respaldo global y vaciado de la base de datos
+import './styles/movil-app.css';             // áreas seguras del iPhone, app instalada, notificaciones y login en celular
 import ErrorBoundary from './components/ErrorBoundary';
 import { aplicarAjustesIniciales } from './lib/ajustesUI';
 import { aplicarAjustesEfectos } from './lib/efectos';
@@ -30,3 +34,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(<React.StrictMode>
       </BrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>);
+
+iniciarActualizacionAutomatica();                 // la app instalada se actualiza sola cuando hay una versión nueva

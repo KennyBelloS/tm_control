@@ -4,6 +4,7 @@
  */
 import { supabase } from './supabaseClient';
 import { armarPayload } from './devolucionesExcel';
+import { minimosValidos } from './devolucionesAnalisis';
 import { normalizarNombre, sumarDias, devolucionesPorFormadora, periodos, inicioSemana, finSemana, primerDiaMes, ultimoDiaMes } from './devolucionesCalculos';
 
 /** Supabase entrega máximo 1.000 filas por consulta: se pide por páginas hasta traer todo. */
@@ -20,19 +21,36 @@ async function paginar(construir, tam = 1000) {
 
 export const esErrorSinTablas = e => ['42P01', 'PGRST205', 'PGRST202', '42883'].includes(e?.code) || /devoluciones_/.test(e?.message || '') && /(does not exist|schema cache|Could not find)/i.test(e?.message || '');
 
+/** Los mínimos de días elegidos por el administrador (tabla devoluciones_ajustes). null = aún no hay; 'sin-tabla' = falta ejecutar la actualización de la base. */
+export async function leerAjustesDevoluciones() {
+  const { data, error } = await supabase.from('devoluciones_ajustes').select('minimos, actualizado_en').eq('id', 1).maybeSingle();
+  if (error) return 'sin-tabla';
+  return data ? { minimos: minimosValidos(data.minimos), actualizadoEn: data.actualizado_en } : null;
+}
+/** Guarda los mínimos como PREDETERMINADOS para todos. Solo lo permite la base a los administradores. */
+export async function guardarAjustesDevoluciones(minimos) {
+  const m = minimosValidos(minimos);
+  const { error } = await supabase.from('devoluciones_ajustes').upsert({ id: 1, minimos: m, actualizado_en: new Date().toISOString() }, { onConflict: 'id' });
+  if (error) throw error;
+  return m;
+}
+
 export async function cargarDatosDevoluciones() {
-  const [dias, asistencia, personas, meta] = await Promise.all([
+  const [dias, asistencia, personas, meta, ajustes] = await Promise.all([
     paginar(() => supabase.from('devoluciones_dia').select('fecha, colaborador_id, codigo, razones, total, filas').order('fecha').order('colaborador_id')),
     paginar(() => supabase.from('devoluciones_asistencia').select('colaborador_id, mes, dias').order('mes').order('colaborador_id')),
     paginar(() => supabase.from('devoluciones_personas').select('colaborador_id, nombre, codigo').order('colaborador_id')),
-    supabase.from('devoluciones_meta').select('*').eq('id', 1).maybeSingle()
+    supabase.from('devoluciones_meta').select('*').eq('id', 1).maybeSingle(),
+    leerAjustesDevoluciones().then(a => (a === 'sin-tabla' ? undefined : a))
   ]);
   if (meta.error) throw meta.error;
   return {
     dias: dias.map(r => ({ fecha: r.fecha, id: r.colaborador_id, codigo: r.codigo, razones: r.razones || {}, total: r.total, filas: r.filas })),
     asistencia: asistencia.map(r => ({ id: r.colaborador_id, mes: r.mes, dias: r.dias })),
     personas: new Map(personas.map(p => [p.colaborador_id, { id: p.colaborador_id, nombre: p.nombre, codigo: p.codigo }])),
-    meta: meta.data || {}
+    meta: meta.data || {},
+    ajustes: ajustes?.minimos ?? null,                  // mínimos de días guardados por el administrador (null = todavía no hay nada guardado)
+    ajustesDisponibles: ajustes !== undefined
   };
 }
 
@@ -210,4 +228,10 @@ export async function devolucionesDePersonas(personasApp, fecha) {
 export async function cargarAtribuidor(personasDev, desde, hasta) {
   const asig = await traerAsignaciones(sumarDias(desde, -45), hasta);
   return { ...construirAtribuidor(asig, personasDev, { conRespaldo: true }), hayAsignaciones: asig.length > 0 };
+}
+
+/** Las personas del módulo de Devoluciones con su CÓDIGO corto (el del Excel, ej. 15; no es el ID). */
+export async function listarPersonasDevoluciones() {
+  const filas = await paginar(() => supabase.from('devoluciones_personas').select('colaborador_id, nombre, codigo').order('colaborador_id'));
+  return filas.map(p => ({ id: p.colaborador_id, nombre: p.nombre, codigo: p.codigo }));
 }

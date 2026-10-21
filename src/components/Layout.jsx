@@ -27,6 +27,7 @@ export default function Layout() {
       <div className={`overlay ${open ? 'visible' : ''}`} onClick={() => setOpen(false)} />
       <CapaAmbiente />
       <BarraRuta />
+      <div className="barra-estado" aria-hidden="true" />
       <Toasts />
       <VolverArriba />
       <PaletaComandos />

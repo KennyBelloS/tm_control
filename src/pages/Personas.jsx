@@ -1,3 +1,4 @@
+import { conTarea } from '../lib/actualizacionApp';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import { useSesion } from '../lib/useSesion';
@@ -66,7 +67,7 @@ export default function Personas() {
     try {
       await validarArchivoExcel(file);
       const lista = parsearReportePersonas(await file.arrayBuffer());
-      const { insertados } = await insertarPersonasDesdeExcel(lista);
+      const { insertados } = await conTarea(() => insertarPersonasDesdeExcel(lista));
       const aviso = lista.sinCodigo ? ` (${lista.sinCodigo} fila(s) sin Emp.Cod se ignoraron)` : '';
       setMensaje({ tipo: 'ok', texto: `Se guardaron ${insertados} personas${aviso}. Cada una queda identificada por su Emp.Cod, igual que en el boncheo, y la mesa es su código.` });
       await cargar();

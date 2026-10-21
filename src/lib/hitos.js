@@ -29,8 +29,3 @@ export function aperturaFlor(pct, n = PETALOS) {
 }
 /** Apertura (0–1) de CADA pétalo exterior i: el primero se abre antes que el segundo, y así. */
 export const aperturaPetalo = (exteriores, i) => Math.min(1, Math.max(0, exteriores - i));
-
-/* ---- Memoria de qué hito ya se celebró hoy (por pantalla: 'dash' o 'pres'), en este navegador ---- */
-const clave = (ambito, fecha) => `tm_hito_${ambito}_${fecha}`;
-export function leerHito(ambito, fecha) { try { return Number(localStorage.getItem(clave(ambito, fecha))) || 0; } catch { return 0; } }
-export function guardarHito(ambito, fecha, h) { try { localStorage.setItem(clave(ambito, fecha), String(h)); } catch { /* sin almacenamiento */ } }

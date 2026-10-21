@@ -1,6 +1,6 @@
 /**
  * Cálculos del TABLERO INTEGRADO DEL COLABORADOR. PURO: sin base de datos ni navegador, para poder probarlo con datos reales.
- * Junta lo que la app sabe de una persona: productividad (boncheo), calidad (devoluciones), constancia y comparación con su equipo.
+ * Junta lo que la app sabe de una persona: productividad (boncheo), calidad (devoluciones), presentismo (asistencia) y comparación con su equipo.
  */
 import { calcularRendimientoReal, calcularPorcentajeMeta, clasificarEstado } from './calculos.js';
 import { sumarDias, primerDiaMes, ultimoDiaMes, inicioSemana, finSemana } from './devolucionesCalculos.js';
@@ -58,7 +58,8 @@ export function armarDias({ boncheo, periodo, metaHora, dev }) {
       estado: b ? clasificarEstado(pct) : null,
       devol: cargado ? (dev.dias.get(fecha)?.total ?? 0) : null,
       razones: cargado ? (dev.dias.get(fecha)?.razones ?? {}) : {},
-      asistioDev: cargado ? !!dev.asistio(fecha) : null
+      asistioDev: cargado ? !!dev.asistio(fecha) : null,
+      laborado: cargado ? !!dev.laborado?.(fecha) : null           // ¿la finca trabajó ese día? (alguien tiene asistencia)
     };
   });
 }
@@ -79,12 +80,15 @@ export function resumenColaborador(dias, metaHora) {
   const conDev = dias.filter(d => d.devol !== null);
   const devol = conDev.reduce((s, d) => s + d.devol, 0);
   const diasAsistencia = conDev.filter(d => d.asistioDev).length;
+  // PRESENTISMO: de los días que la finca trabajó (y ya están cargados), a cuántos vino la persona según la asistencia diaria.
+  const laborados = conDev.filter(d => d.laborado), diasLaborados = laborados.length, diasAsistidos = laborados.filter(d => d.asistioDev).length;
   const razones = {};
   for (const d of conDev) for (const [k, v] of Object.entries(d.razones)) razones[k] = (razones[k] || 0) + v;
   return {
     diasTrabajados: trabajados.length, tallos, horas: Math.round(horas * 10) / 10, promedioRend, pct, estado: trabajados.length ? clasificarEstado(pct) : null,
     ponderado: horas > 0 ? Math.round(tallos / horas) : 0,
-    cumplieron, constancia: trabajados.length ? Math.round((cumplieron / trabajados.length) * 100) : null,
+    cumplieron, diasMetaPct: trabajados.length ? Math.round((cumplieron / trabajados.length) * 100) : null,
+    diasLaborados, diasAsistidos, presentismo: diasLaborados > 0 ? Math.round((diasAsistidos / diasLaborados) * 100) : null,
     mejor: ordenados[0] || null, peor: ordenados[ordenados.length - 1] || null, rachaCumple, rachaBajo,
     devol, diasConDatosDev: conDev.length, diasAsistencia, razones,
     devolPorDia: diasAsistencia > 0 ? devol / diasAsistencia : null
@@ -92,7 +96,7 @@ export function resumenColaborador(dias, metaHora) {
 }
 
 /* ---------------- Índice integral (propuesto) ---------------- */
-export const PESOS_DEFECTO = Object.freeze({ productividad: 50, calidad: 30, constancia: 20 });
+export const PESOS_DEFECTO = Object.freeze({ productividad: 50, calidad: 30, presentismo: 20 });
 export const clamp = (v, a = 0, b = 100) => Math.min(b, Math.max(a, v));
 
 /** Calidad 0–100: sin devoluciones = 100; igual al promedio general = 50; el doble del promedio (o más) = 0. */
@@ -103,14 +107,14 @@ export function calidadScore(devolPorDia, referencia) {
   return Math.round(clamp(100 * (1 - devolPorDia / (2 * referencia))));
 }
 /**
- * Índice integral 0–100 = productividad (cumplimiento de la meta, máx. 100) + calidad + constancia (días que cumplió la meta),
+ * Índice integral 0–100 = productividad (cumplimiento de la meta, máx. 100) + calidad + presentismo (días que vino de los días laborados),
  * con pesos ajustables. Si falta un componente (por ejemplo, la persona no está en Devoluciones) los pesos se reparten entre los demás.
  */
-export function indiceIntegral({ pct, calidad, constancia }, pesos = PESOS_DEFECTO) {
+export function indiceIntegral({ pct, calidad, presentismo }, pesos = PESOS_DEFECTO) {
   const partes = [
     { k: 'productividad', v: pct == null ? null : clamp(pct), peso: pesos.productividad },
     { k: 'calidad', v: calidad, peso: pesos.calidad },
-    { k: 'constancia', v: constancia, peso: pesos.constancia }
+    { k: 'presentismo', v: presentismo, peso: pesos.presentismo }
   ].filter(p => p.v != null && p.peso > 0);
   const total = partes.reduce((s, p) => s + p.peso, 0);
   if (!total) return { score: null, partes: [] };
@@ -146,7 +150,8 @@ export function lecturas({ resumen: r, metaHora, ranking, previo, refDev, razone
   if (!r.diasTrabajados) return [{ tono: 'info', icono: 'fa-circle-info', texto: 'No hay días trabajados en este período.' }];
   const tonoPct = r.pct >= 100 ? 'ok' : r.pct >= 90 ? 'aviso' : 'mal';
   out.push({ tono: tonoPct, icono: r.pct >= 100 ? 'fa-bullseye' : 'fa-arrow-trend-down', texto: `Rinde en promedio ${f0(r.promedioRend)} tallos por hora: ${f1(r.pct)}% de la meta de ${f0(metaHora)}.` });
-  out.push({ tono: r.constancia >= 70 ? 'ok' : r.constancia >= 40 ? 'aviso' : 'mal', icono: 'fa-calendar-check', texto: `Cumplió la meta ${r.cumplieron} de ${r.diasTrabajados} días trabajados (${r.constancia}%).` });
+  out.push({ tono: r.diasMetaPct >= 70 ? 'ok' : r.diasMetaPct >= 40 ? 'aviso' : 'mal', icono: 'fa-calendar-check', texto: `Cumplió la meta ${r.cumplieron} de ${r.diasTrabajados} días trabajados (${r.diasMetaPct}%).` });
+  if (r.presentismo != null) out.push({ tono: r.presentismo >= 95 ? 'ok' : r.presentismo >= 85 ? 'aviso' : 'mal', icono: 'fa-user-check', texto: `Presentismo: vino ${r.diasAsistidos} de ${r.diasLaborados} días laborados (${r.presentismo}%), según la asistencia diaria.` });
   if (r.mejor && r.diasTrabajados > 1) out.push({ tono: 'info', icono: 'fa-trophy', texto: `Su mejor día fue el ${fecha(r.mejor.fecha)} con ${f0(r.mejor.rend)} t/h; el más bajo, el ${fecha(r.peor.fecha)} con ${f0(r.peor.rend)} t/h.` });
   if (r.rachaCumple >= 3) out.push({ tono: 'ok', icono: 'fa-fire', texto: `Lleva ${r.rachaCumple} días seguidos cumpliendo la meta.` });
   if (r.rachaBajo >= 3) out.push({ tono: 'mal', icono: 'fa-triangle-exclamation', texto: `Lleva ${r.rachaBajo} días seguidos por debajo de la meta: conviene hablar con ella o él.` });

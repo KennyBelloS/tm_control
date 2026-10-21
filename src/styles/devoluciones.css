@@ -177,3 +177,27 @@ th.th-dev small{ display:block; font-size:9.5px; font-weight:600; letter-spacing
 .dev-nombre-codigo{ display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; }
 .codigo-copiable{ cursor:copy; transition:background-color var(--mov-1) ease, transform var(--mov-2) var(--ease-resorte); } .codigo-copiable:hover{ background:var(--primary-soft,#EAF5EE); color:var(--primary-dark); transform:scale(1.08); }
 .gx-texto-fuerte{ font-weight:800; fill:var(--text); } .gx-texto-sub{ font-size:9px; }
+
+/* ---------- Mínimos de días: solo el administrador los cambia ---------- */
+.dev-minimos.bloqueado input{ opacity:.65; cursor:not-allowed; background:var(--superficie-2); } .dev-minimos.bloqueado > span i{ margin-right:5px; font-size:11px; }
+.dev-ajuste-estado{ font-size:11px; font-weight:700; color:var(--gray); } .dev-ajuste-estado.ok{ color:var(--ok); } .dev-ajuste-estado.mal{ color:var(--peligro); }
+
+/* ---------- Top 3 de personas por causa ---------- */
+.dev-topcausas{ padding:16px 18px 14px; border-radius:18px; background:var(--superficie-2); box-shadow:var(--borde-fino); display:flex; flex-direction:column; gap:12px; }
+.dev-topcausas > header{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 14px; } .dev-topcausas h4{ font-size:14px; font-weight:800; } .dev-topcausas h4 i{ color:var(--gold); margin-right:7px; } .dev-topcausas > header small{ display:block; margin-top:2px; font-size:11.5px; color:var(--gray); }
+.dev-topcausas-lista{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; } @media (max-width:1100px){ .dev-topcausas-lista{ grid-template-columns:repeat(2,minmax(0,1fr)); } } @media (max-width:640px){ .dev-topcausas-lista{ grid-template-columns:1fr; } }
+.dev-causa-card{ display:flex; flex-direction:column; gap:8px; padding:12px 14px; border-radius:14px; background:var(--panel); box-shadow:var(--elev-1), var(--borde-fino); border-top:4px solid var(--peligro); animation:entrada-pagina .4s var(--ease-salida) backwards; }
+.dev-causa-card header{ display:flex; flex-direction:column; gap:1px; } .dev-causa-card header strong{ font-size:14px; font-weight:900; } .dev-causa-card header span{ font-size:11px; color:var(--gray); }
+.dev-causa-card ol{ list-style:none; padding:0; display:flex; flex-direction:column; gap:6px; }
+.dev-causa-card li{ display:flex; align-items:center; gap:8px; min-width:0; }
+.dev-causa-puesto{ flex-shrink:0; width:22px; height:22px; border-radius:50%; background:var(--medalla); color:#fff; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center; }
+.dev-causa-quien{ flex:1 1 0; min-width:0; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dev-causa-barra{ flex:0 0 52px; height:7px; border-radius:7px; background:var(--superficie-3); overflow:hidden; } .dev-causa-barra i{ display:block; height:100%; background:var(--medalla); border-radius:7px; }
+.dev-causa-card li b{ flex-shrink:0; min-width:24px; text-align:right; font-size:15px; font-weight:900; font-variant-numeric:tabular-nums; }
+.dev-causa-empate{ font-size:10.5px; color:var(--gray); }
+/* ---------- Comparar defectos y causa principal por día ---------- */
+.dev-comparar{ margin-top:6px; flex-wrap:wrap; } .dev-comparar strong{ font-size:13px; }
+.dev-por-dia{ max-height:340px; overflow:auto; } .dev-causa-principal{ font-weight:800; color:var(--peligro); }
+.dev-por-dia .dev-chip{ margin:0 5px 3px 0; }
+
+.dev-descargar{ padding:7px 13px; font-size:12px; min-height:34px; } .dev-descargar i{ margin-right:6px; }

@@ -3,14 +3,14 @@ import NumeroAnimado from '../NumeroAnimado';
 import { indiceIntegral, nivelIndice, PESOS_DEFECTO } from '../../lib/colaboradorCalculos';
 
 const COLOR = { ok: 'var(--ok)', aviso: 'var(--aviso)', mal: 'var(--peligro)', neutro: 'var(--gray)' };
-const ETIQUETA = { productividad: 'Productividad', calidad: 'Calidad', constancia: 'Constancia' };
+const ETIQUETA = { productividad: 'Productividad', calidad: 'Calidad', presentismo: 'Presentismo' };
 const AYUDA = {
   productividad: 'Qué tanto cumple la meta de tallos por hora (tope 100).',
   calidad: 'Menos devoluciones por día trabajado que el promedio de la finca: sin devoluciones = 100; igual al promedio = 50; el doble o más = 0.',
-  constancia: 'Porcentaje de días trabajados en que cumplió la meta.'
+  presentismo: 'De los días que la finca trabajó, a cuántos vino la persona, según la asistencia diaria del registro de devoluciones.'
 };
 
-/** El Índice integral: un número de 0 a 100 que junta productividad, calidad y constancia (los pesos se pueden ajustar). */
+/** El Índice integral: un número de 0 a 100 que junta productividad, calidad y presentismo (los pesos se pueden ajustar). */
 export default function Indice({ componentes, pesos, onPesos }) {
   const [abierto, setAbierto] = useState(false);
   const { score, partes } = indiceIntegral(componentes, pesos);
@@ -30,7 +30,7 @@ export default function Indice({ componentes, pesos, onPesos }) {
         <span className="colab-etiqueta">Índice integral</span>
         <span className={`colab-nivel colab-nivel-${nivel.tono}`}>{nivel.etiqueta}</span>
         <div className="colab-partes">
-          {['productividad', 'calidad', 'constancia'].map(k => {
+          {['productividad', 'calidad', 'presentismo'].map(k => {
             const p = partes.find(x => x.k === k);
             return (
               <div key={k} className={`colab-parte ${p ? '' : 'sin-dato'}`} title={AYUDA[k]}>

@@ -3,10 +3,13 @@ import { buscarPersona, seguimientoPersona, normalizarNombre } from '../../lib/d
 import { fmt, dec, fFecha } from './util';
 import { BarrasHorizontales, COLORES } from './Graficos';
 import { NombreCodigo } from './NombreCodigo';
+import { defectosPersonaRango, periodosComparar, TIPOS_COMPARACION, causaPrincipalPorDia, causaPrincipalRango } from '../../lib/devolucionesAnalisis';
 
 /** Seguimiento individual: se busca por código (manda) o por parte del nombre. */
 export default function ColaboradorDev({ datos, periodos, minimos, razones, diaSinCargar, modo = 'ambos', inicial = '' }) {
   const [texto, setTexto] = useState(inicial);
+  const [comparar, setComparar] = useState('mes_historico');        // qué se compara en la gráfica de defectos
+  const [rangoDia, setRangoDia] = useState('mes');                    // qué días muestra la tabla de la causa principal por día
   useEffect(() => { if (inicial) setTexto(inicial); }, [inicial]);
   const persona = useMemo(() => buscarPersona(datos.personas, texto), [datos.personas, texto]);
   const sugerencias = useMemo(() => {
@@ -43,18 +46,50 @@ export default function ColaboradorDev({ datos, periodos, minimos, razones, diaS
             </table>
           </div>
           <p className="dev-pie">Puesto “más”: 1 = el que más devolvió. Puesto “menos”: 1 = el mejor entre los elegibles; “No elegible” = no cumple los días mínimos o está en el Top 5 de “más”.</p>
-          {filasDef.length > 0 && (
-            <div className="dev-colab-def">
-            <BarrasHorizontales titulo="Defectos del colaborador — mes vs histórico" filas={filasDef.filter(k => (sg.defectos.mes[k] || 0) + (sg.defectos.historico[k] || 0) > 0).map(k => ({ etq: nombreRazon[k] || k.replace(/_/g, ' '), valores: [sg.defectos.mes[k] || 0, sg.defectos.historico[k] || 0] }))} series={[{ nombre: 'Mes', color: COLORES.naranja }, { nombre: 'Histórico', color: COLORES.marino }]} />
-            <div className="dev-tabla-scroll">
-              <table className="dev-tabla">
-                <thead><tr><th>Tipo de defecto</th><th className="num">Semana</th><th className="num">Mes</th><th className="num">Histórico</th></tr></thead>
-                <tbody>{filasDef.map(k => <tr key={k}><td>{nombreRazon[k] || k.replace(/_/g, ' ')}</td>{['semana', 'mes', 'historico'].map(c => <td key={c} className={`num ${!(sg.defectos[c][k]) ? 'dev-cero' : ''}`}>{fmt(sg.defectos[c][k] || 0)}</td>)}</tr>)}</tbody>
-                <tfoot><tr><td>TOTAL</td>{['semana', 'mes', 'historico'].map(c => <td key={c} className="num">{fmt(Object.values(sg.defectos[c]).reduce((a, b) => a + b, 0))}</td>)}</tr></tfoot>
-              </table>
-            </div>
-            </div>
-          )}
+          {(() => {
+            const ref = periodos.dia.desde, pc = periodosComparar(comparar, ref);
+            const dA = defectosPersonaRango(datos, persona.id, pc.a.desde, pc.a.hasta), dB = defectosPersonaRango(datos, persona.id, pc.b.desde, pc.b.hasta);
+            const claves = [...new Set([...Object.keys(dA.porRazon), ...Object.keys(dB.porRazon)])].filter(k => (dA.porRazon[k] || 0) + (dB.porRazon[k] || 0) > 0).sort((x, y) => ((dA.porRazon[y] || 0) + (dB.porRazon[y] || 0)) - ((dA.porRazon[x] || 0) + (dB.porRazon[x] || 0)));
+            const R = periodos[rangoDia] || periodos.mes, filasDia = causaPrincipalPorDia(datos, persona.id, R.desde, R.hasta, razones), principalRango = causaPrincipalRango(datos, persona.id, R.desde, R.hasta, razones);
+            const nombre = k => nombreRazon[k] || k.replace(/_/g, ' ');
+            return (<>
+              <div className="dev-sub dev-comparar">
+                <strong>Comparar defectos</strong>
+                <div className="fuente-toggle" role="tablist" aria-label="Qué comparar">
+                  {TIPOS_COMPARACION.map(([k, n]) => <button key={k} className={comparar === k ? 'activo' : ''} onClick={() => setComparar(k)} role="tab" aria-selected={comparar === k}>{n}</button>)}
+                </div>
+                <span className="dev-rango">{pc.a.etiqueta} contra {pc.b.etiqueta}</span>
+              </div>
+              {claves.length === 0 ? <p className="dev-vacio-mini">Esta persona no tiene devoluciones en {pc.a.etiqueta} ni en {pc.b.etiqueta}.</p> : (
+                <div className="dev-colab-def">
+                  <BarrasHorizontales titulo={`Defectos del colaborador — ${pc.a.etiqueta} vs ${pc.b.etiqueta}`} filas={claves.map(k => ({ etq: nombre(k), valores: [dA.porRazon[k] || 0, dB.porRazon[k] || 0] }))} series={[{ nombre: pc.a.etiqueta, color: COLORES.naranja }, { nombre: pc.b.etiqueta, color: COLORES.marino }]} />
+                  <div className="dev-tabla-scroll">
+                    <table className="dev-tabla">
+                      <thead><tr><th>Tipo de defecto</th><th className="num">{pc.a.etiqueta}</th><th className="num">{pc.b.etiqueta}</th><th className="num">Cambio</th></tr></thead>
+                      <tbody>{claves.map(k => { const x = dA.porRazon[k] || 0, y = dB.porRazon[k] || 0, d = x - y; return <tr key={k}><td>{nombre(k)}</td><td className={`num ${x === 0 ? 'dev-cero' : ''}`}>{fmt(x)}</td><td className={`num ${y === 0 ? 'dev-cero' : ''}`}>{fmt(y)}</td><td className={`num ${d > 0 ? 'dev-mal' : d < 0 ? 'dev-ok' : 'dev-cero'}`}>{d > 0 ? '+' : ''}{fmt(d)}</td></tr>; })}</tbody>
+                      <tfoot><tr><td>TOTAL</td><td className="num">{fmt(dA.total)}</td><td className="num">{fmt(dB.total)}</td><td className={`num ${dA.total - dB.total > 0 ? 'dev-mal' : dA.total - dB.total < 0 ? 'dev-ok' : ''}`}>{dA.total - dB.total > 0 ? '+' : ''}{fmt(dA.total - dB.total)}</td></tr></tfoot>
+                    </table>
+                    <p className="dev-pie">Cambio en rojo = más devoluciones que en el otro período; en verde = menos.</p>
+                  </div>
+                </div>
+              )}
+              <div className="dev-sub dev-comparar">
+                <strong>Causa principal por día</strong>
+                <div className="fuente-toggle" role="tablist" aria-label="Días a mostrar">
+                  {[['semana', 'Semana'], ['mes', 'Mes'], ['historico', 'Histórico']].map(([k, n]) => <button key={k} className={rangoDia === k ? 'activo' : ''} onClick={() => setRangoDia(k)} role="tab" aria-selected={rangoDia === k}>{n}</button>)}
+                </div>
+                {principalRango && <span className="dev-chip dev-chip-0">Más frecuente: {principalRango.nombre} · {principalRango.cantidad}</span>}
+              </div>
+              {filasDia.length === 0 ? <p className="dev-vacio-mini">Sin devoluciones en este período.</p> : (
+                <div className="dev-tabla-scroll dev-por-dia">
+                  <table className="dev-tabla">
+                    <thead><tr><th>Día</th><th className="num">Devol.</th><th>Causa principal</th><th>Otras causas ese día</th></tr></thead>
+                    <tbody>{filasDia.map(f => <tr key={f.fecha}><td>{fFecha(f.fecha)}</td><td className="num"><b>{fmt(f.total)}</b></td><td><span className="dev-causa-principal">{f.principal.nombre}</span> <b>{fmt(f.principal.cantidad)}</b></td><td>{f.otras.length ? f.otras.map(o => <span key={o.k} className="dev-chip">{o.nombre} · {o.cantidad}</span>) : <span className="dev-cero">—</span>}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              )}
+            </>);
+          })()}
         </>
       )}
     </div>

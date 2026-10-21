@@ -1,3 +1,4 @@
+import { iniciarTarea } from '../lib/actualizacionApp';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import ClasificacionPanel from '../components/ClasificacionPanel';
@@ -68,6 +69,7 @@ export default function Clasificacion() {
 
   async function guardar() {
     setGuardando(true); setMensaje(null);
+    const liberar = iniciarTarea();
     try {
       await guardarClasificacionDia({ fecha, resumen });
       setMensaje({ tipo: 'ok', texto: `Guardado: ${fmt(resumen.totalTallos)} tallos de ${resumen.lineas.length} línea(s) para el ${formatoFecha(fecha)}. El histórico diario se actualizó solo.` });
@@ -77,6 +79,7 @@ export default function Clasificacion() {
     } catch (e) {
       setMensaje({ tipo: 'err', texto: e.message });
     } finally {
+      liberar();
       setGuardando(false);
     }
   }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import { EstadoVacio, BloqueCargando } from '../components/Estados';
@@ -16,10 +16,13 @@ import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { useMostrarColaborador } from '../lib/periodoDev';
 import { useSesion } from '../lib/useSesion';
 import { puedeEditar } from '../lib/roles';
+import { guardarAjustesDevoluciones } from '../lib/devoluciones';
+import TopCausas from '../components/devoluciones/TopCausas';
+import { minimosValidos } from '../lib/devolucionesAnalisis';
+import { avisar } from '../lib/avisos';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
 
 const TABS = [['resumen', 'Resumen', 'fa-table-cells'], ['top', 'Top 5', 'fa-ranking-star'], ['causas', 'Causas', 'fa-chart-pie'], ['tendencia', 'Tendencia', 'fa-chart-line'], ['colaborador', 'Colaborador', 'fa-user'], ['formadoras', 'Formadoras', 'fa-people-group']];
-const leerMin = () => { try { const j = JSON.parse(localStorage.getItem('tm_dev_min')); return { semana: j.semana ?? 5, mes: j.mes ?? 22, historico: j.historico ?? 25 }; } catch { return { semana: 5, mes: 22, historico: 25 }; } };
 
 export default function Devoluciones() {
   const { sesion } = useSesion();
@@ -31,19 +34,23 @@ export default function Devoluciones() {
   const [buscarColab, setBuscarColab] = useState(params.get('buscar') || '');
   useEffect(() => { if (params.get('buscar')) setTab('colaborador'); }, []);        // viene del Tablero integrado del colaborador
   const [fecha, setFecha] = useState('');
-  const [minimos, setMinimos] = useState(leerMin);
+  const [minimos, setMinimos] = useState(() => minimosValidos(null));
+  const esAdmin = sesion?.rol === 'administrador';                       // solo el administrador cambia los mínimos; se guardan para todos
+  const [estadoAjuste, setEstadoAjuste] = useState('');                  // '' | 'guardando' | 'ok' | 'error' | 'sin-tabla'
+  const editando = useRef(false);
   const [modo, setModo] = useMostrarColaborador();          // Mostrar colaborador por: Código / Nombre / Ambos (como en el Excel)
 
   const cargar = useCallback(async () => {
     try {
       const d = await cargarDatosDevoluciones();
       setDatos(d); setError('');
+      if (!editando.current) setMinimos(minimosValidos(d.ajustes));
+      if (!d.ajustesDisponibles) setEstadoAjuste('sin-tabla');
       setFecha(f => f || d.meta?.ultima_fecha_registro || d.dias[d.dias.length - 1]?.fecha || fechaLocalISO());
     } catch (e) { setError(esErrorSinTablas(e) ? 'sin-tablas' : (e.message || 'No se pudieron leer las devoluciones.')); setDatos(null); }
   }, []);
   useEffect(() => { cargar(); }, [cargar]);
   useRealtimeRefresco(['devoluciones_dia', 'devoluciones_meta', 'devoluciones_asistencia'], cargar);
-  useEffect(() => { try { localStorage.setItem('tm_dev_min', JSON.stringify(minimos)); } catch { /* sin almacenamiento */ } }, [minimos]);
 
   const razones = datos?.meta?.razones?.length ? datos.meta.razones : [];
   const hayDatos = !!datos && datos.dias.length > 0;
@@ -63,7 +70,18 @@ export default function Devoluciones() {
   const primera = hayDatos ? datos.dias[0].fecha : null;
   const ultima = datos?.meta?.ultima_fecha_registro || (hayDatos ? datos.dias[datos.dias.length - 1].fecha : null);
   const diaSinCargar = !!ultima && !!fecha && fecha > ultima;          // el día elegido es posterior al último que se subió: no hay nada cargado
-  const cambiarMin = (k, v) => setMinimos(m => ({ ...m, [k]: Math.max(1, Math.min(31, Number(v) || 1)) }));
+  const temporizador = useRef(null);
+  const cambiarMin = (k, v) => {
+    if (!esAdmin) return;
+    const nuevo = { ...minimos, [k]: Math.max(1, Math.min(31, Number(v) || 1)) };
+    setMinimos(nuevo); editando.current = true; setEstadoAjuste('guardando');
+    clearTimeout(temporizador.current);
+    temporizador.current = setTimeout(async () => {                       // guarda solo, 0,8 s después de dejar de escribir
+      try { await guardarAjustesDevoluciones(nuevo); setEstadoAjuste('ok'); avisar('Mínimos guardados: ahora son los predeterminados para todos.'); }
+      catch (e) { setEstadoAjuste(/devoluciones_ajustes/.test(e?.message || '') ? 'sin-tabla' : 'error'); avisar('No se pudieron guardar los mínimos.', 'error'); }
+      editando.current = false;
+    }, 800);
+  };
 
   return (
     <>
@@ -91,9 +109,12 @@ export default function Devoluciones() {
                   <label className="dev-mostrar" title="Cómo se muestra cada colaborador en los rankings, gráficos y tablas">Mostrar colaborador por
                     <select value={modo} onChange={e => setModo(e.target.value)}><option value="codigo">Código</option><option value="nombre">Nombre</option><option value="ambos">Ambos</option></select>
                   </label>
-                  <div className="dev-minimos" title="Mínimo de días trabajados para entrar en el ranking de “menos devoluciones”">
-                    <span>Mín. días</span>
-                    {[['semana', 'Sem.'], ['mes', 'Mes'], ['historico', 'Hist.']].map(([k, et]) => <label key={k}>{et}<input type="number" min="1" max="31" value={minimos[k]} onChange={e => cambiarMin(k, e.target.value)} /></label>)}
+                  <div className={`dev-minimos ${esAdmin ? '' : 'bloqueado'}`} title={esAdmin ? 'Mínimo de días trabajados para entrar en el ranking de “menos devoluciones”. Lo que pongas se guarda y queda como predeterminado para todos.' : 'Mínimo de días trabajados para el ranking de “menos devoluciones”. Solo los administradores pueden cambiarlo.'}>
+                    <span>{esAdmin ? 'Mín. días' : <><i className="fa-solid fa-lock"></i> Mín. días</>}</span>
+                    {[['semana', 'Sem.'], ['mes', 'Mes'], ['historico', 'Hist.']].map(([k, et]) => <label key={k}>{et}<input type="number" min="1" max="31" value={minimos[k]} disabled={!esAdmin} onChange={e => cambiarMin(k, e.target.value)} /></label>)}
+                    {esAdmin && estadoAjuste === 'guardando' && <small className="dev-ajuste-estado"><i className="fa-solid fa-spinner fa-spin"></i> guardando…</small>}
+                    {esAdmin && estadoAjuste === 'ok' && <small className="dev-ajuste-estado ok"><i className="fa-solid fa-check"></i> guardado para todos</small>}
+                    {esAdmin && estadoAjuste === 'sin-tabla' && <small className="dev-ajuste-estado mal" title="Ejecuta la sección 26 del SQL en Supabase"><i className="fa-solid fa-triangle-exclamation"></i> falta preparar la base</small>}
                   </div>
                 </div>
 
@@ -102,6 +123,7 @@ export default function Devoluciones() {
                 </div>
 
                 {diaSinCargar && <p className="dev-nota dev-nota-aviso"><i className="fa-solid fa-triangle-exclamation"></i> El <b>{fFecha(fecha)}</b> todavía no tiene devoluciones cargadas (el último día cargado es el <b>{fFecha(ultima)}</b>). Por eso el «Día» aparece sin datos; la semana y el mes solo suman lo que ya está cargado.</p>}
+                {(tab === 'resumen' || tab === 'causas') && <TopCausas datos={datos} razones={razones} periodos={P} diaSinCargar={diaSinCargar} modo={modo} />}
                 {tab === 'resumen' && <ResumenDev resumen={calc.resumen} periodos={P} fecha={fecha} calidad={calc.calidad} cuadra={calc.cuadra} primera={primera} diaSinCargar={diaSinCargar} />}
                 {tab === 'top' && <TopDev rankings={calc.rankings} periodos={P} minimos={min4} diaSinCargar={diaSinCargar} ultima={ultima} modo={modo} onVer={e => { setBuscarColab(String(e.codigo ?? e.nombre)); setTab('colaborador'); }} />}
                 {tab === 'causas' && <CausasDev datos={calc.causas} diaSinCargar={diaSinCargar} />}

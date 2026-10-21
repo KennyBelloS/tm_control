@@ -1,3 +1,4 @@
+import { conTarea } from '../lib/actualizacionApp';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import { getConfig, getHistorico, getActual, insertarHistorico, reemplazarActual, borrarTablaHistorico, borrarTablaActual, actualizarRegistroHistorico, eliminarRegistroHistorico, actualizarRegistroActual, eliminarRegistroActual, eliminarPersonaDeActual, getMetaTotalPeriodo, getUltimaFechaHistorico, getRangoHorarioHistorico, getResumenHistoricoCompleto, getDescansosDiariosRango } from '../lib/db';
@@ -137,7 +138,7 @@ export default function Rendimientos() {
       if (destino === 'historico') {
         const {
           insertados
-        } = await insertarHistorico(registrosFinales);
+        } = await conTarea(() => insertarHistorico(registrosFinales));
         setMensaje({
           tipo: 'ok',
           texto: `Histórico actualizado: ${insertados} persona(s) con su total del día para ${fechaCarga}${semana ? ` (semana ${semana})` : ''}. Recuerda editar el tiempo trabajado de cada quien para ver el rendimiento real.`
@@ -145,7 +146,7 @@ export default function Rendimientos() {
       } else {
         const {
           insertados
-        } = await reemplazarActual(registrosFinales);
+        } = await conTarea(() => reemplazarActual(registrosFinales));
         setMensaje({
           tipo: 'ok',
           texto: `Se reemplazó automáticamente la carga anterior: ${insertados} registros nuevos guardados para ${fechaCarga}.`

@@ -5,9 +5,13 @@ import Top3Podium from './Top3Podium';
 import CarruselLista from './CarruselLista';
 import AnilloProgreso from './AnilloProgreso';
 import FlorMeta from './FlorMeta';
+import SlideDevoluciones from './presentacion/SlideDevoluciones';
+import { cargarDatosDevoluciones } from '../lib/devoluciones';
+import { vistasDevolucionesHoy, minimosDeDatos } from '../lib/devolucionesPresentacion';
 import { CapaFestiva, IntroFestiva, CelebracionHito } from './presentacion/FestivoPresentacion';
 import { useEfectos } from '../lib/efectos';
-import { hitoAlcanzado, hitoNuevo, leerHito, guardarHito } from '../lib/hitos';
+import { hitoAlcanzado, hitoNuevo } from '../lib/hitos';
+import { leerHito, guardarHito } from '../lib/hitosAlmacen';
 import { getRankingRango, getUltimaFechaHistorico } from '../lib/db';
 import { getDetalleRendimientoTurnoActual, getDetalleRendimientoAsignaciones } from '../lib/lineas';
 import { etiquetaHora, nombreLineaClasificacion, etiquetaCortaLinea, LINEA_SUPPORT } from '../lib/clasificacionCalculos';
@@ -17,7 +21,7 @@ import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { entrarPantallaCompleta, salirPantallaCompleta, enPantallaCompleta } from '../lib/pantallaCompleta';
 
 // Cuánto dura cada vista: el hora a hora y los históricos 10 minutos; todo lo demás 5.
-const MINUTOS_POR_VISTA = { podio: 5, hora: 10, lineas: 5, formadoras: 5, 'hist-dia': 10, 'hist-semana': 10, 'hist-mes': 10 };
+const MINUTOS_POR_VISTA = { podio: 5, hora: 10, lineas: 5, formadoras: 5, 'hist-dia': 10, 'hist-semana': 10, 'hist-mes': 10, 'dev-dia': 5, 'dev-semana': 5, 'dev-mes': 5 };
 // El lienzo se dibuja siempre en 1600 x 900 y se escala para llenar la pantalla (TV, zoom, lo que sea).
 const LIENZO_ANCHO = 1600, LIENZO_ALTO = 900;
 // "Tamaño": cuánto se agranda todo. El lienzo lógico mide 1600x900 dividido entre este factor, así que con 1,35 todo se ve
@@ -524,6 +528,17 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
   const semana = rangoSemanaAnterior();
   const mes = rangoMesAnterior();
 
+  // Devoluciones: el día (último registrado) siempre; la semana lunes y martes; el mes los primeros 5 días. Se recarga cada 5 minutos.
+  const [devDatos, setDevDatos] = useState(null);
+  useEffect(() => {
+    let vivo = true;
+    const cargar = () => cargarDatosDevoluciones().then(d => { if (vivo) setDevDatos(d); }).catch(() => { if (vivo) setDevDatos(null); });
+    cargar();
+    const t = setInterval(cargar, 5 * 60 * 1000);
+    return () => { vivo = false; clearInterval(t); };
+  }, []);
+  const vistasDev = useMemo(() => vistasDevolucionesHoy(devDatos, fechaLocal(new Date()), minimosDeDatos(devDatos)), [devDatos]);
+
   const slides = [
     {
       id: 'podio', nombre: 'Podio',
@@ -545,6 +560,7 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
       id: 'hist-semana', nombre: 'Histórico semanal',
       render: () => <SlideHistorico titulo="Histórico de la Semana" subtitulo={`${formatoLargo(semana.desde)} — ${formatoLargo(semana.hasta)}`} icono="fa-calendar-week" desde={semana.desde} hasta={semana.hasta} metaHora={metaHora} />
     },
+    ...vistasDev.map(v => ({ id: v.id, nombre: v.nombre, render: () => <SlideDevoluciones vista={v} /> })),
     esInicioDeMes && {
       id: 'hist-mes', nombre: 'Histórico mensual',
       render: () => <SlideHistorico titulo="Histórico del Mes" subtitulo={mes.nombre} icono="fa-calendar" desde={mes.desde} hasta={mes.hasta} metaHora={metaHora} />

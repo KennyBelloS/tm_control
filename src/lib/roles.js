@@ -13,13 +13,13 @@ export const MODULOS = {
     roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   personas: {
-    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   rendimientos: {
     roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   reportes: {
-    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   ranking: {
     roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
@@ -28,7 +28,7 @@ export const MODULOS = {
     roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   lineas: {
-    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   indirectos: {
     roles: ['administrador', 'ingeniero', 'profesional', 'digitador']
@@ -37,10 +37,10 @@ export const MODULOS = {
     roles: ['administrador', 'ingeniero', 'profesional', 'digitador']
   },
   clasificacion: {
-    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   devoluciones: {
-    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor']
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   },
   tableros: {
     // Todos los roles pueden ver este módulo, tal como pediste.
@@ -60,6 +60,7 @@ export const MODULOS = {
 export function puedeVer(rol, moduloKey) {
   return MODULOS[moduloKey]?.roles.includes(rol) ?? false;
 }
+// Supervisor y Formador son roles de SOLO VISUALIZACIÓN: nunca cargan, editan ni borran nada (la base de datos también lo impide).
 export function puedeEditar(rol) {
   return rol === 'administrador' || rol === 'ingeniero' || rol === 'profesional' || rol === 'digitador';
 }

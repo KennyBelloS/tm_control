@@ -83,7 +83,7 @@ export default function Tableros() {
             </div>
           </div>
 
-          <NotaClave clave="tableros_clave" roles={['administrador', 'ingeniero', 'supervisor']} titulo="Contraseña del tablero" quienes="Administrador, Ingeniero y Supervisor" />
+          <NotaClave clave="tableros_clave" roles={['administrador', 'ingeniero', 'supervisor', 'formador']} titulo="Contraseña del tablero" quienes="Administrador, Ingeniero, Supervisor y Formador" />
 
           {sospecha && <div className="alert warn">
               <i className="fa-solid fa-triangle-exclamation"></i>
