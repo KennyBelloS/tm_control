@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import VaciarBaseDatos from '../components/auditoria/VaciarBaseDatos';
+import RespaldoBD from '../components/auditoria/RespaldoBD';
+import DepuracionSemestral from '../components/auditoria/DepuracionSemestral';
+import EstimacionEspacio from '../components/auditoria/EstimacionEspacio';
 import { getConfig, getAlmacenamientoUsadoMB, getHistoricoCompleto, getActualCompleto, getPersonasCompleto, getMetasDiariasCompleto, limpiarBloquesAntiguos } from '../lib/db';
 export default function Auditoria() {
   const [cargando, setCargando] = useState(true);
@@ -132,6 +135,9 @@ export default function Auditoria() {
         </section>
 
         <VaciarBaseDatos porcentaje={porcentaje} usoMB={usoMB} limiteMB={limiteMB} onVaciada={recargarUso} />
+        <EstimacionEspacio usoMB={usoMB} limiteMB={limiteMB} />
+        <DepuracionSemestral />
+        <RespaldoBD />
 
         <section className="panel">
           <div className="panel-header">

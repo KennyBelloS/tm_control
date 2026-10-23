@@ -48,13 +48,16 @@ export function agruparBoncheoPorDia(filas) {
  * dev = null (la persona no está en Devoluciones) o { dias: Map(fecha → {total, razones}), asistio: (fecha) → bool, ultima }
  * Un día de devoluciones posterior al último cargado queda en null: NO se inventa un 0.
  */
+import { tipoDia, nombreFestivo } from './festivosColombia.js';
+
 export function armarDias({ boncheo, periodo, metaHora, dev }) {
   return listaDias(periodo.desde, periodo.hasta).map(fecha => {
     const b = boncheo.get(fecha);
     const pct = b ? calcularPorcentajeMeta(b.rend, metaHora) : null;
     const cargado = !!dev && !!dev.ultima && fecha <= dev.ultima;
     return {
-      fecha, trabajo: !!b, tallos: b?.tallos ?? 0, horas: b?.horas ?? 0, rend: b?.rend ?? null, pct,
+      fecha, tipoDia: tipoDia(fecha), festivo: nombreFestivo(fecha),            // 'ordinario' | 'domingo' | 'festivo' (Colombia)
+      trabajo: !!b, tallos: b?.tallos ?? 0, horas: b?.horas ?? 0, rend: b?.rend ?? null, pct,
       estado: b ? clasificarEstado(pct) : null,
       devol: cargado ? (dev.dias.get(fecha)?.total ?? 0) : null,
       razones: cargado ? (dev.dias.get(fecha)?.razones ?? {}) : {},
@@ -81,14 +84,16 @@ export function resumenColaborador(dias, metaHora) {
   const devol = conDev.reduce((s, d) => s + d.devol, 0);
   const diasAsistencia = conDev.filter(d => d.asistioDev).length;
   // PRESENTISMO: de los días que la finca trabajó (y ya están cargados), a cuántos vino la persona según la asistencia diaria.
-  const laborados = conDev.filter(d => d.laborado), diasLaborados = laborados.length, diasAsistidos = laborados.filter(d => d.asistioDev).length;
+  // Domingos y festivos NO se trabajan: si ese día hay reporte, solo cuenta para quienes aparecen en él (a quien no vino no se le descuenta).
+  const laborados = conDev.filter(d => d.laborado && (d.tipoDia === 'ordinario' || d.asistioDev)), diasLaborados = laborados.length, diasAsistidos = laborados.filter(d => d.asistioDev).length;
+  const diasEspeciales = conDev.filter(d => d.laborado && d.tipoDia !== 'ordinario' && d.asistioDev).length;
   const razones = {};
   for (const d of conDev) for (const [k, v] of Object.entries(d.razones)) razones[k] = (razones[k] || 0) + v;
   return {
     diasTrabajados: trabajados.length, tallos, horas: Math.round(horas * 10) / 10, promedioRend, pct, estado: trabajados.length ? clasificarEstado(pct) : null,
     ponderado: horas > 0 ? Math.round(tallos / horas) : 0,
     cumplieron, diasMetaPct: trabajados.length ? Math.round((cumplieron / trabajados.length) * 100) : null,
-    diasLaborados, diasAsistidos, presentismo: diasLaborados > 0 ? Math.round((diasAsistidos / diasLaborados) * 100) : null,
+    diasLaborados, diasAsistidos, diasEspeciales, presentismo: diasLaborados > 0 ? Math.round((diasAsistidos / diasLaborados) * 100) : null,
     mejor: ordenados[0] || null, peor: ordenados[ordenados.length - 1] || null, rachaCumple, rachaBajo,
     devol, diasConDatosDev: conDev.length, diasAsistencia, razones,
     devolPorDia: diasAsistencia > 0 ? devol / diasAsistencia : null
@@ -152,6 +157,7 @@ export function lecturas({ resumen: r, metaHora, ranking, previo, refDev, razone
   out.push({ tono: tonoPct, icono: r.pct >= 100 ? 'fa-bullseye' : 'fa-arrow-trend-down', texto: `Rinde en promedio ${f0(r.promedioRend)} tallos por hora: ${f1(r.pct)}% de la meta de ${f0(metaHora)}.` });
   out.push({ tono: r.diasMetaPct >= 70 ? 'ok' : r.diasMetaPct >= 40 ? 'aviso' : 'mal', icono: 'fa-calendar-check', texto: `Cumplió la meta ${r.cumplieron} de ${r.diasTrabajados} días trabajados (${r.diasMetaPct}%).` });
   if (r.presentismo != null) out.push({ tono: r.presentismo >= 95 ? 'ok' : r.presentismo >= 85 ? 'aviso' : 'mal', icono: 'fa-user-check', texto: `Presentismo: vino ${r.diasAsistidos} de ${r.diasLaborados} días laborados (${r.presentismo}%), según la asistencia diaria.` });
+  if (r.diasEspeciales > 0) out.push({ tono: 'info', icono: 'fa-calendar-day', texto: `Trabajó ${r.diasEspeciales} día${r.diasEspeciales === 1 ? '' : 's'} festivo${r.diasEspeciales === 1 ? '' : 's'} o domingo${r.diasEspeciales === 1 ? '' : 's'}: esos días solo suman si vino (no se descuenta cuando no fue citado).` });
   if (r.mejor && r.diasTrabajados > 1) out.push({ tono: 'info', icono: 'fa-trophy', texto: `Su mejor día fue el ${fecha(r.mejor.fecha)} con ${f0(r.mejor.rend)} t/h; el más bajo, el ${fecha(r.peor.fecha)} con ${f0(r.peor.rend)} t/h.` });
   if (r.rachaCumple >= 3) out.push({ tono: 'ok', icono: 'fa-fire', texto: `Lleva ${r.rachaCumple} días seguidos cumpliendo la meta.` });
   if (r.rachaBajo >= 3) out.push({ tono: 'mal', icono: 'fa-triangle-exclamation', texto: `Lleva ${r.rachaBajo} días seguidos por debajo de la meta: conviene hablar con ella o él.` });

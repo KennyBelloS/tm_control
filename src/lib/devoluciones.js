@@ -5,7 +5,8 @@
 import { supabase } from './supabaseClient';
 import { armarPayload } from './devolucionesExcel';
 import { minimosValidos } from './devolucionesAnalisis';
-import { normalizarNombre, sumarDias, devolucionesPorFormadora, periodos, inicioSemana, finSemana, primerDiaMes, ultimoDiaMes } from './devolucionesCalculos';
+export { emparejarConDevoluciones };                       // vive en devolucionesCalculos.js (regla pura); se vuelve a exportar aquí para no cambiar a quien la usa
+import { palabras, subconjunto, unicoParcial, emparejarConDevoluciones, normalizarNombre, sumarDias, devolucionesPorFormadora, periodos, inicioSemana, finSemana, primerDiaMes, ultimoDiaMes } from './devolucionesCalculos';
 
 /** Supabase entrega máximo 1.000 filas por consulta: se pide por páginas hasta traer todo. */
 async function paginar(construir, tam = 1000) {
@@ -65,10 +66,6 @@ export async function importarDevoluciones(carga) {
    Asociar con las formadoras: cada persona de Devoluciones se empareja con la persona asignada a una formadora
    (por ID; si no, por nombre completo; si no, por nombre parcial + mismo código).
    ------------------------------------------------------------------------------------------------ */
-const palabras = n => normalizarNombre(n).split(' ').filter(p => p.length > 1);
-function subconjunto(a, b) { const [chico, grande] = a.length <= b.length ? [a, b] : [b, a]; return chico.length >= 2 && chico.every(p => grande.includes(p)); }
-/** Sin código de mesa, un nombre parcial solo sirve si trae al menos 3 palabras (nombre y apellidos) y es el ÚNICO que coincide. */
-const unicoParcial = (lista, pal, sacar) => { const c = lista.filter(x => sacar(x).length >= 3 && subconjunto(sacar(x), pal)); return c.length === 1 ? c[0] : null; };
 
 /**
  * asignaciones: filas de asignaciones_diarias [{ fecha, colaborador_id, formadora_id, formadoras:{nombre}, personas:{nombre, mesa} }]
@@ -175,26 +172,6 @@ export async function devolucionesParaTablero(filas) {
   return { mapa, ultima };
 }
 
-/**
- * Empareja personas de la app (Líneas, Personas…) con las personas del módulo de Devoluciones.
- * personasApp = [{ id, nombre, mesa }]   personasDev = [{ id, nombre, codigo }]   → Map(idApp → persona de Devoluciones | null)
- * Orden: 1) mismo ID  2) mismo nombre  3) nombre parcial + mismo código  4) nombre parcial de 3+ palabras y ÚNICO (nunca adivina entre dos).
- */
-export function emparejarConDevoluciones(personasApp, personasDev) {
-  const porId = new Map(personasDev.map(p => [p.id, p]));
-  const porNombre = new Map(personasDev.map(p => [normalizarNombre(p.nombre), p]));
-  const lista = personasDev.map(p => ({ ...p, pal: palabras(p.nombre) }));
-  const res = new Map();
-  for (const a of personasApp) {
-    const pal = palabras(a.nombre);
-    const dev = porId.get(a.id)
-      || porNombre.get(normalizarNombre(a.nombre))
-      || (a.mesa != null ? lista.find(x => x.codigo === a.mesa && subconjunto(pal, x.pal)) : null)
-      || unicoParcial(lista, pal, x => x.pal);
-    res.set(a.id, dev || null);
-  }
-  return res;
-}
 
 /**
  * Para la pantalla de Líneas: las devoluciones (día, semana, mes) de CADA PERSONA asignada.

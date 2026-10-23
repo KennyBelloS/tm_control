@@ -125,7 +125,7 @@ export default function Devoluciones() {
                 {diaSinCargar && <p className="dev-nota dev-nota-aviso"><i className="fa-solid fa-triangle-exclamation"></i> El <b>{fFecha(fecha)}</b> todavía no tiene devoluciones cargadas (el último día cargado es el <b>{fFecha(ultima)}</b>). Por eso el «Día» aparece sin datos; la semana y el mes solo suman lo que ya está cargado.</p>}
                 {(tab === 'resumen' || tab === 'causas') && <TopCausas datos={datos} razones={razones} periodos={P} diaSinCargar={diaSinCargar} modo={modo} />}
                 {tab === 'resumen' && <ResumenDev resumen={calc.resumen} periodos={P} fecha={fecha} calidad={calc.calidad} cuadra={calc.cuadra} primera={primera} diaSinCargar={diaSinCargar} />}
-                {tab === 'top' && <TopDev rankings={calc.rankings} periodos={P} minimos={min4} diaSinCargar={diaSinCargar} ultima={ultima} modo={modo} onVer={e => { setBuscarColab(String(e.codigo ?? e.nombre)); setTab('colaborador'); }} />}
+                {tab === 'top' && <TopDev datosCrudos={datos} razones={razones} rankings={calc.rankings} periodos={P} minimos={min4} diaSinCargar={diaSinCargar} ultima={ultima} modo={modo} onVer={e => { setBuscarColab(String(e.codigo ?? e.nombre)); setTab('colaborador'); }} />}
                 {tab === 'causas' && <CausasDev datos={calc.causas} diaSinCargar={diaSinCargar} />}
                 {tab === 'tendencia' && <TendenciaDev serie={calc.serie} />}
                 {tab === 'colaborador' && <ColaboradorDev datos={datos} periodos={P} minimos={min4} razones={razones} diaSinCargar={diaSinCargar} modo={modo} inicial={buscarColab} />}

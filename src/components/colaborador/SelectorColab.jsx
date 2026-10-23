@@ -41,7 +41,7 @@ export default function SelectorColab({ personas, elegido, onElegir, enfocar = f
           {resultados.length === 0 && <p className="colab-sin">{texto.trim() ? `No encontré a nadie con “${texto}”.` : 'Escribe un código o un nombre.'}</p>}
           {resultados.map((p, i) => (
             <button key={p.id} role="option" aria-selected={i === activo} className={i === activo ? 'activo' : ''} onMouseEnter={() => setActivo(i)} onClick={() => elegir(p)}>
-              <span className="dev-codigo">{p.codigo ?? p.mesa ?? '—'}</span><strong>{p.nombre}</strong>{p.rol && <em>{p.rol}</em>}
+              <span className="dev-codigo">{p.codigo ?? p.mesa ?? '—'}</span><strong>{p.nombre}</strong>{p.esClasificador && <em className="colab-tag-clasif">Clasificador</em>}{p.rol && <em>{p.rol}</em>}
             </button>
           ))}
         </div>

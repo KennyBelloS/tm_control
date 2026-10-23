@@ -116,3 +116,13 @@ html[data-tema="oscuro"] .colab-nivel-aviso{ background:rgba(224,164,58,.2); col
 html[data-tema="oscuro"] .colab-nivel-mal{ background:rgba(220,76,94,.22); color:#FFB3BF; }
 html[data-tema="oscuro"] .colab-delta-aviso{ color:#F4CE82 !important; }
 html[data-tema="oscuro"] .colab-lec-aviso i{ color:#F4CE82; }
+
+/* ---------- Domingos y festivos de Colombia en el calendario ---------- */
+.colab-celda.festivo:not(.trabajo){ background:color-mix(in srgb, var(--gold) 20%, var(--panel)); box-shadow:inset 0 0 0 1.5px var(--gold); } .colab-celda.domingo:not(.trabajo){ background:var(--superficie-3); opacity:.7; }
+.colab-celda.festivo.trabajo, .colab-celda.domingo.trabajo{ box-shadow:inset 0 0 0 2px var(--gold); }
+.colab-mapa-leyenda i.fest{ background:color-mix(in srgb, var(--gold) 35%, transparent); box-shadow:inset 0 0 0 1.5px var(--gold); } .colab-mapa-leyenda i.dom{ background:var(--superficie-3); }
+
+/* ---------- Clasificador y días especiales ---------- */
+.colab-chip-clasif{ background:color-mix(in srgb, var(--gold) 35%, transparent) !important; color:#fff; font-weight:700; }
+.colab-tag-clasif{ background:color-mix(in srgb, var(--gold) 28%, transparent); color:var(--primary-dark); font-style:normal; font-weight:800; padding:1px 8px; border-radius:20px; font-size:10.5px; }
+.colab-detalle-via, .colab-detalle-especial{ display:flex; gap:8px; align-items:flex-start; font-size:12px; line-height:1.45; padding:8px 10px; border-radius:10px; margin-bottom:8px; background:color-mix(in srgb, var(--gold) 16%, var(--panel)); } .colab-detalle-via i, .colab-detalle-especial i{ color:var(--gold); margin-top:2px; }

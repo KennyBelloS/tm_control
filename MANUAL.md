@@ -1,650 +1,381 @@
-# Torremolinos Control — Manual de instalación, uso y despliegue
-
-Módulo Rendimientos — versión web (Vite + React + Supabase)
-
-Este manual no asume que sabes programar. Sigue los pasos en orden.
-
----
-
-## 0. Historial de arreglos recientes
-
-**Última entrega (descuento de almuerzo por día puntual):**
-
-⚠️ **Corre este SQL nuevo antes de usar esto:**
-```sql
-create table if not exists descansos_diarios (
-  fecha       date not null,
-  tipo        text not null check (tipo in ('historico', 'actual')),
-  activos     boolean not null default true,
-  descansos   jsonb not null default '[]'::jsonb,
-  primary key (fecha, tipo)
-);
-alter table descansos_diarios enable row level security;
-drop policy if exists "acceso_total_descansos_diarios" on descansos_diarios;
-create policy "acceso_total_descansos_diarios" on descansos_diarios for all using (true) with check (true);
-```
-
-- **Descuento de almuerzo solo para un día puntual**: en Configuración, dentro de cada sección (Histórico y Turno Actual), hay un nuevo recuadro punteado "Descuento solo para hoy" — cambias la hora y los minutos, le das "Guardar descuento de hoy", y esa excepción **solo aplica a ese día**, sin tocar la configuración general de los demás días.
-- Si el día ya tiene una excepción guardada, aparece un aviso "Excepción activa hoy" y un botón para "Volver a usar la config general hoy" (borra la excepción de ese día).
-- Revisé y corregí **los 7 lugares del código** donde se calcula el descuento (subir Excel, ver en vivo el Histórico y el Turno Actual, y el ranking hora a hora) para que primero revisen si ese día específico tiene una excepción, y si no, usen la configuración general — igual que ya funciona la "Meta del día".
-
-**Entrega anterior (descuentos separados Histórico/Turno Actual, Modo Presentación mejorado):**
-
-⚠️ **Corre este SQL nuevo antes de usar esto:**
-```sql
-alter table configuracion add column if not exists descansos_activos_historico boolean;
-alter table configuracion add column if not exists descansos_historico jsonb;
-alter table configuracion add column if not exists descansos_activos_actual boolean;
-alter table configuracion add column if not exists descansos_actual jsonb;
-
-update configuracion
-set descansos_activos_historico = coalesce(descansos_activos_historico, descansos_activos),
-    descansos_historico = coalesce(descansos_historico, descansos),
-    descansos_activos_actual = coalesce(descansos_activos_actual, descansos_activos),
-    descansos_actual = coalesce(descansos_actual, descansos)
-where id = 1;
-
-alter table configuracion alter column descansos_activos_historico set default true;
-alter table configuracion alter column descansos_historico set default '[{"horaCorte":"12:00","minutos":30}]'::jsonb;
-alter table configuracion alter column descansos_activos_actual set default true;
-alter table configuracion alter column descansos_actual set default '[{"horaCorte":"12:00","minutos":30}]'::jsonb;
-```
-
-- **Descuentos de tiempo (almuerzo) separados**: en Configuración ahora hay **dos secciones independientes** — una para el Histórico y otra para el Turno Actual. Puedes tener reglas distintas en cada una (por ejemplo, un corte distinto si el turno actual trabaja diferente al histórico ese día). Al correr el SQL, tu configuración actual se copia a ambas, así que no pierdes nada.
-- **Modo Presentación mejorado**: ahora tiene el logo y los colores de la marca en la parte de arriba (gradiente verde igual al resto de la app), y debajo del Top 3 se agregó el **carrusel de nombres movibles** con el resto del equipo (scroll continuo con barra de progreso), igual al que ya tenías en Reportes y Ranking.
-
-**Entrega anterior (Módulo Líneas completo):**
-
-⚠️ **Corre este SQL nuevo antes de usar esto:**
-```sql
-create table if not exists lineas (
-  id          bigserial primary key,
-  nombre      text not null unique,
-  supervisor  text,
-  activa      boolean not null default true,
-  creado_en   timestamptz not null default now()
-);
-create table if not exists formadoras (
-  id          bigserial primary key,
-  nombre      text not null unique,
-  activa      boolean not null default true,
-  creado_en   timestamptz not null default now()
-);
-create table if not exists asignaciones_diarias (
-  id              bigserial primary key,
-  fecha           date not null,
-  linea_id        bigint not null references lineas(id) on delete cascade,
-  formadora_id    bigint not null references formadoras(id) on delete cascade,
-  colaborador_id  integer not null references personas(id) on delete cascade,
-  creado_en       timestamptz not null default now(),
-  constraint asignacion_persona_dia_unica unique (fecha, colaborador_id)
-);
-create index if not exists idx_asignaciones_fecha on asignaciones_diarias (fecha);
-create index if not exists idx_asignaciones_linea on asignaciones_diarias (linea_id);
-alter table lineas enable row level security;
-alter table formadoras enable row level security;
-alter table asignaciones_diarias enable row level security;
-drop policy if exists "acceso_total_lineas" on lineas;
-create policy "acceso_total_lineas" on lineas for all using (true) with check (true);
-drop policy if exists "acceso_total_formadoras" on formadoras;
-create policy "acceso_total_formadoras" on formadoras for all using (true) with check (true);
-drop policy if exists "acceso_total_asignaciones" on asignaciones_diarias;
-create policy "acceso_total_asignaciones" on asignaciones_diarias for all using (true) with check (true);
-insert into lineas (nombre, activa) values
-  ('Línea 1', true), ('Línea 2', true), ('Línea 3', true), ('Línea 4', true)
-on conflict (nombre) do nothing;
-```
-
-- **Módulo Líneas nuevo**: gestiona líneas de producción (crear, activar/desactivar), formadoras (crear, activar/desactivar), y una **asignación diaria** que vincula cada persona (traída del módulo Personas) a una formadora y una línea — se reinicia cada día automáticamente.
-- **Distribución de Operarios por Línea**: barras visuales con cuántos operarios tiene cada línea hoy.
-- **Top Líneas por Rendimiento**: ranking tipo podio con el rendimiento promedio de cada línea, usando los datos reales del Histórico de ese día.
-- Solo se pueden asignar personas a **líneas activas** y **formadoras activas**.
-
-**Entrega anterior (actualización en tiempo real, Histórico abre en el último día, alerta automática):**
-
-⚠️ **Corre este SQL nuevo antes de usar esto** (activa la sincronización en vivo):
-```sql
-do $$
-declare
-  tabla text;
-begin
-  foreach tabla in array array['rendimiento_historico', 'rendimiento_actual', 'metas_diarias', 'configuracion']
-  loop
-    if not exists (
-      select 1 from pg_publication_tables
-      where pubname = 'supabase_realtime' and tablename = tabla
-    ) then
-      execute format('alter publication supabase_realtime add table %I', tabla);
-    end if;
-  end loop;
-end $$;
-```
-
-- **Toda la app se actualiza sola, en tiempo real**: cuando cualquiera sube un Excel, edita un registro, o cambia la configuración, todas las pantallas abiertas (Dashboard, Rendimientos, Ranking, Reportes) se refrescan solas — sin que nadie tenga que recargar la página. Funciona incluso entre distintos dispositivos/usuarios conectados al mismo tiempo.
-- **Protegido mientras editas**: si estás editando una fila (tiempo trabajado, tiempos muertos, etc.) justo cuando alguien más sube o cambia algo, la actualización automática **espera** — no se pierde lo que estás escribiendo. Verás un aviso ("alguien más actualizó datos...") y en cuanto guardes o canceles tu edición, se aplica sola.
-- **El Histórico ahora abre en el último día registrado**, no en "ayer" fijo — si el domingo no se trabaja, al entrar verás directamente el sábado listo para ajustar tiempos muertos.
-- **Alerta automática flotante**: si el último Histórico lleva más de 1 día sin actualizarse, aparece un aviso solo (sin abrir notificaciones), visible 20 segundos, que puedes cerrar antes si quieres.
-
-**Entrega anterior (Dashboard más visual, semana configurable, optimización de base de datos):**
-
-⚠️ **Corre este SQL nuevo antes de usar esto:**
-```sql
-alter table configuracion add column if not exists dia_fin_semana smallint not null default 6;
-```
-
-- **Emoji integrado a la barra de progreso**: ahora flota justo sobre el punto exacto de avance, y la barra cambia de color según el cumplimiento (rojo → naranja → verde lima → verde intenso al llegar a la meta).
-- **Carrusel del Dashboard con selector manual**: puedes elegir "Turno Actual" o "Histórico" con un clic, sin esperar a que rote solo — con un botón para volver al modo automático.
-- **Semana configurable en Ranking**: en Configuración, elige en qué día termina tu semana (por ejemplo, Sábado) y el Ranking "por semana" arma el rango correcto automáticamente (ej. domingo a sábado, en vez de lunes a domingo).
-- **Gráfica de Tendencia de Producción, mucho más visual**: línea de promedio con su propia etiqueta, marcador dorado en el mejor día, sombra y degradado mejorados.
-- **Optimización automática de la base de datos**: la tabla `historico_bloques` (la que guarda los bloques originales para recalcular el almuerzo) ahora se limpia sola de vez en cuando, borrando el detalle de días de más de 90 días (el tiempo trabajado ya calculado de esos días no se pierde, solo se libera el detalle que ya no hace falta). También hay un botón "Optimizar ahora" en Auditoría para hacerlo cuando quieras.
-
-**Entrega anterior (descanso de almuerzo: corregido a fondo, se recalcula solo):**
-
-⚠️ **Corre la migración nueva antes de usar esto** — agrega una tabla necesaria (ver el bloque de SQL más abajo).
-
-- **Corregido un caso límite**: un bloque que empieza **justo a las 12:00** (u otra hora de corte que definas) ahora sí recibe el descuento — antes solo se aplicaba si el bloque cruzaba estrictamente la hora, no si empezaba exactamente ahí.
-- **El problema de fondo, ya resuelto**: antes, el tiempo trabajado del Histórico se calculaba UNA sola vez al subir el Excel y quedaba fijo — si cambiabas la configuración de descansos después, los días ya guardados no se actualizaban solos. Ahora se guardan los bloques de hora originales de cada carga, y el tiempo trabajado del Histórico se **recalcula en vivo** cada vez que lo consultas, usando la configuración de descansos que tengas en ese momento. Cambias la config → los rendimientos de ese día se actualizan solos, sin subir nada de nuevo.
-- Si editas manualmente el tiempo trabajado de una fila (con el lápiz ✏️), esa edición manual queda firme — no se sobreescribe sola después.
-- **Botón "Guardar descuentos"** agregado en Configuración, además del guardado automático que ya tenías.
-
-```sql
-create table if not exists historico_bloques (
-  id              bigserial primary key,
-  fecha           date not null,
-  colaborador_id  integer not null,
-  hora_inicio     time not null,
-  hora_fin        time not null
-);
-create index if not exists idx_historico_bloques_fecha_persona on historico_bloques (fecha, colaborador_id);
-alter table historico_bloques enable row level security;
-create policy "leer_historico_bloques" on historico_bloques for select using (auth.role() = 'authenticated');
-create policy "escribir_historico_bloques" on historico_bloques for all using (puede_editar()) with check (puede_editar());
-```
-
-> **Nota:** esto solo aplica a partir de las próximas cargas de Excel que hagas — los días que ya tenías guardados ANTES de correr esta migración no tienen bloques guardados todavía, así que no se recalculan solos (se quedan con el valor que ya tenían). Si quieres que un día viejo específico también se beneficie de esto, vuelve a subir el Excel de ese día.
-
-**Entrega anterior — LA MÁS GRANDE (PWA nativa, offline, carrusel, roles, reportes movidos):**
-
-⚠️ **Corre la sección 12 y 13 completas antes de usar esta versión** — hay migraciones nuevas de base de datos.
-
-- **PWA de verdad para Android, iPhone y Windows**: al agregar la app a la pantalla de inicio, ahora se ve con ícono correcto en los tres, sin barra del navegador, como una app nativa. Corregí específicamente el ícono de iPhone (le faltaban las etiquetas de Apple).
-- **Funciona sin internet**: si subes un Excel y se corta la conexión, se guarda en el dispositivo y se sube solo apenas vuelva la señal — verás una banda de aviso en la parte de arriba (sin conexión / subiendo / listo).
-- **Carrusel automático en el Dashboard**: va mostrando el rendimiento de cada persona del Turno Actual de hoy, uno por uno cada ~3 segundos, y después pasa automáticamente al Histórico de ayer — con animación.
-- **Emoji según el cumplimiento** en la barra de progreso del Dashboard (😟 lejos de la meta → 😐 a mitad → 🙂 cerca → 🤩 meta alcanzada).
-- **Renombrado**: "Personas Activas" → "Mesas Activas"; "Operarios trabajando" → "Mesas operando"; "Promedio general" → "Cumplimiento de Tallos".
-- **Ranking con Top por semana** (además de día y mes), y el Top 3 ahora es un podio real, mucho más llamativo.
-- **La sección de exportar (Excel/PDF/PNG/JPG) se movió de Rendimientos al módulo Reportes**, con vista previa en vivo y tarjetas grandes de "Rendimiento Promedio General" y "Total de Tallos". Por esto, el Supervisor ahora ve Rendimientos en modo solo lectura (igual que el Formador) — su acceso a filtrar y exportar vive en Reportes, al que ya tiene acceso.
-- **El Código (Mesa) ahora también aparece en los reportes del Histórico** — antes esa columna no existía ahí porque el Histórico no guardaba esa información; ahora se captura automáticamente desde el Excel al momento de guardar.
-- **Usuarios: edición y eliminación completa** — puedes cambiar nombre, contraseña, rol, o eliminar cualquier cuenta, excepto la que quede marcada como "Super Administrador" (protegida a propósito para que nunca te quedes sin acceso).
-
-**Entrega anterior (reportes: Código en vez de Id, rendimiento promedio, respaldo en varias hojas):**
-- **En Excel, PDF, PNG y JPG ya no aparece "Id"** — se cambió a **"Código"** en todos los reportes.
-- **Rendimiento promedio de todos, visible en cada reporte**: ahora el encabezado de cada Excel, PDF e imagen muestra el rendimiento promedio general del grupo.
-- **Respaldo completo con varias hojas**: Resumen, Histórico, Turno Actual, Personas, Metas Diarias y Configuración.
-
-**Entrega anterior (autenticación real, roles, Auditoría):**
-
-- **Login real con Supabase Auth**: el Administrador entra con su correo real; Ingeniero, Supervisor y Formador entran con un usuario y contraseña que el Administrador les crea desde el módulo **Usuarios**.
-- **Permisos reales por rol** (protegidos también en la base de datos, no solo en pantalla): solo Administrador e Ingeniero pueden modificar datos.
-
-- **Módulo Auditoría (nuevo, solo Administrador)**: barra de cuánto espacio real llevas usado en Supabase, alerta automática al Administrador cuando llegues al 88-90%, y un botón para generar un **respaldo completo en Excel con 6 hojas**: Resumen, Histórico, Turno Actual, Personas, Metas Diarias y Configuración — toda la base de datos organizada, no solo el Histórico.
-- **Se necesita una función serverless** (`api/crear-usuario.js`) para crear cuentas de forma segura — solo funciona una vez publicado en Vercel con la variable `SUPABASE_SERVICE_ROLE_KEY` configurada (ver sección 12).
-
-**Entrega anterior (media hora de almuerzo activada por defecto, guardado corregido, exportar a imagen):**
-- **Media hora de almuerzo activada por defecto**: ahora viene lista desde el inicio con "12:00, 30 minutos" — si registras de 6am a 1pm, automáticamente son 6.5 horas trabajadas. Los otros 2 espacios de descanso quedan libres para que agregues si necesitas.
-- **Arreglado el bug de "no se guarda"**: el interruptor y los descansos ahora se guardan solos, al instante — ya no dependen del botón "Guardar cambios" de otra sección. Si recargas la página o cambias de módulo, tu configuración se mantiene.
-- **Nueva opción: descargar como imagen (PNG o JPG)**: en Rendimientos, junto a Excel y PDF, hay botones para descargar el ranking como una sola imagen — sin importar cuántas personas tenga, todo queda contenido en una sola foto (se hace tan alta como haga falta, no se corta ni se reparte en varias).
-
-**Entregas anteriores (descuento de almuerzo, correcciones de Gerencia):**
-- **Descuento de tiempo de almuerzo**: en Configuración → "Descuentos de tiempo (almuerzo)" puedes activar hasta 3 descuentos, cada uno con su "hora de corte" y minutos a restar. Solo se descuenta si el bloque realmente cruza esa hora — si el bloque termina antes, no se resta nada. Aplica tanto al Turno Actual como al tiempo calculado automáticamente en el Histórico.
-- **Gerencia: vista previa corregida** — quité el `calc(100vh...)` que dependía del zoom/tamaño de pantalla y dejé una altura fija estable (680px), y quité el efecto de "zoom" al pasar el mouse que hacía ver borroso el contenido. También agregué un botón de recargar y un aviso si la otra app se queda pegada en su pantalla de carga (por bloqueo de almacenamiento de terceros en algunos navegadores).
-
-**Entregas anteriores (meta en Configuración, Gerencia más vistosa, segunda gráfica):**
-- **La meta de tallos de hoy ahora se define en Configuración, no en el Dashboard**: el Dashboard pasó a ser solo de visualización (como pediste), sin controles para editar nada. El campo "Meta de tallos de HOY" vive en Configuración, arriba de los parámetros generales.
-- **Segunda gráfica en el Dashboard**: además de la tendencia de 14 días, ahora hay una dona con la distribución del Turno Actual por estado (Excelente/Cumple/A punto/Bajo), lado a lado con la de tendencia.
-- **Vista previa de Gerencia más vistosa**: borde con degradado animado (verde/dorado/rojo de la marca), insignia "EN VIVO" con punto pulsante, y un leve efecto al pasar el mouse — se siente más como una integración nativa que una simple ventana embebida.
-
-**Entregas anteriores (gráficas, error de metas_diarias, Gerencia nativo):**
-- **Arreglado el error "Could not find the table 'public.metas_diarias'"**: si todavía no corriste la migración, el Dashboard ya no se rompe — usa el valor de Configuración mientras tanto y te avisa con un mensaje claro qué falta hacer. Recuerda correr `supabase/migracion_metas_diarias.sql` cuando puedas para que la meta por día quede guardada de verdad.
-- **Gráficas reales agregadas** (misma librería que tu proyecto de referencia, ApexCharts): tendencia de tallos por día en el Dashboard, distribución por estado (dona) en Ranking, y producción por bloque de hora en Rendimientos. Se cargan solo cuando entras a esas pantallas, para no hacer más lenta la app en general.
-- **Gerencia con pantalla completa de verdad**: al presionar "Pantalla completa", la Calculadora de Costo por Tallo ahora se sobrepone a TODA la pestaña (incluyendo el menú lateral), como una app nativa — se sale con el botón "Salir" o la tecla Esc.
-
-**Entregas anteriores (Ranking sin duplicados, meta diaria, móvil):**
-- **Corregido el bug de Ranking**: el Top 3 aparecía dos veces (una vez arriba como tarjetas grandes, y otra vez repetido dentro del bloque verde). Ya solo aparece una vez.
-- **Nuevas tarjetas en Ranking**: "Tallos Totales" y "Rendimiento Promedio" del período, junto a las que ya tenías (Mejor rendimiento, Operarios trabajando, Promedio general, Meta cumplida).
-- **La meta de tallos ahora es por día, no un valor fijo para siempre**: en el Dashboard puedes cambiar la meta de HOY con un clic, y no afecta ningún otro día. El valor de Configuración pasó a ser solo una sugerencia inicial (se explica en la sección 8.1).
-- **Ajustes de móvil**: tarjetas, panel de progreso y ranking se ven mejor en pantallas angostas (una columna, mejor espaciado, notificaciones ajustadas al ancho de pantalla).
-
-**Entregas anteriores (roles, notificaciones, Gerencia):**
-- **Sistema de roles**: 4 roles (Administrador, Ingeniero, Supervisor, Formador), cada uno ve solo los módulos que le corresponden en el menú lateral — y si alguien intenta entrar a una URL que no le corresponde, se le redirige al Dashboard. **Importante:** solo me diste las reglas de Administrador e Ingeniero; para Supervisor y Formador puse un criterio razonable por defecto — revísalo en la sección 8.2 y dime si quieres cambiarlo.
-- **Pantalla de inicio de sesión** (temporal, sin backend de autenticación todavía): eliges tu nombre y tu rol, y el sistema lo recuerda en el navegador. Es la base para conectar después el login real desde el módulo Usuarios.
-- **Notificaciones estilo campanita**, igual a la referencia que enviaste: ícono con contador rojo en la barra superior, panel desplegable con borde de color, "Marcar todas leídas", "Leído al abrir" y botón de eliminar. Ahí es donde ahora aparece la alerta de "rendimiento bajo sostenido" (antes vivía en un panel aparte dentro de Ranking).
-- **Barra superior con tu identidad**: fecha, "Tu nombre · Tu rol" y botón "Cerrar sesión", en todas las pantallas.
-- **Gerencia con la Calculadora de Costo por Tallo embebida**: tu otra app (`calculadora-costo-tallo.vercel.app`) se ve dentro de un marco tipo navegador, con botón de pantalla completa y de abrir en pestaña nueva. Si el sitio bloquea que lo muestren embebido, se avisa automáticamente con una alternativa.
-- **Dos módulos nuevos, vacíos por ahora**: "Usuarios" y "Auditoría" (solo visibles para Administrador) — listos para construir su contenido cuando lo pidas.
-
-**Entregas anteriores:**
-- Turno Actual con su propio filtro de fecha y KPIs propios (Personas Activas, Total Tallos, Rendimiento Promedio).
-- Ranking por mes o por fecha elegida, con "Mejor rendimiento del mes".
-- Excel corregido (error de compatibilidad `exceljs` + Vite, solucionado con `vite-plugin-node-polyfills`).
-- PDF corregido: ranking real, sin duplicados, ordenado de mayor a menor, con podio del Top 3.
-- Rediseño visual con colores del logo real, tarjetas KPI con acento por indicador, panel "hero" de cumplimiento, tablas estilo editorial.
-- "Ampliar" del Ranking con vista agrupada por nivel de desempeño (Cumple / A punto / Bajo).
-- Dashboard corregido para usar el Turno Actual en vivo (antes solo miraba el Histórico de hoy, casi siempre vacío).
-- Cumplimiento arreglado: llegar a la meta (470) dice "Cumple" en verde; 90-99% dice "A punto de cumplir" en amarillo con texto alusivo.
-- "Mesa" renombrado a "Código" (son códigos de trabajo, no mesas físicas) — el "Id" es el Colaborador Id.
-- Histórico por defecto muestra el día anterior. Botón "Ir a Turno Actual" con scroll directo.
-
----
-
-## 1. Qué se entregó (y qué cambió respecto a la versión anterior)
-
-- **Rediseño visual**, tomando como base el look & feel de tu otro proyecto (`calculadora-costo-tallo`): logo real de Falcon Farms · Finca Torremolinos en el menú, sidebar verde sólido, tarjetas planas, tipografía del sistema (más limpia y liviana), **pantalla de carga (splash) al abrir la app** con el logo, degradado verde y spinner, y **menú deslizante funcional en celular** (con botón ☰ y fondo oscuro al abrir), igual que en tu app de referencia. Los módulos (Dashboard, Personas, Rendimientos, Reportes, Ranking, Líneas, Indirectos, Gerencia, Configuración) siguen exactamente igual, solo cambió la piel visual.
-- **Fórmula de rendimiento corregida**, portada exactamente de tu archivo maestro (la validé fila por fila contra `B_D_RENDIMIENT_-TM-POS-02.xlsb`, hoja "Rendimiento"):
-
-  ```
-  Tiempo Real Laborado (horas) = (Tiempo Trabajado − Tiempo No Productivo) / 60
-  Rendimiento                  = Total Tallos / Tiempo Real Laborado (horas)
-  ```
+# Torremolinos Control (TMControl) — Manual de uso y de instalación
 
-  Cuando editas una persona, ahora escribes las **horas trabajadas** (por ejemplo "8"), la app las convierte a minutos, resta el tiempo no productivo si lo indicas, y te muestra en vivo el tiempo real y el rendimiento resultante — antes de guardar.
+Aplicación web de **producción floral** de Falcon Farms / Finca Torremolinos: sube el reporte de boncheo, calcula el rendimiento de cada persona, sigue la clasificación hora a hora, la calidad (devoluciones) y el presentismo, y deja todo listo para revisar, mostrar y descargar. Funciona en computador y en celular, con login real (Supabase) y se publica gratis en Vercel.
 
-- **El Histórico cambió de estructura**: ya no es una fila por bloque de hora, sino **un solo total por persona por día** (se suman automáticamente todos los bloques del Excel que subas), igual que la columna "Total Unidades" de tu archivo maestro. Así el rendimiento se calcula sobre el tiempo real trabajado en el día completo, no sobre un bloque suelto.
-- **Ranking con filtro Histórico (día) / Turno Actual (hora a hora)**: en la pestaña Ranking eliges cuál de las dos fuentes quieres ver, con su propio filtro de fecha.
-- **Un solo formato de Excel**: tu **Reporte Consolidado Boncheo**, en `.xls`, `.xlsx` o `.xlsb`.
-- **Base de datos real (Supabase)**, proyecto **tm-control**. El Excel nunca se guarda — solo los datos ya calculados.
-- **Turno Actual (hora a hora)**: cada carga reemplaza automáticamente la anterior — solo existe la última.
-- **Botón "Eliminar toda la tabla"** para cada una de las dos tablas, y edición/eliminación por registro individual.
-- **Ranking visual**: medallas, barra de progreso, % de eficiencia y estado (Excelente ≥110%, Cumple 90-109%, Bajo <90%), con opción de expandir y ver a todo el personal.
+Este manual tiene tres partes: **cómo se usa** (lo que ves dentro de la app, en la pantalla *Cómo se usa*), **instalación y mantenimiento** (para quien administra) y **novedades** (qué cambió en cada versión). **Se actualiza con cada función nueva** — ver la última sección técnica.
 
-> Si ya habías creado tu base de datos en Supabase con una versión anterior de este manual, **no vuelvas a correr `schema.sql`** — usa `supabase/migracion_v3.sql` (ver sección 3.1). Si aún no tienes datos importantes guardados, lo más simple es borrar las tablas viejas y correr `schema.sql` desde cero.
+<!-- USO:INICIO -->
 
----
+## Qué es y para quién
 
-## 2. Requisitos previos
+TMControl junta en un solo lugar lo que antes estaba repartido en Excel y papel:
 
-Solo necesitas instalar **Node.js** (incluye `npm`).
+- **Producción:** cuántos tallos hace cada persona por hora real, contra la meta.
+- **Clasificación:** tallos movidos hora a hora por línea, comparados con el día anterior.
+- **Calidad:** devoluciones por persona, causa, día, semana y mes.
+- **Personas:** el Tablero Integrado del Colaborador (TIC) junta productividad, calidad y presentismo de cada uno.
+- **Para mostrar y compartir:** modo *Presentar* para pantallas grandes, fotos listas (PNG/JPG), PDF, Excel y resúmenes.
 
-1. Entra a <https://nodejs.org>
-2. Descarga la versión **LTS** para tu sistema operativo.
-3. Instala normalmente, dejando todas las opciones por defecto.
-4. Confirma la instalación abriendo una terminal (`cmd`/`PowerShell` en Windows, `Terminal` en Mac) y escribiendo:
+Cada persona entra con su cuenta y ve solo lo que su **rol** permite (más abajo).
 
-   ```bash
-   node -v
-   npm -v
-   ```
+## Módulos incluidos
 
-   Si ambos responden con un número de versión, quedó listo.
+| Módulo | Qué hace | Quién lo ve |
+|---|---|---|
+| **Dashboard** | Resumen del Turno Actual en vivo, avance contra la meta, último Histórico, clasificación y formadoras, tendencia. Botón *Presentar* | Todos |
+| **Personas** | Catálogo de colaboradores: Emp.Cod, mesa (código) y nombre. Carga desde el Excel de Activos | Todos ven · editan Administrador, Ingeniero, Profesional y Digitador |
+| **Rendimientos** | Sube el *Reporte Consolidado Boncheo* y consulta el Turno Actual (hora a hora) y el Histórico | Todos ven · suben los que editan |
+| **Reportes** | Filtra, mira la vista previa de la foto y descarga en PNG, JPG, PDF o Excel | Todos |
+| **Ranking** | Quién rinde más, por persona y por formadora, con la distribución por estado | Todos |
+| **Líneas** | Líneas de producción, formadoras, asignación diaria de personal, tablero de formadoras y clasificador↔bonchador | Todos ven · editan los que editan |
+| **Clasificación** | Tallos por hora y por línea contra el día anterior | Todos |
+| **Devoluciones** | Calidad: resumen, Top 5, causas, tendencia, por colaborador y por formadora | Todos |
+| **TIC** | Tablero Integrado del Colaborador: productividad, calidad y presentismo de una persona | Todos |
+| **Tableros** | Tableros externos integrados dentro de la app (con nota de la clave) | Todos |
+| **Indirectos** | Personal indirecto: supervisión, calidad, logística, mantenimiento | Administrador, Ingeniero, Profesional, Digitador |
+| **Gerencia** | Vista ejecutiva con herramientas conectadas (ej. Costo por Tallo), protegida con clave | Administrador, Ingeniero, Profesional, Digitador |
+| **Configuración** | Metas, jornada, fin de semana del Ranking y descuentos de tiempo | Administrador y Digitador |
+| **Usuarios** | Crea cuentas y asigna roles | Administrador y Digitador |
+| **Auditoría** | Espacio de la base de datos, copias de seguridad, vaciar y depuración semestral | Solo Administrador |
+| **Resúmenes** | Resumen de la finca o de cada equipo, con imagen y texto | Solo Administrador |
+| **Cómo se usa** | Recorrido animado, manual interactivo con lecciones y simuladores, y las novedades de cada versión | Todos |
 
----
+## Primeros pasos
 
-## 3. Crear tu proyecto de Supabase ("tm-control")
+0. **Si es tu primera vez**, abre **Cómo se usa**: el *Recorrido* te enseña la app con dibujos que se mueven y el *Manual* te deja practicar cada módulo con simuladores.
+1. **Entra** con tu cuenta. El Administrador entra con correo; el resto con *usuario* y contraseña (los crea el Administrador en *Usuarios*).
+2. **El menú** de la izquierda (en el celular, el ícono de menú) lleva a cada módulo. Solo aparecen los que tu rol puede ver.
+3. **Buscador rápido:** pulsa `Ctrl + K` (o `⌘ + K` en Mac) y escribe el nombre de un módulo o una acción para saltar a ella.
+4. **Atajos de teclado:** pulsa `?` para ver la lista. Por ejemplo, `g` y luego una letra te lleva a una pantalla.
+5. **Tema oscuro, densidad y ambiente festivo:** en el menú de tu avatar (arriba a la derecha). La densidad *compacta* muestra más información en menos espacio; el ambiente festivo se puede apagar cuando quieras.
+6. **Instalar como app:** en Chrome o Edge, con el ícono de instalar de la barra de direcciones; en iPhone, Compartir → *Añadir a pantalla de inicio*. Una vez instalada, se actualiza sola cuando hay una versión nueva.
 
-Supabase es la base de datos donde queda toda la información. Es gratis para este tamaño de proyecto.
+## Cómo se usa cada módulo
 
-1. Entra a <https://supabase.com> y crea una cuenta (puedes usar tu cuenta de Google/GitHub).
-2. Clic en **"New Project"**.
-3. Ponle de nombre exactamente **`tm-control`** (o el que prefieras, no afecta el funcionamiento).
-4. Elige una contraseña de base de datos segura (guárdala, no la volverás a ver) y la región más cercana (por ejemplo, alguna en EE.UU. o Sudamérica).
-5. Espera 1-2 minutos mientras Supabase crea el proyecto.
-6. En el menú lateral, entra a **SQL Editor** → **New query**.
-7. Abre el archivo `supabase/schema.sql` que viene dentro del proyecto que te entregué, copia **todo** su contenido, pégalo en el editor de Supabase, y presiona **Run**.
-   - Esto crea las 4 tablas necesarias (`personas`, `configuracion`, `rendimiento_historico`, `rendimiento_actual`) ya optimizadas y con seguridad básica activada.
-8. Ve a **Project Settings** (ícono de engranaje) → **API**.
-9. Copia dos valores:
-   - **Project URL** (algo como `https://xxxxxxxx.supabase.co`)
-   - **anon public key** (una clave larga)
+### Dashboard
 
-Guarda esos dos datos, los necesitas en el siguiente paso.
+Es la pantalla de inicio: el saludo del día y, debajo, **Turno Actual (en vivo)** con las mesas activas, el total de tallos y el avance contra la meta del día. Más abajo están el **Último Histórico registrado**, la **Clasificación y formadoras**, las visualizaciones y la **Tendencia de Producción**.
 
-### 3.1 Ya tenías la base de datos creada (actualizar de v2 a v3)
+1. Quienes pueden cargar datos ven **Subir Reporte Boncheo** arriba a la derecha: lleva a *Rendimientos*.
+2. Pulsa **Presentar** para mostrar la producción en una pantalla grande (ver *Modo Presentar*).
+3. Si el último Histórico está desactualizado, la campana te lo avisa (ver *Notificaciones*).
 
-Si ya habías corrido una versión anterior de `schema.sql` y **quieres conservar los datos que ya subiste**:
+### Modo Presentar
 
-1. Ve a **SQL Editor** → **New query**.
-2. Abre `supabase/migracion_v3.sql`, copia todo su contenido y pégalo ahí.
-3. Presiona **Run**.
+Pensado para mostrar en una pantalla o televisor: diapositivas a pantalla completa con el **Top 3 de hoy**, el **Rendimiento hora a hora de todo el equipo**, la **Clasificación por línea** y el **Resumen por formadora**; las devoluciones aparecen cuando ya están cargadas para ese día. En temporada, trae decoración festiva. Controles: `←` y `→` cambian de diapositiva, la **barra espaciadora** pausa o reanuda, `+` y `-` cambian el tamaño, `F` apaga o enciende la decoración festiva y el botón **Salir** (arriba a la derecha) cierra la presentación.
 
-Esto convierte el Histórico de "una fila por bloque de hora" a "un total por persona por día" (sumando lo que ya tenías), sin perder tus registros.
+### Personas
 
-Si todavía no tienes datos importantes guardados (estás en pruebas), es más simple borrar las tablas antiguas desde **Table Editor** y correr `schema.sql` de una vez, desde cero.
+El catálogo que une todo: el **Emp.Cod** une a la persona con el boncheo y la **mesa** es su código corto.
 
----
+1. Para cargar muchas personas, usa **Cargar Excel de Activos**.
+2. Para agregar o corregir una, llena **Emp.Cod**, **Mesa (código)** y **Nombre completo** y pulsa **Guardar**.
+3. Mantén este catálogo al día: si una persona no está aquí, no aparece bien en los demás módulos.
 
-## 4. Instalar y conectar el proyecto
+### Rendimientos
 
-1. Descomprime `torremolinos-control.zip` en cualquier carpeta.
-2. Abre la terminal en esa carpeta:
+Aquí se sube el reporte y se consulta lo cargado.
 
-   ```bash
-   cd torremolinos-control
-   npm install
-   ```
+1. Elige el **Reporte Consolidado Boncheo** (`.xls`, `.xlsx` o `.xlsb`). El archivo **nunca se guarda**: solo sus datos.
+2. En **Guardar en** elige *Turno Actual* (el día en curso, hora a hora) o *Histórico* (días ya cerrados).
+3. Indica la **Fecha operación**. Las horas de inicio y fin son opcionales y, si las llenas, **sobrescriben** lo que dice el Excel.
+4. Para consultar, usa las tablas **Turno Actual (hora a hora)** e **Histórico**, con sus fechas y **Aplicar consulta**.
+5. **Eliminar toda la tabla** borra lo cargado en esa tabla: úsalo solo si de verdad hay que empezar de cero.
 
-   (El proyecto ya trae un archivo `.npmrc` que resuelve automáticamente un conflicto de versiones de la librería de gráficas — no necesitas hacer nada especial, `npm install` normal funciona.)
+### Reportes
 
-3. Dentro de la carpeta del proyecto, busca el archivo **`.env.example`**, haz una copia y renómbrala a **`.env`** (sin ".example").
-4. Abre `.env` con cualquier editor de texto y reemplaza con tus datos reales de Supabase:
+1. En **¿Qué quieres descargar?** elige la fuente: *Turno Actual* o *Histórico* (con sus fechas).
+2. Mira la **vista previa**: es la foto tal cual se descargará, con su encabezado, el rendimiento promedio, el total de tallos, los **cuatro estados** con su conteo y la tabla de personas.
+3. Descarga en **PNG**, **JPG**, **PDF** o **Excel**. Con **Pantalla completa** ves la foto grande.
+4. Abajo hay el resumen por línea, por formadora y la **Clasificación hora a hora** (con su propia vista previa).
 
-   ```
-   VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
-   VITE_SUPABASE_ANON_KEY=tu-anon-public-key-aqui
-   ```
+Los cuatro estados se calculan contra la meta por hora:
 
-5. Guarda el archivo.
-
----
-
-## 5. Ejecutar el sistema
-
-```bash
-npm run dev
-```
-
-Abre en tu navegador la dirección que te muestra la terminal (normalmente `http://localhost:5173`). Ya deberías ver el Dashboard conectado a tu base de datos (con 0 registros, hasta que subas tu primer Excel).
-
-Si ves un aviso amarillo de "Supabase no está configurado", revisa que el archivo `.env` tenga los valores correctos y reinicia `npm run dev`.
-
----
-
-## 6. Cómo funciona el módulo de Rendimientos
-
-> **Esta versión no requiere tocar la base de datos** — solo se corrigió la lógica de cálculo. Actualiza el código y listo.
-
-### 6.1 El Excel que siempre se usa
-
-Tu **Reporte Consolidado Boncheo**, tal como me lo compartiste. La app busca automáticamente estas columnas dentro del archivo (sin importar si su posición exacta cambia, porque es una exportación de tabla dinámica):
-
-| Columna del Excel | Qué guarda el sistema |
+| Estado | Regla |
 |---|---|
-| Mesa | Número de mesa (solo en Turno Actual) |
-| Colaborador Id | Código del colaborador |
-| Colaborador | Nombre completo |
-| Hora Acumulada | Bloque horario (ej. "06:00 - 10:00") |
-| Total Tallos | Tallos producidos; en Histórico se suman todos los bloques del día |
-| Total Ramos | Ramos producidos; igual, se suman en Histórico |
-| Semana Bonchado | Se detecta automáticamente (ej. 202636 = año 2026, semana 36) |
+| **Excelente** | 130 % o más de la meta |
+| **Cumple** | 100 % a 129 % |
+| **A punto de cumplir** | 90 % a 99 % |
+| **Por mejorar** | menos de 90 % |
 
-Soporta `.xls`, `.xlsx` y `.xlsb` sin ninguna configuración adicional.
+El Administrador ve además una tabla de **Tiempo Productivo** para detectar a quien trabajó muy poco tiempo; esa tabla **nunca** sale en los archivos que se descargan.
 
-### 6.2 Subir a Histórico vs. subir a Turno Actual
+### Ranking
 
-En la pantalla de Rendimientos eliges, antes de subir el archivo:
+Ordena a las personas por rendimiento y muestra la **Distribución por Estado** (los cuatro estados de arriba). También hay un ranking por formadora. La semana del ranking termina el día que fijes en *Configuración*.
 
-- **Turno actual (reemplaza lo anterior)**: para las cargas de hora a hora durante el día. Cada carga borra la anterior — solo existe la última. El rendimiento de cada bloque se calcula solo: **Tallos ÷ horas del bloque** (ej. bloque 06:00–10:00 = 4 horas, 2.300 tallos → 2.300 / 4 = 575 tallos/h). Si el bloque de horas está mal, lo editas con el lápiz y el rendimiento se recalcula automáticamente.
-- **Histórico (suma el total del día)**: suma todos los bloques de hora del archivo por persona → un total de tallos por día, **y también suma automáticamente los minutos trabajados** de esos mismos bloques — ya no hace falta escribirlos a mano. Si vuelves a subir un Excel para ese mismo día, el total y el tiempo se recalculan con lo nuevo.
+### Líneas
 
-### 6.3 Corregir el tiempo trabajado si hace falta (Histórico)
+Tiene tres usos:
 
-Aunque el tiempo ya se calcula solo al subir el Excel, puedes corregirlo: clic en el lápiz (✏️) de la fila y verás:
+1. **Líneas y formadoras:** qué formadora tiene cada línea.
+2. **Asignación diaria de personal:** quién trabajó con qué formadora y en qué línea ese día. De aquí salen el tablero de formadoras y los resúmenes por equipo.
+3. **Tablero de formadoras:** pulsa **Vista previa** para ver la imagen, y luego **Imagen** o **PDF** para descargarla.
 
-- El campo de **horas trabajadas** (ya viene lleno con lo calculado; lo puedes cambiar).
-- Un campo opcional de **tiempo no productivo, en minutos** (paradas, daños, etc.).
-- En vivo, el sistema te muestra el cálculo antes de guardar: *"Tiempo real: 480 min (8 h) → Rendimiento: 255 tallos/h"*.
+**Asignar un clasificador a un bonchador (por día):** busca por nombre al bonchador (entre los asignados ese día) y al clasificador (entre las personas del catálogo). Ese día el clasificador toma, en el TIC, la **asistencia, el rendimiento y las devoluciones** de su bonchador. Un clasificador tiene un solo bonchador por día; si lo cambias el mismo día, se reemplaza.
 
-La fórmula (verificada fila por fila contra tu archivo maestro):
+### Clasificación
 
-```
-Tiempo Real (horas) = (Horas trabajadas × 60 − Tiempo No Productivo) / 60
-Rendimiento          = Total Tallos / Tiempo Real (horas)      ← redondeado, sin decimales
-```
+Muestra los tallos movidos **hora a hora por línea**, comparados con el día anterior (o con otro día guardado que elijas).
 
-### 6.4 Filtros
+1. Alterna entre **Por hora** y **Acumulado**.
+2. Descarga en **Imagen** o **PDF**, o mira antes la **Vista previa**.
+3. El detalle por hora se conserva **4 días**; después queda el total diario en el histórico.
 
-El filtro de fecha aplica a ambas tablas (Histórico y Turno Actual) al mismo tiempo. También puedes buscar por nombre o código de colaborador.
+### Devoluciones
 
-### 6.5 Eliminar una tabla completa o un registro puntual
+La calidad de lo que se devuelve. Se alimenta con el Excel de devoluciones; al cargarlo, solo se escribe lo **nuevo o lo que cambió**. Tiene pestañas:
 
-Cada tabla tiene su botón **"Eliminar toda la tabla"**. Además, cada fila tiene su propio ícono de papelera para borrar solo ese registro, sin afectar el resto.
+- **Resumen:** totales por período y el **Top 3 de personas por causa**.
+- **Top 5:** quién tiene más y quién tiene menos devoluciones (la imagen lleva dos gráficos: devoluciones por día o mes y causas que más pesan).
+- **Causas**, **Tendencia**, **Colaborador** (el seguimiento de una persona) y **Formadoras**.
 
-### 6.6 Promedio general
+Las imágenes se pueden ver antes con **Vista previa** y bajar con **Descargar imagen**. En el *Top 3 por causa* eliges **Imagen con**: solo código (para mostrar en grupo), solo nombre (para verificar) o código y nombre. Los *mínimos de días trabajados* del Top 5 los fija el Administrador.
 
-Tanto la tabla **Histórico** como **Turno Actual** muestran ahora su propio indicador de **"Promedio general"** (tallos/hora) en la parte superior de cada tabla, junto al botón de eliminar.
+### TIC — Tablero Integrado del Colaborador
 
-### 6.7 Ranking — solo en la pestaña Ranking
+La ficha completa de una persona: **productividad, calidad y presentismo** juntas.
 
-El panel de ranking visual (medallas, barra de progreso, % de eficiencia) ya **no aparece dentro de Rendimientos** — vive únicamente en la pestaña **Ranking**, donde eliges entre **Histórico (día)** o **Turno Actual (hora a hora)**, cada uno con su propio filtro de fecha. Los números de rendimiento se muestran **sin decimales** (ej. 451.76 se ve como 452); el % de eficiencia sí conserva 2 decimales, igual que en tu referencia.
+1. Busca por **código corto** o por **nombre**.
+2. Verás sus indicadores, el calendario del mes y el detalle de cada día.
+3. En el **presentismo**, los domingos y los **festivos de Colombia** solo cuentan si la persona fue citada ese día; un día sin ningún registro en la finca no se considera trabajado.
+4. Si fue clasificador, el día muestra "Como clasificador de…" y toma los datos de su bonchador.
 
-> Nota: el Reporte Consolidado Boncheo que probé no trae columna de "Formador", así que esa columna no aparece todavía. Si tu Excel sí la incluye, cuéntame y la agrego.
+### Tableros e Indirectos
 
----
+- **Tableros:** tableros conectados de toda la operación dentro de la app. Quienes tienen la **nota de la clave** la ven enmascarada (`••••`) y pueden mostrarla u ocultarla.
+- **Indirectos:** el personal indirecto (supervisión, calidad, logística, mantenimiento).
 
-## 7. Cómo se optimizó el espacio en la base de datos
+### Gerencia
 
-Como pediste que no se guarde nada innecesario, el diseño de la base de datos (`supabase/schema.sql`) sigue estas reglas:
+Vista ejecutiva con herramientas conectadas, como **Costo por Tallo**. Está protegida con una clave; si la herramienta no abre, usa **Reintentar**.
 
-1. **El archivo Excel nunca se guarda** — ni como archivo, ni como texto plano, ni en ningún campo. Solo se guardan los 8-9 valores ya extraídos de cada fila.
-2. **Los nombres no se repiten en cada registro.** Existe una tabla `personas` (código → nombre) y el resto de tablas solo guardan el código numérico, no el nombre completo repetido miles de veces.
-3. **Tipos de datos pequeños.** Campos como tallos, ramos y rendimientos usan `smallint` (2 bytes) en vez del `integer` por defecto (4 bytes), porque sus valores nunca superan unos pocos miles.
-4. **Sin columnas de auditoría innecesarias.** No se guardan fechas de creación/modificación ni otros metadatos que no pediste.
-5. **Histórico agregado por día, no por bloque.** En vez de guardar una fila por cada bloque de hora del Excel (que se repite muchas veces al día por persona), el Histórico suma todo y guarda **una sola fila por persona por día** — mucho menos espacio, y es exactamente el nivel de detalle que necesitas para calcular el rendimiento real.
-6. **Los cálculos no se guardan, se recalculan al leer.** El tiempo real y el rendimiento no se almacenan como columnas — se calculan al momento a partir de los tallos y el tiempo trabajado, así nunca quedan desactualizados si editas algo.
+### Configuración
 
----
+Solo Administrador y Digitador. Aquí están:
 
-## 8. Configuración
+- **Meta de tallos de HOY** y la **meta por hora / persona**.
+- **Jornada** (hora de inicio y fin por defecto) y el día en que **termina la semana del Ranking**.
+- **Descuentos de tiempo** (Histórico y Turno Actual): por hora de corte y minutos a descontar, o para corregir una fecha.
 
-En la pestaña Configuración puedes ajustar (se guardan en la base de datos, aplican para todos):
+### Usuarios
 
-- Meta de tallos por hora por persona.
-- Meta de tallos **por defecto** (sugerida) — ver 8.1 para la meta real de cada día.
-- Horario por defecto de la jornada.
-- Ver cuántos registros hay en cada tabla y vaciarlas si es necesario.
-- **Mi sesión**: tu nombre y tu rol actual (selector temporal, ver 8.2).
+Solo Administrador y Digitador. En **Crear nueva cuenta** pones nombre completo, usuario (o correo para el Administrador), contraseña y **rol**. En **Cuentas existentes** cambias el rol, activas o desactivas la cuenta, o la eliminas.
 
----
+### Auditoría (solo Administrador)
 
-## 8.1 Meta de tallos por día
+El cuidado de la base de datos:
 
-Como pediste, la meta de tallos **ya no es un número fijo para siempre** — se define día por día:
+1. **Almacenamiento:** cuánto espacio usa la base.
+2. **¿Cuándo se llena la base de datos?:** una estimación con el ritmo real de los últimos 60 días, qué tablas la llenan y consejos para no quedarse sin espacio.
+3. **Copia de seguridad (`.tmbackup`):** **exporta** una copia de toda la información o **importa** una (combinando con lo actual, o reemplazando). Cada copia lleva una huella por tabla: si alguien la altera, se rechaza.
+4. **Copias automáticas:** una vez al mes se guarda sola una copia con el nombre *Backup TMControl* y las fechas del primer y último registro (ej. `Backup TMControl 12-10-26_6-2-27`). Se conservan las últimas 12.
+5. **Depuración semestral:** cuando hay datos de más de 6 meses, descarga **dos respaldos** (Excel y `.tmbackup`) y, escribiendo una frase de seguridad, elimina lo anterior al corte.
+6. **Vaciar datos operativos:** borra lo que se acumula día a día (conserva usuarios, personas, líneas y configuración). Exige una frase y haber descargado antes el respaldo.
 
-- En **Configuración**, arriba de todo, hay un campo **"Meta de tallos de HOY"** — lo escribes, guardas, y listo: esa meta aplica **solo para el día de hoy**.
-- El **Dashboard** solo muestra esa meta (tarjeta "Cumplimiento" y el panel de progreso) — es de pura visualización, no tiene ningún control para editarla ahí.
-- Si nunca defines una meta puntual para un día, el sistema usa automáticamente el valor de "Meta de tallos por defecto" que configures en la pestaña Configuración — así nunca te quedas sin meta, pero puedes ajustarla cualquier día sin que eso cambie los demás días.
-- Cada día queda guardado por separado en la base de datos (tabla `metas_diarias`), así que el historial de metas de cada fecha no se pierde.
+### Resúmenes (solo Administrador)
 
-> Si ya tenías el proyecto de Supabase creado antes de esta entrega, corre `supabase/migracion_metas_diarias.sql` en el SQL Editor (no borra nada existente). Si es una instalación nueva, ya viene incluido en `schema.sql`.
+El resumen de la **finca** o de **un equipo** (una formadora), por **semana anterior**, **mes anterior**, **últimos 7 días** o fechas a elección. Trae una imagen con tallos, rendimiento, cumplimiento, devoluciones, calidad y clasificación, comparados con el período anterior, y un texto con lo más importante. Puedes **Descargar imagen**, **Copiar texto** o verla en **Pantalla completa**. La *Firma* ("De parte de…") es opcional y se guarda en tu equipo.
 
----
+### Cómo se usa (este manual)
 
-## 8.2 Roles y permisos
+Para todos los roles. Tiene tres pestañas:
 
-Al abrir la app por primera vez en un navegador, te pide tu **nombre** y tu **rol** (se recuerda ahí mismo; para cambiarlo, usa "Cerrar sesión" en la barra superior o en Configuración → "Mi sesión"). Esto es un selector temporal: cuando quieras, construimos el login real conectado a Supabase Auth + el módulo Usuarios, y cada persona entrará con su propia cuenta en vez de elegir el rol manualmente.
+1. **Recorrido** (la primera): un paso por pantalla, con dibujos animados de las pantallas reales y cuatro puntos que explican lo importante. Avanza solo; puedes **Pausar**, ir atrás o adelante con los botones, con `←` `→` (la barra espaciadora pausa), tocando un tramo de la barra de arriba o deslizando en el celular. Cada paso trae **Ir a…** (te lleva a esa pantalla) y **Practícalo** (abre su lección).
+2. **Manual**: un centro de práctica. Cada módulo es una **lección** con tres etapas: **Mira** (el dibujo y los puntos), **Pruébalo** (un simulador que usa las mismas reglas de la app: mueves el deslizador y ves el estado, marcas días del calendario y ves el presentismo, cambias la base de datos y ves cuándo se llena, simulas la campana…) y **Demuéstralo** (un reto de una pregunta). Al acertar, la lección queda **dominada**, sube tu nivel (de Principiante a Experto TMControl) y se guarda en tu equipo. Dentro de cada lección puedes abrir *Leer la guía completa de este módulo*, y arriba, *Ver todo el texto (referencia)* con buscador.
+3. **Novedades**: qué cambió en cada versión. Cuando sale una versión nueva, la campana te avisa **una sola vez**.
 
-Estos son los módulos que ve cada rol hoy:
+## Notificaciones (la campana)
 
-| Módulo | Administrador | Ingeniero | Supervisor | Formador |
-|---|---|---|---|---|
-| Dashboard | ✅ | ✅ | ✅ | ✅ |
-| Personas | ✅ | ✅ | ✅ | — |
-| Rendimientos | ✅ | ✅ | ✅ | ✅ |
-| Reportes | ✅ | ✅ | ✅ | — |
-| Ranking | ✅ | ✅ | ✅ | ✅ |
-| Líneas | ✅ | ✅ | ✅ | — |
-| Indirectos | ✅ | ✅ | — | — |
-| Gerencia | ✅ | ✅ | — | — |
-| Configuración | ✅ | — | — | — |
-| Usuarios | ✅ | — | — | — |
-| Auditoría | ✅ | — | — | — |
+Arriba a la derecha. **Solo lo crítico interrumpe** (un aviso flotante, una vez al día); lo demás espera en la campana, **ordenado por importancia**: *Requieren atención*, *Importantes* e *Informativas*. Cada aviso trae un botón para ir a resolverlo.
 
-**Lo que tú definiste exactamente:** Administrador ve todo; Ingeniero ve todo menos los módulos técnicos (Configuración, Usuarios, Auditoría).
+- **Mañana:** te lo recuerda al día siguiente. **✕:** lo descarta.
+- **No molestar** (la lunita): silencia los avisos flotantes durante 1 hora o hasta mañana.
+- Cada rol ve solo lo suyo. Ejemplos: rendimiento bajo sostenido (3 o más días seguidos bajo el 90 % de la meta), devoluciones o Histórico sin cargar (sin contar domingos ni festivos), clasificadores sin asignar, base de datos casi llena, copia mensual pendiente, depuración semestral, el festivo del día y las **novedades de cada versión**.
 
-**Lo que yo asumí (avísame si quieres ajustarlo):** Supervisor ve la operación diaria pero no Indirectos, Gerencia ni lo técnico; Formador solo ve lo esencial para su turno (Dashboard, Rendimientos, Ranking). Para cambiar estas reglas, dime exactamente qué debe ver cada uno y lo ajusto en un archivo (`src/lib/roles.js`) — no requiere tocar nada más del sistema.
+## Fotos: vista previa, pantalla completa y descarga
 
----
+Todo lo que se puede descargar como imagen se puede **ver antes**, igual a como saldrá: ranking de Reportes, Top 5 y Top 3 por causa, Clasificación, tablero de formadoras y Resúmenes. Pulsa **Pantalla completa** para verla más grande y `Esc` para cerrar. Lo que ves y lo que se descarga salen del mismo dibujo, así que no pueden diferir.
 
-## 8.3 Gerencia — Calculadora de Costo por Tallo embebida
+## Roles y permisos
 
-El módulo Gerencia ahora muestra tu otra aplicación (`calculadora-costo-tallo.vercel.app`) integrada dentro de un marco tipo navegador, con:
+| Rol | Qué puede hacer |
+|---|---|
+| **Administrador** | Todo, incluida Auditoría, Resúmenes, Configuración y Usuarios |
+| **Ingeniero** | Ver todo y cargar/editar datos; ve Gerencia con su clave |
+| **Profesional** | Ver todo y cargar/editar datos |
+| **Digitador** | Cargar/editar datos; además Configuración y Usuarios |
+| **Supervisor** | Solo **ver** (sin botones de subir, editar ni borrar) |
+| **Formador** | Solo **ver**, igual que el Supervisor |
 
-- Botón **"Pantalla completa"** para verla más grande sin salir de Torremolinos Control.
-- Botón **"Abrir en pestaña nueva"** por si prefieres usarla aparte.
-- Un aviso automático si el sitio no permite mostrarse embebido (algunos sitios lo bloquean por seguridad) — en ese caso, usa el botón de abrir en pestaña nueva.
+## Flujo recomendado del día
 
-Es la app real funcionando en vivo — cualquier cálculo que hagas ahí se guarda en esa app, no dentro de Torremolinos Control.
+1. Al empezar el turno, sube el **Reporte Consolidado Boncheo** a *Turno Actual* (*Rendimientos*).
+2. Revisa el **Dashboard** durante el día; usa **Presentar** en la pantalla del equipo.
+3. Carga la **clasificación** y la **asignación diaria** (y los clasificadores, si hay).
+4. Al cerrar el día, guarda lo del día en **Histórico** y carga las **Devoluciones**.
+5. Cada semana, mira el **Ranking**, los **Resúmenes** y el **TIC** de quien necesites.
+6. Cada mes, el Administrador confirma que se hizo la **copia automática** (*Auditoría*).
 
----
+## Preguntas frecuentes
 
-## 8.4 Módulos nuevos: Usuarios y Auditoría
+**¿Por qué el presentismo de alguien es bajo?** Revisa si es clasificador: solo cuentan los días con asignación. Y recuerda que domingos y festivos no cuentan si no fue citado.
 
-Quedaron creados como espacio reservado (sin funcionalidad todavía), visibles solo para el rol Administrador:
+**¿Por qué un día no aparece en Devoluciones?** Todavía no se ha cargado; la campana avisa cuando faltan 2 o más días de trabajo.
 
-- **Usuarios**: aquí se administrarán las cuentas reales (crear usuario, asignar rol, activar/desactivar), conectado a Supabase Auth.
-- **Auditoría**: aquí quedará el historial de quién subió cada Excel, quién editó o eliminó un registro, y cuándo.
+**¿Puedo recuperar datos borrados?** Sí, si hay una copia: *Auditoría → Copia de seguridad → Importar*.
 
-Cuando quieras que construya cualquiera de los dos, dime qué necesitas ver exactamente ahí y seguimos.
+**¿Se manda algo por WhatsApp?** No. Los resúmenes y las imágenes se ven, se descargan o se copian desde la app.
 
----
+**¿La app funciona sin internet?** Abre sin conexión (es una PWA), pero para ver datos nuevos y subir reportes necesita conexión.
 
-## 9. Publicar el sistema en internet (opcional)
+## Limitaciones honestas
 
-Cuando quieras que el sistema tenga una dirección web accesible para tu equipo:
+- La **copia mensual automática** depende de que la tarea programada de Vercel esté configurada; si no, la campana avisa desde el día 3 que falta.
+- El **PDF** y el **Excel** de Reportes no tienen vista previa propia (las imágenes sí).
+- **Resúmenes** es solo para el Administrador porque muestra cifras de todo el personal.
+- Lo que **no** está probado en dispositivos reales (iPhone/Android) ni en una base de Supabase con Storage real se indica en las notas de cada versión.
 
-1. Genera la versión de producción:
+<!-- USO:FIN -->
 
-   ```bash
-   npm run build
+<!-- TECNICO:INICIO -->
+
+## Instalación y mantenimiento
+
+Lo que sigue es para quien administra la aplicación (no aparece en la pantalla *Cómo se usa*).
+
+### Parte 1 — Base de datos en Supabase (una sola vez)
+
+1. Entra a **supabase.com**, crea un proyecto y espera a que termine de aprovisionarse.
+2. Abre el **SQL Editor** y pega **todo** el contenido de `supabase/migracion_autenticacion.sql`. Se puede volver a ejecutar para actualizar una base existente; la sección 32 ya no se usa y se puede omitir.
+3. En **Authentication → Providers → Email**, desactiva **Confirm email**.
+4. En **Authentication → Users** crea el primer administrador y, en la tabla `perfiles`, ponle `rol = 'administrador'` y `es_super_admin = true`.
+5. En **Project Settings → API** copia la **Project URL**, la **anon public key** y la **service_role key** (esta última solo para Vercel, nunca en el código).
+
+### Parte 2 — Probarlo en tu computador
+
+Requisitos: **Node.js 18 o superior**.
+
+1. Descomprime el proyecto y abre una terminal dentro de la carpeta.
+2. Crea un archivo `.env` con:
    ```
+   VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
+   VITE_SUPABASE_ANON_KEY=tu-clave-anon-real
+   ```
+3. Instala y ejecuta:
+   ```
+   npm install
+   npm run dev
+   ```
+4. Abre **http://localhost:5173**.
 
-   Esto crea la carpeta `dist` con todo listo y optimizado.
+### Parte 3 — Publicarlo gratis en Vercel
 
-2. Sube esa carpeta a un servicio como [Vercel](https://vercel.com) o [Netlify](https://netlify.com) (ambos gratuitos para este tamaño de proyecto). En su panel puedes conectar tu proyecto de GitHub para que se publique solo cada vez que subas cambios, o arrastrar directamente la carpeta `dist`.
-3. **Importante:** en el panel de Vercel/Netlify tienes que configurar las mismas variables de entorno del paso 4 (`VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`), porque el archivo `.env` no se sube a internet por seguridad.
-4. En minutos obtienes una dirección pública para compartir con tu equipo — y como los datos ya viven en Supabase, todos verán la misma información en tiempo real.
+1. Sube la carpeta a un repositorio de GitHub y créalo en **vercel.com** (*Add New → Project*).
+2. Antes de *Deploy*, agrega en **Environment Variables**:
+   - `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (como en `.env`).
+   - `SUPABASE_SERVICE_ROLE_KEY` (solo en Vercel): la usan crear/gestionar usuarios y la copia automática.
+   - `CRON_SECRET` (una clave larga inventada por ti): protege la tarea programada.
+3. Pulsa **Deploy**. Cada `git push` republica sola.
 
----
+### Copia mensual automática (tarea programada)
 
-## 10. Seguridad — ya se resolvió con la autenticación real
+`vercel.json` programa una llamada diaria a `/api/cron-diario` (9:00 a. m. de Colombia). Si todavía no hay copia del mes, el servidor la genera y la guarda en el almacenamiento privado `respaldos` (se crea con la sección 30 del SQL). No depende de que alguien abra la app. Si no tienes `CRON_SECRET` y `SUPABASE_SERVICE_ROLE_KEY`, no se ejecuta.
 
-Antes, cualquiera que tuviera la dirección de tu Supabase podía leer y escribir todo. **Ya no es así** desde esta entrega: con `migracion_autenticacion.sql` (sección 12), solo quien inició sesión puede leer datos, y solo Administrador/Ingeniero pueden modificarlos.
+### Actualizar después de hacer cambios
 
-- **No compartas tu archivo `.env`** ni la clave "anon" fuera de tu equipo de trabajo.
-- **La clave `SUPABASE_SERVICE_ROLE_KEY` es aún más sensible** — nunca la pongas en el código de React ni en `.env` del proyecto (esa variable NO lleva el prefijo `VITE_` a propósito, para que nunca llegue al navegador). Solo va en las variables de entorno de Vercel (sección 12).
+1. Sustituye los archivos del proyecto y ejecuta `npm install` si cambió `package.json`.
+2. Si hay secciones nuevas en el SQL, ejecútalas en Supabase.
+3. `git push`. La app instalada se actualiza sola.
 
----
+### Comandos útiles
 
-## 11. Próximos pasos sugeridos
+| Comando | Para qué |
+|---|---|
+| `npm run dev` | Servidor local |
+| `npm run build` | Compilación de producción (con service worker) |
+| `npm run build:sin-pwa` | Compilar sin el service worker (diagnóstico) |
+| `npm run verificar-arquitectura` | Comprueba las reglas de dependencia y que no queden marcas de conflicto de Git |
+| `npm run verificar-manual` | Comprueba que cada módulo y la versión actual estén en este manual |
+| `npm run revisar-instalacion` | Busca archivos `package.json` dañados en `node_modules` |
+| `npm run diagnosticar-build` | Señala qué archivo falló si la compilación se detiene |
 
-- **Personas**: administración de colaboradores (alta/edición), aprovechando la tabla `personas` ya creada.
-- **Reportes**: informes por rango de fechas, exportables en PDF.
-- **Líneas**: consolidado de producción por línea/mesa.
-- **Indirectos**: seguimiento del personal que no produce tallos directamente.
+### Si la app no carga o la compilación falla
 
-Cualquier duda sobre un paso específico, dime en qué parte te quedaste y seguimos desde ahí.
+1. Debe existir `.env` (o las variables en Vercel). Tras agregarlas en Vercel, haz **Redeploy**.
+2. Si en Windows la compilación se detiene al generar el service worker, el proyecto ya usa una carpeta temporal propia; ejecuta `npm run revisar-instalacion`.
+3. Si Git dejó marcas `<<<<<<<` en algún archivo, `npm run verificar-arquitectura` las encuentra.
+4. En la app, usa la consola del navegador (`F12`) para ver el error.
 
----
+### Estructura del proyecto
 
-## 12. Cómo activar la autenticación real (IMPORTANTE — hazlo en este orden)
-
-### 12.1 Correr el SQL en Supabase
-
-Ve a tu proyecto de Supabase → **SQL Editor** → **New query**, pega el contenido completo de `supabase/migracion_autenticacion.sql` y dale **Run**. Esto crea:
-- La tabla `perfiles` (nombre + rol de cada cuenta).
-- Las funciones de seguridad (`es_administrador`, `puede_editar`, `almacenamiento_usado_mb`).
-- Las políticas nuevas que exigen haber iniciado sesión para leer, y ser Administrador/Ingeniero para escribir.
-- La columna `almacenamiento_limite_mb` en Configuración (500 MB por defecto, el límite del plan gratuito).
-
-### 12.2 Desactivar la confirmación de correo (panel de Supabase, no es SQL)
-
-1. En tu proyecto de Supabase, ve a **Authentication** → **Providers** → **Email**.
-2. Busca la opción **"Confirm email"** y **apágala**.
-
-Esto es necesario porque los usuarios que no son Administrador entran con un correo "falso" (`usuario@torremolinos.local`) que nunca va a recibir un correo de confirmación real.
-
-### 12.3 Crear tu primera cuenta de Administrador
-
-Como el módulo Usuarios solo deja crear cuentas a alguien que YA es Administrador, la primera cuenta hay que crearla directo en Supabase:
-
-1. Ve a **Authentication** → **Users** → **Add user** → **Create new user**.
-2. Pon tu correo real y una contraseña.
-3. Marca **"Auto Confirm User"**.
-4. Dale crear.
-5. Ahora ve a **Table Editor** → tabla **perfiles** → **Insert row**:
-   - `id`: copia el ID del usuario que acabas de crear (lo ves en la lista de Authentication → Users).
-   - `nombre`: tu nombre.
-   - `rol`: `administrador`
-   - `activo`: `true`
-6. Guarda.
-
-Ya puedes entrar a la app con ese correo y esa contraseña — desde ahí, crea a todos los demás (Ingeniero, Supervisor, Formador) directamente desde el módulo **Usuarios**, sin volver a tocar Supabase manualmente.
-
-### 12.4 Configurar la función de crear usuarios (necesaria para Vercel)
-
-El módulo Usuarios necesita una función especial (`api/crear-usuario.js`, ya incluida en el proyecto) que usa una clave privada de Supabase. Para que funcione una vez publicado en Vercel:
-
-1. En Supabase, ve a **Project Settings** → **API**.
-2. Copia la clave **`service_role`** (es distinta a la "anon" — ¡nunca la compartas ni la subas a GitHub!).
-3. En Vercel, ve a tu proyecto → **Settings** → **Environment Variables**, y agrega:
-
-   | Name | Value |
-   |---|---|
-   | `SUPABASE_SERVICE_ROLE_KEY` | (la clave `service_role` que copiaste) |
-
-4. Vuelve a desplegar el proyecto en Vercel (Deployments → los tres puntos → Redeploy) para que tome la nueva variable.
-
-> **Nota sobre pruebas locales:** crear usuarios nuevos desde el módulo Usuarios **solo funciona una vez publicado en Vercel** (la función `/api/crear-usuario` no corre con `npm run dev` normal). Mientras pruebas localmente, crea las cuentas directo en Supabase como en el paso 12.3.
-
-### 12.5 Roles y lo que ves cada uno (recordatorio)
-
-| | Administrador | Ingeniero | Supervisor | Formador |
-|---|---|---|---|---|
-| Entra con | Correo real | Usuario y contraseña | Usuario y contraseña | Usuario y contraseña |
-| Ve todos los módulos | ✅ | Todo menos Usuarios/Auditoría/Configuración | Solo visualización | Solo visualización |
-| En Rendimientos | Todo | Todo | Solo lectura (igual que Formador) | Solo lectura, sin editar/subir/borrar |
-| Filtrar y exportar reportes | ✅ (en Reportes) | ✅ (en Reportes) | ✅ (en Reportes) | — |
-| Puede editar/borrar/subir datos | ✅ | ✅ | ❌ | ❌ |
-
----
-
-## 13. Últimas migraciones — corre esto también
-
-Estas 3 líneas quedaron agregadas al final de `supabase/migracion_autenticacion.sql`. Si ya habías corrido ese archivo antes, solo hace falta correr estas 3 líneas nuevas (SQL Editor → New query → Run):
-
-```sql
--- Guarda qué Mesas (Código) usó cada persona ese día en el Histórico,
--- para que los reportes del Histórico también puedan mostrar el Código.
-alter table rendimiento_historico add column if not exists codigos text;
-
--- Marca de "Super Administrador" (cuenta protegida, nadie la puede tocar)
-alter table perfiles add column if not exists es_super_admin boolean not null default false;
+```
+torremolinos-control/
+├── MANUAL.md                ← este manual (lo lee también la pantalla "Cómo se usa")
+├── supabase/migracion_autenticacion.sql   ← todo el esquema y las funciones
+├── api/                     ← funciones del servidor (usuarios y copia mensual)
+├── scripts/                 ← verificadores (arquitectura, manual, instalación)
+└── src/
+    ├── lib/                 ← lógica: módulos PUROS (cálculos) y de infraestructura (base de datos)
+    ├── components/          ← piezas de pantalla
+    ├── pages/               ← una página por módulo
+    └── styles/              ← estilos
 ```
 
-### 13.1 Marcar tu cuenta como Super Administrador
+La regla de dependencias (la lógica pura no toca la base de datos ni la pantalla) está en `ARQUITECTURA.md` y la vigila `npm run verificar-arquitectura`.
 
-Para que tu propia cuenta quede protegida (nadie más, ni siquiera otro administrador, la pueda editar o eliminar por accidente desde el módulo Usuarios):
+### Cómo se mantiene este manual
 
-1. Ve a Supabase → **Authentication** → **Users**, copia tu **ID** (el de tu cuenta de correo).
-2. SQL Editor → corre esto reemplazando el ID:
-   ```sql
-   update perfiles set es_super_admin = true where id = 'TU-ID-AQUI';
-   ```
-3. Listo — desde ahora, esa cuenta aparece con un candado 🔒 en Usuarios y nadie puede tocarla desde ahí.
+**Cada vez que se actualiza la app o se agrega una función, este manual se actualiza en el mismo cambio:**
 
-### 13.2 PWA — cómo instalarla en el celular
+1. Si hay un **módulo nuevo**, agrégalo a la tabla *Módulos incluidos*, escribe su sección en *Cómo se usa cada módulo* y crea su paso en el recorrido (`src/lib/recorrido.js`, con su dibujo en `src/components/recorrido/Visuales.jsx`) y su lección interactiva (`src/lib/aprende.js`: un simulador o cuatro cartas para descubrir, y un reto de tres opciones). Los textos son cortos: título, una frase y hasta 4 puntos.
+2. Si cambia o se agrega una función de uno existente, ajusta su sección.
+3. Sube la `version` de `package.json` y agrega arriba, en *Historial de cambios*, una entrada `### Versión X.Y.Z — dd/mm/aaaa · título`.
+4. Ejecuta `npm run verificar-manual`: falla si falta un módulo del menú (en la tabla, en su sección, en el recorrido o en las lecciones), si un texto del recorrido o de un reto es demasiado largo o la versión actual no está en el historial.
 
-**En Android (Chrome):**
-1. Entra a la app publicada en Chrome.
-2. Te va a aparecer un aviso de "Agregar a pantalla de inicio", o desde el menú (⋮) → **"Instalar app"**.
-3. Se agrega con el ícono correcto, y al abrirla no se ve la barra del navegador.
+La campana avisa a cada persona, una sola vez por versión, que hay novedades.
 
-**En iPhone (Safari — es el único navegador de iOS que permite esto):**
-1. Entra a la app publicada en Safari (no funciona igual de bien en Chrome para iPhone).
-2. Toca el botón de compartir (el cuadrado con la flecha hacia arriba).
-3. Busca **"Agregar a pantalla de inicio"**.
-4. Confirma — ahora sí debería verse el ícono correcto (antes no tenía las etiquetas necesarias para iPhone; ya quedó corregido).
+<!-- TECNICO:FIN -->
 
-**En Windows (Chrome o Edge):**
-1. Entra a la app publicada.
-2. En la barra de direcciones, verás un ícono de "Instalar" (una pantalla con una flecha).
-3. Clic ahí → Instalar. Queda como una app de escritorio independiente.
+<!-- NOVEDADES:INICIO -->
 
-### 13.3 Cómo funciona el modo sin internet
+## Historial de cambios
 
-Si subes un Excel y no hay conexión (o se corta a mitad de la subida), el sistema:
-1. Guarda el archivo procesado en el propio dispositivo (no se pierde).
-2. Te avisa con una banda naranja/gris arriba de la pantalla.
-3. En cuanto vuelve el internet, sube todo solo y te confirma con una banda verde.
+### Versión 1.3.0 — 22/10/2026 · Manual interactivo con simuladores
 
-Esto es una primera versión simplificada — guarda los cambios pendientes en el navegador de ese dispositivo específico (si cierras el navegador sin que haya subido, al volver a abrirlo debería reintentar solo). Si necesitas algo más robusto a futuro (como que funcione igual de bien cerrando la app por completo), lo podemos reforzar más adelante.
+- **El manual ya no es solo texto:** cada módulo es una lección con tres etapas, *Mira*, *Pruébalo* y *Demuéstralo*, con progreso, niveles (de Principiante a Experto TMControl) y confeti al dominarla.
+- **Simuladores con las reglas reales de la app:** estados de rendimiento (Excelente, Cumple, A punto de cumplir, Por mejorar), subir un reporte, presentismo con domingos y festivos de Colombia, la imagen real del Top 3 por causa, cuándo se llena la base de datos y la campana de notificaciones.
+- **Recorrido más descriptivo:** cuatro puntos por paso y cada dibujo dentro de una ventana de la app; cada paso tiene el botón *Practícalo*.
+- El texto completo sigue disponible como *referencia*, con buscador.
+- Cada módulo nuevo debe traer su lección: `npm run verificar-manual` lo exige.
 
+### Versión 1.2.0 — 22/10/2026 · Recorrido animado para aprender la app
+
+- **Cómo se usa ahora es un recorrido animado:** un paso por pantalla, con pocas palabras y un dibujo que se mueve para cada módulo. Avanza solo, se puede pausar, ir atrás o adelante, saltar a un paso y, en cada uno, ir directo a la pantalla.
+- Cada rol ve solo los pasos de lo que puede usar.
+- El manual completo y las novedades siguen en las pestañas *Manual* y *Novedades*.
+- Cada módulo nuevo debe traer su paso: `npm run verificar-manual` lo exige.
+
+### Versión 1.1.0 — 22/10/2026 · Manual dentro de la app, vista previa, resúmenes y copias
+
+- **Cómo se usa:** este manual ahora está dentro de la app, con buscador y novedades; la campana avisa de cada versión nueva.
+- **Vista previa de las fotos:** ranking de Reportes, Top 5, Top 3 por causa, Clasificación, tablero de formadoras y Resúmenes se ven antes de descargar, iguales a la foto, y con **Pantalla completa**. Los cuatro estados (Excelente, Cumple, A punto de cumplir, Por mejorar) se ven con su conteo y su regla.
+- **Resúmenes:** resumen de la finca o de cada equipo, con imagen (con el **logo real**) y texto para copiar. Se quitaron los envíos por WhatsApp.
+- **Notificaciones rediseñadas:** campana agrupada por importancia, con botón de acción, *Mañana* y *No molestar*; el aviso flotante solo interrumpe lo crítico. El aviso de Histórico desactualizado pasó a la campana.
+- **Copias de seguridad:** copia `.tmbackup` (exportar e importar), copia mensual automática desde el servidor con el nombre *Backup TMControl* y las fechas, y **depuración semestral** con doble respaldo.
+- **Auditoría:** estimación de cuándo se llena la base de datos, con consejos.
+- **Clasificadores:** asignar un clasificador a un bonchador por día; en el TIC toma su asistencia, rendimiento y devoluciones.
+- **Festivos de Colombia:** domingos y festivos entran al presentismo solo para quien fue citado; el calendario del mes los marca.
+- **Top 3 por causa:** la imagen se puede hacer por código, por nombre o por ambos.
+- **Roles:** el Formador tiene los mismos permisos de solo lectura que el Supervisor.
+- **Base de datos:** nuevas secciones 28 a 31 del SQL (vaciar, clasificadores, copias y depuración, espacio).
+
+### Versión 1.0.0 — Versión base
+
+- Dashboard con Turno Actual en vivo y modo Presentar.
+- Rendimientos (carga del Reporte Consolidado Boncheo), Reportes (PNG, JPG, PDF y Excel), Ranking, Líneas, Clasificación y Personas.
+- Devoluciones, TIC, Tableros, Indirectos y Gerencia.
+- Configuración, Usuarios con roles y Auditoría.
+- App instalable (PWA) con actualización automática.
+
+<!-- NOVEDADES:FIN -->

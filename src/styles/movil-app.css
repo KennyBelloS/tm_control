@@ -24,7 +24,6 @@ button, a, summary, label, select{ touch-action:manipulation; }
 @media (max-width:1023px){
   .topbar{ padding-top:calc(var(--sa-top) + 8px); padding-left:max(12px,var(--sa-left)); padding-right:max(12px,var(--sa-right)); }
   .page{ padding-left:max(14px,var(--sa-left)); padding-right:max(14px,var(--sa-right)); }
-  .aviso-historico-flotante{ left:12px; right:12px; max-width:none; }
 }
 
 /* Notificaciones y menú de la persona: ocupan el ancho de la pantalla, pegados a la barra superior */

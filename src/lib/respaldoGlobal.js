@@ -19,6 +19,7 @@ export const TABLAS = [
   { tabla: 'devoluciones_dia', hoja: 'Devoluciones', titulo: 'Devoluciones (una fila por persona y día)', grupo: 'calidad', vaciar: true, orden: ['fecha', 'colaborador_id'] },
   { tabla: 'devoluciones_asistencia', hoja: 'Asistencia', titulo: 'Asistencia diaria (de devoluciones)', grupo: 'calidad', vaciar: true, orden: ['mes', 'colaborador_id'] },
   { tabla: 'asignaciones_diarias', hoja: 'Asignaciones', titulo: 'Asignación diaria de personas a formadora y línea', grupo: 'organizacion', vaciar: true, orden: ['fecha', 'colaborador_id'] },
+  { tabla: 'asignaciones_clasificador', hoja: 'Asign. clasificador', titulo: 'Clasificador asignado a cada bonchador por día', grupo: 'organizacion', vaciar: true, orden: ['fecha', 'clasificador_id'] },
   { tabla: 'tablero_formadoras', hoja: 'Tablero formadoras', titulo: 'Tablero integrado de formadoras', grupo: 'organizacion', vaciar: true, orden: ['fecha', 'formadora_id'] },
   { tabla: 'lineas_dia', hoja: 'Líneas por día', titulo: 'Líneas que trabajaron cada día', grupo: 'organizacion', vaciar: true, orden: ['fecha'] },
   { tabla: 'formadora_linea', hoja: 'Formadora-línea', titulo: 'Formadora a cargo de cada línea', grupo: 'organizacion', vaciar: true, orden: [] },

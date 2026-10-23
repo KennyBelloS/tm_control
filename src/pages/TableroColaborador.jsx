@@ -129,6 +129,7 @@ export default function TableroColaborador() {
                   <div className="colab-chips">
                     <span className="dev-codigo codigo-copiable" title="Clic para copiar el código" data-copiar={persona.codigo ?? persona.mesa ?? ''}>Código {persona.codigo ?? persona.mesa ?? '—'}</span>
                     {persona.rol && <span className="colab-chip"><i className="fa-solid fa-user-tag"></i> {persona.rol}</span>}
+                    {t.clasificador && <span className="colab-chip colab-chip-clasif" title="Cada día toma la asistencia, el rendimiento y las devoluciones del bonchador que tiene asignado"><i className="fa-solid fa-people-arrows"></i> Clasificador · {t.clasificador.dias} día{t.clasificador.dias === 1 ? '' : 's'} con {t.clasificador.bonchadores.length} bonchador{t.clasificador.bonchadores.length === 1 ? '' : 'es'}</span>}
                     {t.asignacion ? <Link className="colab-chip colab-chip-enlace" to="/lineas" title={`Asignación del ${t.asignacion.fecha.slice(8)}/${t.asignacion.fecha.slice(5, 7)}`}><i className="fa-solid fa-people-group"></i> {t.asignacion.formadora}{t.asignacion.linea ? ` · ${t.asignacion.linea}` : ''}</Link> : <span className="colab-chip colab-chip-gris">Sin formadora asignada</span>}
                     <span className={`colab-chip ${t.devolucion.enModulo ? '' : 'colab-chip-gris'}`}><i className="fa-solid fa-rotate-left"></i> {t.devolucion.enModulo ? `En Devoluciones (código ${t.devolucion.codigoDev ?? '—'})` : 'No está en Devoluciones'}</span>
                   </div>

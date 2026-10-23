@@ -10,6 +10,8 @@ export default function DetalleDia({ dia, metaHora, razonesNombre, ultimaDev, en
   const razones = Object.entries(dia.razones || {}).sort((a, b) => b[1] - a[1]);
   return (
     <section className="colab-detalle" key={dia.fecha}>
+      {(dia.festivo || dia.tipoDia === 'domingo') && <p className="colab-detalle-especial"><i className="fa-solid fa-calendar-day"></i> {dia.festivo ? `Festivo en Colombia: ${dia.festivo}` : 'Domingo'} — día no laborable; solo cuenta si hubo reporte.</p>}
+      {dia.via && <p className="colab-detalle-via"><i className="fa-solid fa-people-arrows"></i> Como clasificador de <b>{dia.via.nombre}</b>: este día toma su asistencia, rendimiento y devoluciones.</p>}
       <header><h4>{diaTxt(dia.fecha)}</h4>{dia.estado && <span className={`colab-nivel colab-nivel-${{ success: 'ok', warning: 'aviso', danger: 'mal' }[dia.estado.css]}`}>{dia.estado.label}</span>}</header>
       {dia.trabajo ? (
         <>

@@ -812,7 +812,7 @@ as $$
 declare
   tablas text[] := array['rendimiento_historico', 'historico_bloques', 'rendimiento_actual', 'metas_diarias', 'descansos_diarios',
     'clasificacion_cargas', 'clasificacion_hora', 'clasificacion_historico', 'devoluciones_dia', 'devoluciones_asistencia',
-    'asignaciones_diarias', 'tablero_formadoras', 'lineas_dia', 'formadora_linea', 'metas_linea_mes'];
+    'asignaciones_diarias', 'asignaciones_clasificador', 'tablero_formadoras', 'lineas_dia', 'formadora_linea', 'metas_linea_mes'];
   t text; n bigint; conteos jsonb := '{}'::jsonb; total bigint := 0; existentes text[] := '{}'; quien text;
 begin
   if not es_administrador() then raise exception 'Solo un administrador puede vaciar la base de datos.' using errcode = '42501'; end if;
@@ -837,4 +837,242 @@ begin
 end $$;
 revoke all on function vaciar_datos_operativos(text) from public, anon;
 grant execute on function vaciar_datos_operativos(text) to authenticated;
+NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 29. LÍNEAS: "Asigna un clasificador a un bonchador". Cada DÍA se asigna a un clasificador (una persona del módulo Personas)
+--     con un bonchador. Ese día el clasificador toma, para el Tablero Integrado del Colaborador, la ASISTENCIA (cuenta como si hubiera
+--     venido), el RENDIMIENTO y las DEVOLUCIONES (calidad) del bonchador asignado. Si cambia de bonchador, cada día guarda el suyo.
+--     · Un clasificador tiene un solo bonchador por día (si se cambia el mismo día, se reemplaza).
+--     · Todos los usuarios con sesión LEEN; solo quien puede editar (Administrador, Ingeniero, Profesional, Digitador) asigna o quita.
+--       Supervisor y Formador son solo lectura.
+-- =====================================================================
+create table if not exists asignaciones_clasificador (
+  id               bigint generated always as identity primary key,
+  fecha            date   not null,
+  clasificador_id  bigint not null references personas(id) on delete cascade,
+  bonchador_id     bigint not null references personas(id) on delete cascade,
+  creado_por       uuid   default auth.uid(),
+  creado_en        timestamptz not null default now(),
+  unique (fecha, clasificador_id),
+  check (clasificador_id <> bonchador_id)
+);
+create index if not exists idx_asig_clasif_fecha on asignaciones_clasificador (fecha);
+create index if not exists idx_asig_clasif_bonchador on asignaciones_clasificador (bonchador_id, fecha);
+alter table asignaciones_clasificador enable row level security;
+do $$ declare pol record; begin
+  for pol in select policyname from pg_policies where schemaname = 'public' and tablename = 'asignaciones_clasificador' loop
+    execute format('drop policy %I on public.asignaciones_clasificador', pol.policyname);
+  end loop;
+end $$;
+create policy "leer_asig_clasificador" on asignaciones_clasificador for select to authenticated using (true);
+create policy "insertar_asig_clasificador" on asignaciones_clasificador for insert to authenticated with check (puede_editar());
+create policy "actualizar_asig_clasificador" on asignaciones_clasificador for update to authenticated using (puede_editar()) with check (puede_editar());
+create policy "borrar_asig_clasificador" on asignaciones_clasificador for delete to authenticated using (puede_editar());
+revoke all on asignaciones_clasificador from anon;
+do $$ begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    begin alter publication supabase_realtime add table asignaciones_clasificador; exception when duplicate_object then null; end;
+  end if;
+end $$;
+NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 30. COPIA DE SEGURIDAD DE LA BASE DE DATOS (archivo .tmbackup que la app exporta e importa) y DEPURACIÓN SEMESTRAL.
+--     Todo es SOLO para el Administrador.
+--     · restaurar_tabla: inserta filas de una copia en una tabla de la lista (sin pisar las que ya existen; respeta los ID originales).
+--       La lista NO incluye "perfiles": los usuarios nunca se restauran desde una copia.
+--     · restablecer_secuencias: deja los contadores (ID automáticos) por encima del mayor ID restaurado.
+--     · depurar_datos_anteriores: elimina lo anterior a una fecha de corte, que debe tener al menos 6 meses de antigüedad.
+--     · registrar_respaldo: deja constancia (quién y cuándo) de una copia manual, mensual o importada.
+--     · Bucket privado "respaldos" en Storage para las copias automáticas mensuales (no ocupa espacio de la base de datos).
+-- =====================================================================
+create or replace function restaurar_tabla(p_tabla text, p_filas jsonb)
+returns integer
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  permitidas text[] := array['configuracion', 'personas', 'lineas', 'formadoras', 'devoluciones_personas', 'devoluciones_meta', 'devoluciones_ajustes',
+    'rendimiento_historico', 'historico_bloques', 'rendimiento_actual', 'metas_diarias', 'descansos_diarios', 'clasificacion_cargas', 'clasificacion_hora',
+    'clasificacion_historico', 'devoluciones_dia', 'devoluciones_asistencia', 'asignaciones_diarias', 'asignaciones_clasificador', 'tablero_formadoras',
+    'lineas_dia', 'formadora_linea', 'metas_linea_mes'];
+  n integer := 0;
+begin
+  if not es_administrador() then raise exception 'Solo un administrador puede restaurar una copia de seguridad.' using errcode = '42501'; end if;
+  if not (p_tabla = any(permitidas)) then raise exception 'La tabla "%" no se puede restaurar.', p_tabla using errcode = '22023'; end if;
+  if to_regclass('public.' || p_tabla) is null then raise exception 'La tabla "%" no existe en esta base de datos.', p_tabla using errcode = '42P01'; end if;
+  if p_filas is null or jsonb_typeof(p_filas) <> 'array' or jsonb_array_length(p_filas) = 0 then return 0; end if;
+  execute format('insert into public.%I overriding system value select * from jsonb_populate_recordset(null::public.%I, $1) on conflict do nothing', p_tabla, p_tabla) using p_filas;
+  get diagnostics n = row_count;
+  return n;
+end $$;
+revoke all on function restaurar_tabla(text, jsonb) from public, anon;
+grant execute on function restaurar_tabla(text, jsonb) to authenticated;
+
+create or replace function restablecer_secuencias()
+returns integer
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  tablas text[] := array['configuracion', 'personas', 'lineas', 'formadoras', 'devoluciones_meta', 'devoluciones_ajustes', 'rendimiento_historico', 'historico_bloques',
+    'rendimiento_actual', 'asignaciones_diarias', 'asignaciones_clasificador', 'tablero_formadoras'];
+  t text; sec text; n integer := 0;
+begin
+  if not es_administrador() then raise exception 'Solo un administrador puede hacer esto.' using errcode = '42501'; end if;
+  foreach t in array tablas loop
+    if to_regclass('public.' || t) is null then continue; end if;
+    sec := pg_get_serial_sequence(format('public.%I', t), 'id');
+    if sec is null then continue; end if;
+    execute format('select setval(%L, greatest(coalesce((select max(id) from public.%I), 0), 1), (select max(id) is not null from public.%I))', sec, t, t);
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+revoke all on function restablecer_secuencias() from public, anon;
+grant execute on function restablecer_secuencias() to authenticated;
+
+create or replace function depurar_datos_anteriores(p_corte date, p_confirmacion text)
+returns jsonb
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare
+  tablas text[] := array['rendimiento_historico', 'historico_bloques', 'rendimiento_actual', 'metas_diarias', 'descansos_diarios', 'clasificacion_cargas',
+    'clasificacion_hora', 'clasificacion_historico', 'devoluciones_dia', 'asignaciones_diarias', 'asignaciones_clasificador', 'tablero_formadoras',
+    'lineas_dia', 'formadora_linea'];
+  t text; n bigint; conteos jsonb := '{}'::jsonb; total bigint := 0; quien text;
+begin
+  if not es_administrador() then raise exception 'Solo un administrador puede depurar la base de datos.' using errcode = '42501'; end if;
+  if p_confirmacion is distinct from 'DEPURAR_DATOS_ANTIGUOS' then raise exception 'Confirmación inválida: no se eliminó nada.' using errcode = '22023'; end if;
+  if p_corte is null or p_corte > (current_date - interval '6 months')::date then
+    raise exception 'La fecha de corte debe tener al menos 6 meses de antigüedad. No se eliminó nada.' using errcode = '22023';
+  end if;
+  foreach t in array tablas loop
+    if to_regclass('public.' || t) is null then continue; end if;
+    execute format('delete from public.%I where fecha < $1', t) using p_corte;
+    get diagnostics n = row_count;
+    conteos := conteos || jsonb_build_object(t, n); total := total + n;
+  end loop;
+  if to_regclass('public.devoluciones_asistencia') is not null then
+    delete from devoluciones_asistencia where mes < date_trunc('month', p_corte)::date;
+    get diagnostics n = row_count;
+    conteos := conteos || jsonb_build_object('devoluciones_asistencia', n); total := total + n;
+  end if;
+  select nombre into quien from perfiles where id = auth.uid();
+  insert into respaldo_eventos (usuario, usuario_nombre, accion, detalle) values (auth.uid(), quien, 'depuracion_semestral', jsonb_build_object('corte', p_corte, 'filas', total, 'tablas', conteos));
+  return jsonb_build_object('corte', p_corte, 'filas', total, 'tablas', conteos);
+end $$;
+revoke all on function depurar_datos_anteriores(date, text) from public, anon;
+grant execute on function depurar_datos_anteriores(date, text) to authenticated;
+
+create or replace function registrar_respaldo(p_accion text, p_detalle jsonb default '{}'::jsonb)
+returns void
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare quien text;
+begin
+  if not es_administrador() then raise exception 'Solo un administrador puede registrar copias de seguridad.' using errcode = '42501'; end if;
+  if p_accion not in ('backup_manual', 'backup_mensual', 'backup_importado') then raise exception 'Acción no válida.' using errcode = '22023'; end if;
+  select nombre into quien from perfiles where id = auth.uid();
+  insert into respaldo_eventos (usuario, usuario_nombre, accion, detalle) values (auth.uid(), quien, p_accion, coalesce(p_detalle, '{}'::jsonb));
+end $$;
+revoke all on function registrar_respaldo(text, jsonb) from public, anon;
+grant execute on function registrar_respaldo(text, jsonb) to authenticated;
+
+-- Bucket privado para las copias automáticas mensuales (solo si existe Storage en este proyecto)
+do $$ begin
+  if to_regclass('storage.buckets') is not null then
+    insert into storage.buckets (id, name, public) values ('respaldos', 'respaldos', false) on conflict (id) do nothing;
+  end if;
+  if to_regclass('storage.objects') is not null then
+    execute 'drop policy if exists "respaldos_admin_leer" on storage.objects';
+    execute 'drop policy if exists "respaldos_admin_subir" on storage.objects';
+    execute 'drop policy if exists "respaldos_admin_actualizar" on storage.objects';
+    execute 'drop policy if exists "respaldos_admin_borrar" on storage.objects';
+    execute $p$create policy "respaldos_admin_leer" on storage.objects for select to authenticated using (bucket_id = 'respaldos' and public.es_administrador())$p$;
+    execute $p$create policy "respaldos_admin_subir" on storage.objects for insert to authenticated with check (bucket_id = 'respaldos' and public.es_administrador())$p$;
+    execute $p$create policy "respaldos_admin_actualizar" on storage.objects for update to authenticated using (bucket_id = 'respaldos' and public.es_administrador()) with check (bucket_id = 'respaldos' and public.es_administrador())$p$;
+    execute $p$create policy "respaldos_admin_borrar" on storage.objects for delete to authenticated using (bucket_id = 'respaldos' and public.es_administrador())$p$;
+  end if;
+end $$;
+NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 31. ESPACIO: cuánto ocupa cada tabla (para estimar cuándo se llena la base de datos y qué la llena).
+--     Solo el Administrador. Devuelve, por tabla, el tamaño en bytes (con índices) y el número de filas.
+-- =====================================================================
+create or replace function uso_por_tabla()
+returns table (tabla text, bytes bigint, filas bigint)
+language plpgsql security definer stable set search_path = public, pg_temp
+as $$
+declare
+  t text;
+  tablas text[] := array['rendimiento_historico', 'historico_bloques', 'rendimiento_actual', 'metas_diarias', 'descansos_diarios', 'clasificacion_cargas', 'clasificacion_hora', 'clasificacion_historico', 'devoluciones_dia', 'devoluciones_asistencia', 'asignaciones_diarias', 'asignaciones_clasificador', 'tablero_formadoras', 'lineas_dia', 'formadora_linea', 'metas_linea_mes', 'personas', 'lineas', 'formadoras', 'devoluciones_personas', 'devoluciones_meta', 'devoluciones_ajustes', 'configuracion', 'perfiles'];
+begin
+  if not es_administrador() then raise exception 'Solo un administrador puede ver el uso de espacio.' using errcode = '42501'; end if;
+  foreach t in array tablas loop
+    if to_regclass('public.' || t) is null then continue; end if;
+    tabla := t;
+    bytes := pg_total_relation_size(format('public.%I', t)::regclass);
+    execute format('select count(*) from public.%I', t) into filas;
+    return next;
+  end loop;
+end $$;
+revoke all on function uso_por_tabla() from public, anon;
+grant execute on function uso_por_tabla() to authenticated;
+NOTIFY pgrst, 'reload schema';
+
+-- =====================================================================
+-- 32. RESÚMENES AUTOMÁTICOS POR WHATSAPP. Todo es SOLO para el Administrador (hay números de teléfono).
+-- (YA NO SE USA: los resúmenes ahora solo se ven, descargan y copian desde la app, sin envíos por WhatsApp. Esta sección se puede omitir.)
+--     · resumen_config: quién envía ("de parte de"), el nombre de la finca y si se avisa antes de enviar.
+--     · resumen_destinos: a quién se envía (nombre + número), qué resumen (general o el de una formadora) y cada cuánto (semanal / mensual).
+--     · resumen_envios: el registro de cada envío. Antes de enviar queda en estado "aviso" (se puede CANCELAR); luego "enviado", "cancelado" o "error".
+--     Lo envían las tareas programadas del servidor (vercel.json → /api/cron-diario) con la llave de servicio, que no depende de estas políticas.
+-- =====================================================================
+create table if not exists resumen_config (
+  id             smallint primary key default 1 check (id = 1),
+  remitente      text not null default '',
+  finca          text not null default 'Finca Torremolinos',
+  aviso_previo   boolean not null default true,
+  actualizado_en timestamptz not null default now()
+);
+insert into resumen_config (id) values (1) on conflict (id) do nothing;
+create table if not exists resumen_destinos (
+  id           bigint generated always as identity primary key,
+  nombre       text not null check (length(trim(nombre)) > 0),
+  numero       text not null check (numero ~ '^\+?[0-9]{8,15}$'),
+  tipo         text not null default 'general' check (tipo in ('general', 'formadora')),
+  formadora_id bigint references formadoras(id) on delete cascade,
+  semanal      boolean not null default true,
+  mensual      boolean not null default false,
+  activo       boolean not null default true,
+  creado_en    timestamptz not null default now(),
+  check (tipo <> 'formadora' or formadora_id is not null)
+);
+create table if not exists resumen_envios (
+  id             bigint generated always as identity primary key,
+  destino_id     bigint not null references resumen_destinos(id) on delete cascade,
+  frecuencia     text not null check (frecuencia in ('semanal', 'mensual', 'manual')),
+  desde          date not null,
+  hasta          date not null,
+  programado_para timestamptz,
+  estado         text not null default 'aviso' check (estado in ('aviso', 'cancelado', 'enviado', 'error')),
+  detalle        jsonb not null default '{}'::jsonb,
+  creado_en      timestamptz not null default now(),
+  unique (destino_id, frecuencia, desde)
+);
+do $$ declare t text; pol record; begin
+  foreach t in array array['resumen_config', 'resumen_destinos', 'resumen_envios'] loop
+    execute format('alter table public.%I enable row level security', t);
+    for pol in select policyname from pg_policies where schemaname = 'public' and tablename = t loop execute format('drop policy %I on public.%I', pol.policyname, t); end loop;
+    execute format('create policy "admin_leer_%s" on public.%I for select to authenticated using (es_administrador())', t, t);
+    execute format('create policy "admin_insertar_%s" on public.%I for insert to authenticated with check (es_administrador())', t, t);
+    execute format('create policy "admin_actualizar_%s" on public.%I for update to authenticated using (es_administrador()) with check (es_administrador())', t, t);
+    execute format('create policy "admin_borrar_%s" on public.%I for delete to authenticated using (es_administrador())', t, t);
+    execute format('revoke all on public.%I from anon', t);
+  end loop;
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    begin alter publication supabase_realtime add table resumen_envios; exception when duplicate_object then null; end;
+  end if;
+end $$;
 NOTIFY pgrst, 'reload schema';

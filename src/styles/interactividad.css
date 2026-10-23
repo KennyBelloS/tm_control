@@ -3,10 +3,19 @@
    ===================================================================== */
 
 /* ---------- Avisos flotantes ---------- */
-.toasts{ position:fixed; left:22px; bottom:22px; z-index:1300; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
-.toast{ display:flex; align-items:center; gap:10px; padding:11px 16px; border-radius:14px; font-size:13px; font-weight:600; color:#fff; background:#0E1A13; box-shadow:var(--elev-4); animation:toast-entra .35s var(--ease-resorte); max-width:340px; }
-.toast i{ font-size:15px; color:#5BD08A; } .toast-error{ background:#8F1D33; } .toast-error i{ color:#FFB4C0; } .toast-info i{ color:#9CC7FF; }
-@keyframes toast-entra{ from{ transform:translateY(14px) scale(.96); opacity:0; } to{ transform:none; opacity:1; } }
+.toasts{ position:fixed; left:22px; bottom:22px; z-index:1300; display:flex; flex-direction:column; gap:10px; pointer-events:none; }
+.toast{ --tc:var(--ok, #1F8A4C); position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; padding:13px 12px 15px 14px; min-width:300px; max-width:min(440px,calc(100vw - 28px)); border-radius:18px; background:var(--panel, #fff); color:var(--text, #1A2A20); box-shadow:0 18px 40px -14px rgba(8,30,18,.45), 0 0 0 1px color-mix(in srgb, var(--tc) 22%, transparent); animation:toast-entra .4s var(--ease-resorte); pointer-events:auto; }
+.toast-error{ --tc:#C0392B; } .toast-info{ --tc:#2F6FB3; }
+.toast .ti-icono{ flex-shrink:0; width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:17px; color:#fff; background:var(--tc); }
+.toast .ti-texto{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; font-size:13px; line-height:1.4; } .toast .ti-texto strong{ font-size:14px; font-weight:800; } .toast .ti-texto span{ color:var(--text-soft, #4B5A51); font-weight:500; }
+.toast:not(:has(strong)) .ti-texto span{ color:var(--text, #1A2A20); font-weight:700; font-size:13.5px; }
+.toast .ti-accion{ flex-shrink:0; padding:7px 14px; border-radius:20px; font-size:12.5px; font-weight:800; color:#fff; background:var(--tc); } .toast .ti-accion:hover{ filter:brightness(1.1); }
+.toast .ti-cerrar{ flex-shrink:0; width:28px; height:28px; border-radius:50%; font-size:12px; color:var(--gray); } .toast .ti-cerrar:hover{ background:var(--superficie-2, #eee); color:var(--text); }
+.toast::after{ content:''; position:absolute; left:0; bottom:0; height:3px; width:100%; background:var(--tc); transform-origin:left; animation:toast-tiempo var(--dur, 4s) linear forwards; }
+@keyframes toast-tiempo{ from{ transform:scaleX(1); } to{ transform:scaleX(0); } }
+@keyframes toast-entra{ from{ transform:translateY(16px) scale(.96); opacity:0; } to{ transform:none; opacity:1; } }
+@media (max-width:640px){ .toasts{ left:12px; right:12px; } .toast{ min-width:0; max-width:none; } }
+@media (prefers-reduced-motion:reduce){ .toast::after{ animation:none; display:none; } }
 
 /* ---------- Volver arriba ---------- */
 .volver-arriba{ position:fixed; right:22px; bottom:22px; z-index:55; width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:15px; color:#fff; background:linear-gradient(135deg,var(--primary-dark),var(--primary)); box-shadow:var(--elev-3); opacity:0; transform:translateY(12px) scale(.9); pointer-events:none; transition:opacity var(--mov-3) ease, transform var(--mov-3) var(--ease-resorte); }

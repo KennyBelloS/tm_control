@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import logo from '../assets/logo-icon.png';
-import { exportarElemento } from '../lib/exportarElemento';
+import { exportarElemento, vistaPreviaElemento } from '../lib/exportarElemento';
+import { ModalVistaImagen } from '../components/VistaPreviaImagen';
 import { fechaLocalISO, formatoFecha } from '../lib/clasificacionCalculos';
 import { esFilaMesaLegada, coincidePersona } from '../lib/personasUtil';
 import PageHeader from '../components/PageHeader';
@@ -18,6 +19,7 @@ import {
 import { limpiarTexto } from '../lib/seguridad';
 import { devolucionesDePersonas } from '../lib/devoluciones';
 import { Link } from 'react-router-dom';
+import AsignarClasificador from '../components/lineas/AsignarClasificador';
 import { usePeriodoDev, useExtrasTablero } from '../lib/periodoDev';
 import { FiltroDevoluciones, FiltroExtrasTablero, valorPeriodo, etiquetaPeriodo, CifraDev } from '../components/devoluciones/PiezasDevLineas';
 import { EstadoVacio, FilasEsqueleto } from '../components/Estados';
@@ -150,6 +152,8 @@ export default function Lineas() {
   }
   const tableroExportRef = useRef(null);
   const [exportandoTablero, setExportandoTablero] = useState(null);
+  const [previaTablero, setPreviaTablero] = useState(null);
+  async function verPreviaTablero() { setPreviaTablero({ src: null }); try { setPreviaTablero({ src: await vistaPreviaElemento(tableroExportRef.current) }); } catch (e) { setPreviaTablero(null); setMensaje({ tipo: 'err', texto: e.message }); } }
   async function descargarTablero(formato) {
     setExportandoTablero(formato);
     try { await exportarElemento(tableroExportRef.current, `tablero_formadoras_${tableroDesde}_a_${tableroHasta}`, formato); }
@@ -599,6 +603,8 @@ export default function Lineas() {
           </div>
         </section>
 
+        <AsignarClasificador fecha={fechaAsignacion} esHoy={fechaAsignacion === hoy} asignaciones={asignaciones} personas={personas} puedeModificar={puedeModificar} />
+
         {asignacionesPorLinea.length > 0 && (
           <section className="panel">
             <div className="panel-header">
@@ -651,8 +657,10 @@ export default function Lineas() {
               <p>Formadora, línea, fecha y rendimiento promedio se llenan solos (de Boncheo). Escribe a mano Semana, Meta, Resultado y Devoluciones — se guardan al salir del campo.</p>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-secondary" disabled={!!exportandoTablero || tableroFilas.length === 0} onClick={verPreviaTablero}><i className="fa-solid fa-eye"></i> Vista previa</button>
               <button className="btn-secondary" disabled={!!exportandoTablero || tableroFilas.length === 0} onClick={() => descargarTablero('png')}><i className="fa-solid fa-file-image"></i> {exportandoTablero === 'png' ? 'Generando…' : 'Imagen'}</button>
               <button className="btn-secondary" disabled={!!exportandoTablero || tableroFilas.length === 0} onClick={() => descargarTablero('pdf')}><i className="fa-solid fa-file-pdf"></i> {exportandoTablero === 'pdf' ? 'Generando…' : 'PDF'}</button>
+              {previaTablero && <ModalVistaImagen titulo="Vista previa — Tablero de formadoras" src={previaTablero.src} onCerrar={() => setPreviaTablero(null)} acciones={[{ texto: 'Descargar imagen', icono: 'fa-file-image', primario: true, deshabilitado: !previaTablero.src || !!exportandoTablero, onClick: () => descargarTablero('png') }]} />}
             </div>
           </div>
           <div className="form-row" style={{ gridTemplateColumns: '1fr 1fr', padding: '0 20px 14px' }}>

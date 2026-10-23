@@ -18,11 +18,13 @@ export default function MapaMes({ dias, mesDe, seleccionado, onElegir, hoy }) {
         {celdas.map((f, i) => {
           if (!f) return <span key={`h${i}`} className="colab-celda vacia"></span>;
           const d = porFecha.get(f);
+          const especial = d && d.tipoDia !== 'ordinario';
+          const etiquetaEspecial = d?.festivo ? `Festivo: ${d.festivo}` : d?.tipoDia === 'domingo' ? 'Domingo' : '';
           const clic = d?.trabajo;
           const estilo = d?.trabajo ? { background: COLOR_ESTADO[d.estado.css] } : undefined;
           return (
-            <button key={f} role="gridcell" className={`colab-celda ${d?.trabajo ? 'trabajo' : ''} ${d ? '' : 'fuera'} ${f === seleccionado ? 'sel' : ''} ${f === hoy ? 'hoy' : ''}`} style={estilo} disabled={!clic} onClick={() => clic && onElegir(f)}
-              title={d?.trabajo ? `${f.slice(8)}/${f.slice(5, 7)} · ${Math.round(d.rend)} t/h (${d.pct.toFixed(0)}%)${d.devol ? ` · ${d.devol} devoluciones` : ''}` : d ? 'Sin trabajo' : 'Fuera del período'}>
+            <button key={f} role="gridcell" className={`colab-celda ${d?.trabajo ? 'trabajo' : ''} ${d ? '' : 'fuera'} ${especial ? (d.festivo ? 'festivo' : 'domingo') : ''} ${f === seleccionado ? 'sel' : ''} ${f === hoy ? 'hoy' : ''}`} style={estilo} disabled={!clic} onClick={() => clic && onElegir(f)}
+              title={d?.trabajo ? `${etiquetaEspecial ? etiquetaEspecial + ' · ' : ''}${f.slice(8)}/${f.slice(5, 7)} · ${Math.round(d.rend)} t/h (${d.pct.toFixed(0)}%)${d.devol ? ` · ${d.devol} devoluciones` : ''}` : d ? (etiquetaEspecial ? `${etiquetaEspecial} (día no laborable)` : 'Sin trabajo') : 'Fuera del período'}>
               <b>{Number(f.slice(8))}</b>
               {d?.trabajo && <small>{Math.round(d.rend)}</small>}
               {d?.devol > 0 && <i className="colab-celda-dev">{d.devol}</i>}
@@ -30,7 +32,7 @@ export default function MapaMes({ dias, mesDe, seleccionado, onElegir, hoy }) {
           );
         })}
       </div>
-      <div className="colab-mapa-leyenda"><span><i style={{ background: COLOR_ESTADO.success }}></i>≥ 100 %</span><span><i style={{ background: COLOR_ESTADO.warning }}></i>90–99 %</span><span><i style={{ background: COLOR_ESTADO.danger }}></i>&lt; 90 %</span><span><i className="gris"></i>sin trabajo</span><span><i className="dev"></i>devoluciones</span></div>
+      <div className="colab-mapa-leyenda"><span><i style={{ background: COLOR_ESTADO.success }}></i>≥ 100 %</span><span><i style={{ background: COLOR_ESTADO.warning }}></i>90–99 %</span><span><i style={{ background: COLOR_ESTADO.danger }}></i>&lt; 90 %</span><span><i className="gris"></i>sin trabajo</span><span><i className="fest"></i>festivo</span><span><i className="dom"></i>domingo</span><span><i className="dev"></i>devoluciones</span></div>
     </section>
   );
 }

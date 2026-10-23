@@ -204,3 +204,30 @@ export function devolucionesPorFormadora(datos, personas, P, quienEsLaFormadora)
   }
   return res;
 }
+
+// ---- Emparejar personas de la app con las del módulo de Devoluciones (regla pura; la usan el navegador y el servidor) ----
+export const palabras = n => normalizarNombre(n).split(' ').filter(p => p.length > 1);
+export function subconjunto(a, b) { const [chico, grande] = a.length <= b.length ? [a, b] : [b, a]; return chico.length >= 2 && chico.every(p => grande.includes(p)); }
+/** Sin código de mesa, un nombre parcial solo sirve si trae al menos 3 palabras (nombre y apellidos) y es el ÚNICO que coincide. */
+export const unicoParcial = (lista, pal, sacar) => { const c = lista.filter(x => sacar(x).length >= 3 && subconjunto(sacar(x), pal)); return c.length === 1 ? c[0] : null; };
+
+/**
+ * Empareja personas de la app (Líneas, Personas…) con las personas del módulo de Devoluciones.
+ * personasApp = [{ id, nombre, mesa }]   personasDev = [{ id, nombre, codigo }]   → Map(idApp → persona de Devoluciones | null)
+ * Orden: 1) mismo ID  2) mismo nombre  3) nombre parcial + mismo código  4) nombre parcial de 3+ palabras y ÚNICO (nunca adivina entre dos).
+ */
+export function emparejarConDevoluciones(personasApp, personasDev) {
+  const porId = new Map(personasDev.map(p => [p.id, p]));
+  const porNombre = new Map(personasDev.map(p => [normalizarNombre(p.nombre), p]));
+  const lista = personasDev.map(p => ({ ...p, pal: palabras(p.nombre) }));
+  const res = new Map();
+  for (const a of personasApp) {
+    const pal = palabras(a.nombre);
+    const dev = porId.get(a.id)
+      || porNombre.get(normalizarNombre(a.nombre))
+      || (a.mesa != null ? lista.find(x => x.codigo === a.mesa && subconjunto(pal, x.pal)) : null)
+      || unicoParcial(lista, pal, x => x.pal);
+    res.set(a.id, dev || null);
+  }
+  return res;
+}

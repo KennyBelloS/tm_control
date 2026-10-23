@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
-import RankingExcelTable from '../components/RankingExcelTable';
+import PreviaRanking from '../components/PreviaRanking';
 import ClasificacionPanel from '../components/ClasificacionPanel';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
 import { useSesion } from '../lib/useSesion';
@@ -396,12 +396,7 @@ export default function Reportes() {
           ) : rankingParaMostrar.length === 0 ? (
             <EstadoVacio icono="fa-inbox" titulo="Sin datos para este filtro" />
           ) : (
-            <RankingExcelTable
-              lista={rankingParaMostrar}
-              metaHora={metaHora}
-              titulo={fuenteExportar === 'historico' ? `Vista previa — ${rango.etiqueta}` : 'Vista previa — Turno Actual'}
-              topInicial={10}
-            />
+            <PreviaRanking tipo={fuenteExportar} filas={filasParaExportar} cfg={cfg} fecha={verSoloConfiables ? `${rango.etiqueta} (sin poco tiempo)` : rango.etiqueta} titulo={fuenteExportar === 'historico' ? `Vista previa — ${rango.etiqueta}` : 'Vista previa — Turno Actual'} />
           )}
         </section>
 

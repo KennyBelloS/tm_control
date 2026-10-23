@@ -7,8 +7,8 @@ import { alternarTema } from '../lib/tema';
 import { MODULOS_PRINCIPALES, MODULOS_GESTION, MODULOS_TECNICOS } from './Sidebar';
 
 // "g" y luego una letra = ir a esa pantalla (como en las herramientas profesionales)
-const IR_A = { d: 'dashboard', p: 'personas', r: 'rendimientos', e: 'reportes', k: 'ranking', l: 'lineas', c: 'clasificacion', o: 'devoluciones', b: 'colaborador', t: 'tableros', i: 'indirectos', h: 'gerencia', u: 'usuarios' };
-const NOMBRE = { d: 'Dashboard', p: 'Personas', r: 'Rendimientos', e: 'Reportes', k: 'Ranking', l: 'Líneas', c: 'Clasificación', o: 'Devoluciones', b: 'TIC · Tablero Integrado del Colaborador', t: 'Tableros' };
+const IR_A = { d: 'dashboard', p: 'personas', r: 'rendimientos', e: 'reportes', k: 'ranking', l: 'lineas', c: 'clasificacion', o: 'devoluciones', b: 'colaborador', t: 'tableros', i: 'indirectos', h: 'gerencia', u: 'usuarios', a: 'ayuda' };
+const NOMBRE = { d: 'Dashboard', p: 'Personas', r: 'Rendimientos', e: 'Reportes', k: 'Ranking', l: 'Líneas', c: 'Clasificación', o: 'Devoluciones', b: 'TIC · Tablero Integrado del Colaborador', t: 'Tableros', a: 'Cómo se usa' };
 
 const escribiendo = el => !!el && (['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName) || el.isContentEditable);
 

@@ -21,6 +21,13 @@ import './styles/tema-oscuro.css';             // tokens y ajustes del tema oscu
 import './styles/fiestas.generated.css';     // paletas de las festividades (generado)
 import './styles/efectos.css';               // capa ambiental, 3D, saludo, panel y adornos festivos
 import './styles/auditoria-respaldo.css';    // respaldo global y vaciado de la base de datos
+import './styles/clasificadores.css';        // asigna un clasificador a un bonchador
+import './styles/notificaciones.css';        // campana de notificaciones
+import './styles/aprende.css';              // manual interactivo (lecciones y simuladores)
+import './styles/recorrido.css';            // recorrido animado de Cómo se usa
+import './styles/ayuda.css';                 // pantalla Cómo se usa (el manual)
+import './styles/vistaprevia.css';           // vista previa de las imágenes (igual a la foto descargada)
+import './styles/resumenes.css';             // resúmenes
 import './styles/movil-app.css';             // áreas seguras del iPhone, app instalada, notificaciones y login en celular
 import ErrorBoundary from './components/ErrorBoundary';
 import { aplicarAjustesIniciales } from './lib/ajustesUI';

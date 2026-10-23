@@ -19,6 +19,8 @@ import Devoluciones from './pages/Devoluciones';
 import TableroColaborador from './pages/TableroColaborador';
 import Usuarios from './pages/Usuarios';
 import Auditoria from './pages/Auditoria';
+import Resumenes from './pages/Resumenes';
+import Ayuda from './pages/Ayuda';
 import { useSesion } from './lib/useSesion';
 const TIEMPO_MINIMO_SPLASH = 1300;
 export default function App() {
@@ -50,6 +52,8 @@ export default function App() {
         <Route path="/configuracion" element={<ProtectedRoute modulo="configuracion"><Configuracion /></ProtectedRoute>} />
         <Route path="/usuarios" element={<ProtectedRoute modulo="usuarios"><Usuarios /></ProtectedRoute>} />
         <Route path="/auditoria" element={<ProtectedRoute modulo="auditoria"><Auditoria /></ProtectedRoute>} />
+        <Route path="/resumenes" element={<ProtectedRoute modulo="resumenes"><Resumenes /></ProtectedRoute>} />
+        <Route path="/ayuda" element={<ProtectedRoute modulo="ayuda"><Ayuda /></ProtectedRoute>} />
       </Route>
     </Routes>;
 }

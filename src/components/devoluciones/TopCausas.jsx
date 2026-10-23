@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { topPersonasPorCausa } from '../../lib/devolucionesAnalisis';
 import { NombreCodigo } from './NombreCodigo';
-import { exportarImagenPorCausa } from '../../lib/exportImagenDevoluciones';
+import { exportarImagenPorCausa, htmlPorCausaVista } from '../../lib/exportImagenDevoluciones';
+import { ModalVistaImagen } from '../VistaPreviaImagen';
+import { MODOS_IMAGEN } from '../../lib/devolucionesImagen';
 import { avisar } from '../../lib/avisos';
 import { fmt, fCorta } from './util';
 
@@ -20,11 +22,16 @@ export default function TopCausas({ datos, razones, periodos, diaSinCargar, modo
   const rango = p === 'dia' ? fCorta(P.desde) : p === 'historico' ? 'todo el historial' : `${fCorta(P.desde)} al ${fCorta(P.hasta)}`;
   const sinDato = p === 'dia' && diaSinCargar;
   const [bajando, setBajando] = useState(false);
+  const [modoImg, setModoImg] = useState(() => { try { return localStorage.getItem('tm_dev_img_modo') || 'codigo'; } catch { return 'codigo'; } });
+  const cambiarModoImg = v => { setModoImg(v); try { localStorage.setItem('tm_dev_img_modo', v); } catch { /* sin almacenamiento */ } };
+  // La foto muestra código (lo predeterminado), nombre o ambos, según lo elegido junto al botón.
+  const armar = () => ({ modo: modoImg, periodo: p, periodoNombre: NOMBRES[p], desde: P.desde, hasta: P.hasta, rango, causas: causas.map(c => ({ nombre: c.nombre, total: c.total, personasConCausa: c.personasConCausa, empatadosFuera: c.empatadosFuera, personas: c.personas.map(x => ({ codigo: datos.personas.get(x.id)?.codigo ?? null, nombre: datos.personas.get(x.id)?.nombre ?? null, cantidad: x.cantidad })) })) });
+  const [previa, setPrevia] = useState(false), [htmlPrevia, setHtmlPrevia] = useState(null);
+  useEffect(() => { if (!previa) { setHtmlPrevia(null); return undefined; } let vivo = true; htmlPorCausaVista(armar()).then(h => { if (vivo) setHtmlPrevia(h); }).catch(e => { if (vivo) { setPrevia(false); avisar(e.message || 'No se pudo armar la vista previa.', 'error'); } }); return () => { vivo = false; }; }, [previa, modoImg, p, causas]); // eslint-disable-line react-hooks/exhaustive-deps
   const descargar = async () => {
     setBajando(true);
     try {
-      // En la imagen las personas salen SOLO con su código (son las que más devoluciones tienen por esa causa).
-      await exportarImagenPorCausa({ periodo: p, periodoNombre: NOMBRES[p], desde: P.desde, hasta: P.hasta, rango, causas: causas.map(c => ({ nombre: c.nombre, total: c.total, personasConCausa: c.personasConCausa, empatadosFuera: c.empatadosFuera, personas: c.personas.map(x => ({ codigo: datos.personas.get(x.id)?.codigo ?? null, cantidad: x.cantidad })) })) });
+      await exportarImagenPorCausa(armar());
       avisar('Imagen del Top 3 por causa descargada.');
     } catch (e) { avisar(e.message || 'No se pudo generar la imagen.', 'error'); } finally { setBajando(false); }
   };
@@ -32,7 +39,9 @@ export default function TopCausas({ datos, razones, periodos, diaSinCargar, modo
     <section className="dev-topcausas" aria-label="Top 3 de personas por causa de devolución">
       <header>
         <div><h4><i className="fa-solid fa-ranking-star"></i> Top 3 de personas por causa</h4><small>{rango} · quién tiene más devoluciones en cada causa</small></div>
-        <button className="btn-secondary dev-descargar" onClick={descargar} disabled={bajando || sinDato || causas.length === 0} title="Descarga una imagen con el código de las 3 personas de cada causa"><i className={`fa-solid ${bajando ? 'fa-spinner fa-spin' : 'fa-image'}`}></i> Descargar imagen</button>
+        <label className="dev-img-modo" title="Qué se ve de cada persona en la imagen: el código (para mostrar en grupo) o el nombre (para verificar)">Imagen con<select value={modoImg} onChange={e => cambiarModoImg(e.target.value)} aria-label="Qué mostrar en la imagen">{Object.entries(MODOS_IMAGEN).map(([k, n]) => <option key={k} value={k}>{n}</option>)}</select></label>
+        <button className="btn-secondary dev-descargar" onClick={() => setPrevia(true)} disabled={bajando || sinDato || causas.length === 0} title="Mira cómo quedará la imagen antes de descargarla"><i className="fa-solid fa-eye"></i> Vista previa</button>
+        <button className="btn-secondary dev-descargar" onClick={descargar} disabled={bajando || sinDato || causas.length === 0} title="Descarga una imagen con las 3 personas de cada causa"><i className={`fa-solid ${bajando ? 'fa-spinner fa-spin' : 'fa-image'}`}></i> Descargar imagen</button>
         <div className="fuente-toggle" role="tablist" aria-label="Período">
           {Object.entries(NOMBRES).map(([k, n]) => <button key={k} className={p === k ? 'activo' : ''} onClick={() => elegir(k)} role="tab" aria-selected={p === k}>{n}</button>)}
         </div>
@@ -62,6 +71,9 @@ export default function TopCausas({ datos, razones, periodos, diaSinCargar, modo
             ))}
           </div>
         )}
+      {previa && <ModalVistaImagen titulo="Vista previa — Top 3 de personas por causa" html={htmlPrevia} onCerrar={() => setPrevia(false)}
+        pie={<label className="dev-img-modo vp-modo">Imagen con<select value={modoImg} onChange={e => cambiarModoImg(e.target.value)}>{Object.entries(MODOS_IMAGEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>}
+        acciones={[{ texto: 'Descargar imagen', icono: 'fa-image', onClick: descargar, deshabilitado: bajando || !htmlPrevia }]} />}
     </section>
   );
 }

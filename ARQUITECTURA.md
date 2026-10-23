@@ -41,3 +41,13 @@ Falla si una regla pura toca la base de datos, la pantalla o el navegador, o si 
 ## Deuda conocida (se paga al tocar cada archivo, sin urgencia)
 Pantallas que aún consultan Supabase directamente: `Configuracion.jsx`, `Dashboard.jsx`, `Rendimientos.jsx`, `NotaClave.jsx`.
 Mezclas menores: `clasificacionCalculos.js` importa `xlsx` (lectura del archivo + cálculo).
+
+## El manual (MANUAL.md) se actualiza con cada cambio
+
+`MANUAL.md` es la única fuente de la pantalla **Cómo se usa** y de las **Novedades**. Cada vez que se actualiza la app o se agrega una función:
+
+1. Módulo nuevo → fila en *Módulos incluidos* y sección en *Cómo se usa cada módulo*.
+2. Función nueva o cambiada → ajustar la sección del módulo.
+3. Subir `version` en `package.json` y agregar arriba, en *Historial de cambios*, `### Versión X.Y.Z — dd/mm/aaaa · título`.
+4. Comando nuevo en `package.json` → fila en *Comandos útiles*.
+5. `npm run verificar-manual` debe pasar. La campana avisa a cada persona, una vez por versión.

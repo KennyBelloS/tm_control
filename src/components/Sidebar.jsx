@@ -63,6 +63,12 @@ export const MODULOS_PRINCIPALES = [{
   icon: 'fa-table-columns',
   label: 'Tableros',
   key: 'tableros'
+}, {
+  to: '/ayuda',
+  icon: 'fa-circle-question',
+  label: 'Cómo se usa',
+  key: 'ayuda',
+  nuevo: true
 }];
 export const MODULOS_GESTION = [{
   to: '/indirectos',
@@ -90,6 +96,11 @@ export const MODULOS_TECNICOS = [{
   icon: 'fa-clipboard-list',
   label: 'Auditoría',
   key: 'auditoria'
+}, {
+  to: '/resumenes',
+  icon: 'fa-file-lines',
+  label: 'Resúmenes',
+  key: 'resumenes'
 }];
 export default function Sidebar({
   open,

@@ -84,10 +84,8 @@
 @media (prefers-reduced-motion:reduce){ .indice-lateral::before{ transition:none; } .menu-usuario-panel{ animation:none; } }
 
 /* El aviso de histórico desactualizado ya no tapa el avatar ni la campana: queda debajo de la barra superior */
-.aviso-historico-flotante{ top:calc(var(--aviso-top, 64px) + 10px) !important; }
 /* Capas: la barra superior (con sus menús desplegables) queda por encima de los avisos flotantes */
 .topbar{ z-index:60; }
-.aviso-historico-flotante{ z-index:30; }
 /* La campana toma el mismo fondo que los demás botones de la barra (en oscuro se veía blanca) */
 .topbar .notif-bell{ background:var(--panel) !important; color:var(--text-soft); }
 .topbar .notif-bell:hover{ color:var(--primary); }

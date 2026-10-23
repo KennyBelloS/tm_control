@@ -1,0 +1,11 @@
+/* Resúmenes */
+.rs-pagina{ display:flex; flex-direction:column; gap:16px; }
+.rs-form{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 16px; align-items:end; } @media (max-width:760px){ .rs-form{ grid-template-columns:1fr; } }
+.rs-form label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:700; color:var(--gray); } .rs-form .vb-input{ min-height:42px; font-family:inherit; font-size:14px; } .vb-input.mal{ border-color:#C0392B; }
+.rs-check{ flex-direction:row !important; align-items:center; gap:8px !important; font-size:13px !important; font-weight:600 !important; color:var(--text) !important; } .rs-form > .rs-check{ grid-column:1 / -1; }
+.rs-modal{ max-width:760px; } .rs-periodos{ display:flex; flex-wrap:wrap; gap:6px; } .rs-periodos button{ padding:6px 13px; border-radius:20px; font-size:12.5px; font-weight:700; background:var(--superficie-2); color:var(--gray); } .rs-periodos button.activo{ background:var(--primary); color:#fff; }
+.rs-fechas{ display:flex; gap:14px; flex-wrap:wrap; } .rs-fechas label{ display:flex; flex-direction:column; font-size:12px; font-weight:700; color:var(--gray); gap:3px; } .rs-fechas input{ min-height:38px; padding:0 8px; border-radius:10px; border:1.5px solid var(--border); background:var(--panel); }
+.rs-imagen{ width:100%; border-radius:14px; box-shadow:var(--elev-2); background:#fff; } .rs-texto summary{ cursor:pointer; font-size:12.5px; font-weight:700; color:var(--primary); } .rs-texto pre{ white-space:pre-wrap; font:inherit; font-size:12.5px; line-height:1.5; padding:10px 12px; border-radius:10px; background:var(--superficie-2); margin-top:6px; max-height:240px; overflow:auto; }
+.rs-acciones{ display:flex; flex-wrap:wrap; gap:8px; } .rs-acciones i{ margin-right:6px; } .rs-nota{ color:var(--gray); font-size:11.5px; line-height:1.4; }
+.rs-controles{ display:flex; flex-wrap:wrap; gap:14px 22px; align-items:flex-end; margin-bottom:12px; } .rs-controles label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:700; color:var(--gray); min-width:220px; } .rs-controles .vb-input{ min-height:42px; }
+.rs-firma{ margin-top:12px; } .rs-firma summary{ cursor:pointer; font-size:12.5px; font-weight:700; color:var(--primary); } .rs-firma .rs-form{ margin:10px 0 6px; } .rs-texto{ margin:12px 0; }

@@ -201,3 +201,6 @@ th.th-dev small{ display:block; font-size:9.5px; font-weight:600; letter-spacing
 .dev-por-dia .dev-chip{ margin:0 5px 3px 0; }
 
 .dev-descargar{ padding:7px 13px; font-size:12px; min-height:34px; } .dev-descargar i{ margin-right:6px; }
+
+.dev-img-modo{ display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:700; color:var(--gray); } .dev-img-modo select{ height:34px; padding:0 8px; border-radius:10px; border:1.5px solid var(--border); background:var(--panel); font-size:12px; }
+

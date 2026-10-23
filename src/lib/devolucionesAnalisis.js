@@ -70,3 +70,19 @@ export function minimosValidos(m) {
   const n = (v, d) => { const x = Math.round(Number(v)); return Number.isFinite(x) && x >= 1 && x <= 31 ? x : d; };
   return { semana: n(m?.semana, MINIMOS_PREDETERMINADOS.semana), mes: n(m?.mes, MINIMOS_PREDETERMINADOS.mes), historico: n(m?.historico, MINIMOS_PREDETERMINADOS.historico) };
 }
+
+/**
+ * Serie para el gráfico de la foto: devoluciones por DÍA (si el rango es de hasta 35 días) o por MES (si es más largo).
+ * Devuelve { unidad:'dia'|'mes', barras:[{ etq, valor }] }, de la fecha más antigua a la más reciente.
+ */
+export function serieDevoluciones(datos, desde, hasta) {
+  const por = new Map();
+  for (const r of datos.dias) if (r.fecha >= desde && r.fecha <= hasta) por.set(r.fecha, (por.get(r.fecha) || 0) + r.total);
+  const fechas = [...por.keys()].sort();
+  if (!fechas.length) return { unidad: 'dia', barras: [] };
+  const dias = Math.round((new Date(`${fechas[fechas.length - 1]}T12:00:00Z`) - new Date(`${fechas[0]}T12:00:00Z`)) / 864e5) + 1;
+  if (dias <= 35) return { unidad: 'dia', barras: fechas.map(f => ({ etq: `${f.slice(8)}/${f.slice(5, 7)}`, valor: por.get(f) })) };
+  const meses = new Map(); for (const f of fechas) meses.set(f.slice(0, 7), (meses.get(f.slice(0, 7)) || 0) + por.get(f));
+  const M = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return { unidad: 'mes', barras: [...meses].map(([m, v]) => ({ etq: `${M[Number(m.slice(5)) - 1]} ${m.slice(2, 4)}`, valor: v })) };
+}

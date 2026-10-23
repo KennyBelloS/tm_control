@@ -3,7 +3,8 @@ import logo from '../assets/logo-icon.png';
 import ClasificacionGrid from './ClasificacionGrid';
 import { getComparacionClasificacion, getHistoricoClasificacion, limpiarClasificacionAntigua, etiquetaHora, formatoFecha, minutosAHora } from '../lib/clasificacion';
 import { getContextoLineas } from '../lib/lineas';
-import { exportarElemento } from '../lib/exportarElemento';
+import { exportarElemento, vistaPreviaElemento } from '../lib/exportarElemento';
+import { ModalVistaImagen } from './VistaPreviaImagen';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { EstadoVacio } from './Estados';
 
@@ -51,6 +52,8 @@ export default function ClasificacionPanel({ fecha, refresco = 0 }) {
     };
   }, [datos]);
 
+  const [previa, setPrevia] = useState(null);
+  async function verPrevia() { setPrevia({ src: null }); try { setPrevia({ src: await vistaPreviaElemento(reporteRef.current) }); } catch (e) { setPrevia(null); setError(e.message); } }
   async function descargar(formato) {
     setExportando(formato);
     try { await exportarElemento(reporteRef.current, `clasificacion_${fecha}`, formato); }
@@ -94,8 +97,10 @@ export default function ClasificacionPanel({ fecha, refresco = 0 }) {
               </select>
             </label>
           )}
+          <button className="btn-secondary" disabled={!!exportando} onClick={verPrevia}><i className="fa-solid fa-eye"></i> Vista previa</button>
           <button className="btn-secondary" disabled={!!exportando} onClick={() => descargar('png')}><i className="fa-solid fa-file-image"></i> {exportando === 'png' ? 'Generando…' : 'Imagen'}</button>
           <button className="btn-secondary" disabled={!!exportando} onClick={() => descargar('pdf')}><i className="fa-solid fa-file-pdf"></i> {exportando === 'pdf' ? 'Generando…' : 'PDF'}</button>
+          {previa && <ModalVistaImagen titulo="Vista previa — Clasificación hora a hora" src={previa.src} onCerrar={() => setPrevia(null)} acciones={[{ texto: 'Descargar imagen', icono: 'fa-file-image', primario: true, deshabilitado: !previa.src || !!exportando, onClick: () => descargar('png') }]} />}
         </div>
       </div>
 

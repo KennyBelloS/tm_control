@@ -55,6 +55,14 @@ export const MODULOS = {
   auditoria: {
     // Auditoría = base de datos, respaldo, optimización — nunca para Digitador.
     roles: ['administrador']
+  },
+  resumenes: {
+    // Resúmenes de la finca (con cifras de todo el personal) → solo Administrador.
+    roles: ['administrador']
+  },
+  ayuda: {
+    // Cómo se usa: el manual dentro de la app, para todos.
+    roles: ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador']
   }
 };
 export function puedeVer(rol, moduloKey) {

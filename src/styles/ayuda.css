@@ -1,0 +1,24 @@
+/* Cómo se usa: el manual dentro de la app */
+.ay-pagina{ display:flex; flex-direction:column; gap:14px; }
+.ay-barra{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; }
+.ay-buscar{ position:relative; flex:1 1 280px; max-width:460px; } .ay-buscar i{ position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--gray); font-size:13px; }
+.ay-buscar input{ width:100%; min-height:44px; padding:0 14px 0 38px; border-radius:14px; border:1.5px solid var(--border, rgba(0,0,0,.12)); background:var(--panel, #fff); color:var(--text); font-size:14px; }
+.ay-cuerpo{ display:grid; grid-template-columns:240px minmax(0,1fr); gap:18px; align-items:start; }
+.ay-indice{ position:sticky; top:84px; display:flex; flex-direction:column; gap:2px; max-height:calc(100vh - 110px); overflow:auto; padding:12px; border-radius:18px; background:var(--panel, #fff); box-shadow:var(--elev-1, 0 4px 14px -8px rgba(0,0,0,.3)), var(--borde-fino, 0 0 0 1px rgba(0,0,0,.06)); }
+.ay-indice strong{ font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--gray); margin:2px 8px 6px; }
+.ay-indice button{ text-align:left; padding:7px 10px; border-radius:10px; font-size:13px; font-weight:600; color:var(--text-soft, #4B5A51); } .ay-indice button:hover{ background:var(--superficie-2); color:var(--primary); }
+.ay-contenido{ display:flex; flex-direction:column; gap:14px; min-width:0; }
+.ay-seccion{ display:block; scroll-margin-top:90px; line-height:1.6; font-size:14.5px; }
+.ay-seccion > *:first-child{ margin-top:0; }
+.ay-seccion h2{ font-size:21px; font-weight:900; margin:0 0 10px; color:var(--text); }
+.ay-seccion h3{ font-size:16.5px; font-weight:800; margin:22px 0 6px; color:var(--primary); } .ay-seccion h4{ font-size:14.5px; font-weight:800; margin:14px 0 4px; }
+.ay-seccion p{ margin:8px 0; padding:0; } .ay-seccion ul, .ay-seccion ol{ margin:8px 0 8px 4px; padding-left:22px; display:flex; flex-direction:column; gap:5px; } .ay-seccion li::marker{ color:var(--primary); font-weight:800; }
+.ay-seccion code{ padding:1px 7px; border-radius:7px; font-size:12.5px; background:var(--superficie-2); color:var(--text); font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.ay-seccion pre{ margin:10px 0; padding:12px 14px; border-radius:12px; overflow:auto; background:var(--superficie-2); } .ay-seccion pre code{ padding:0; background:none; }
+.ay-seccion blockquote{ margin:10px 0; padding:10px 14px; border-left:4px solid var(--gold); border-radius:0 12px 12px 0; background:color-mix(in srgb, var(--gold) 12%, transparent); }
+.ay-seccion a{ color:var(--primary); font-weight:700; text-decoration:underline; text-underline-offset:2px; }
+.ay-tabla{ overflow-x:auto; margin:10px 0; border-radius:14px; box-shadow:var(--borde-fino, 0 0 0 1px rgba(0,0,0,.08)); } .ay-tabla table{ width:100%; border-collapse:collapse; font-size:13.5px; min-width:480px; }
+.ay-tabla th{ text-align:left; padding:9px 12px; font-size:11.5px; letter-spacing:.05em; text-transform:uppercase; color:#fff; background:var(--primary); } .ay-tabla td{ padding:9px 12px; border-top:1px solid var(--border, rgba(0,0,0,.08)); vertical-align:top; } .ay-tabla tbody tr:nth-child(even){ background:var(--superficie-2); }
+.ay-vacio{ display:flex; flex-direction:column; align-items:center; gap:6px; padding:44px 12px; color:var(--gray); text-align:center; } .ay-vacio i{ font-size:34px; } .ay-vacio b{ color:var(--text); font-size:15px; }
+@media (max-width:980px){ .ay-cuerpo{ grid-template-columns:minmax(0,1fr); } .ay-indice{ position:static; max-height:none; flex-direction:row; flex-wrap:nowrap; overflow-x:auto; align-items:center; } .ay-indice button{ white-space:nowrap; flex-shrink:0; } .ay-indice strong{ display:none; } }
+@media print{ .ay-barra, .ay-indice{ display:none; } .ay-cuerpo{ display:block; } }

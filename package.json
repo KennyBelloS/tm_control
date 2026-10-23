@@ -1,12 +1,13 @@
 {
   "name": "torremolinos-control",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "verificar-manual": "node scripts/verificar-manual.mjs",
     "verificar-arquitectura": "node scripts/verificar-arquitectura.mjs",
     "revisar-instalacion": "node scripts/revisar-instalacion.cjs",
     "diagnosticar-build": "node -r ./scripts/diagnosticar-json.cjs node_modules/vite/bin/vite.js build",
