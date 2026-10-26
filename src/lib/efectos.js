@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { fiestaDelDia, fiestaPorId } from './fiestas';
-import { fechaLocalISO } from './clasificacionCalculos';
+// (copia local: importarla de clasificacionCalculos arrastraba la librería de Excel al arranque)
+export function fechaLocalISO(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 /**
  * Efectos visuales y festividades.

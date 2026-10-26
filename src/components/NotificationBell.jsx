@@ -5,7 +5,7 @@ import { tiempoRelativo } from '../lib/notificaciones';
 import { useEfectos } from '../lib/efectos';
 import { celebrar } from '../lib/confeti';
 
-const FILTROS = [['todas', 'Todas'], ['importantes', 'Importantes'], ['sin_leer', 'Sin leer']];
+const FILTROS = [['todas', 'Todas'], ['importantes', 'Importantes'], ['leidas', 'Leídas']];
 const ETIQUETA = { critica: 'Crítica', importante: 'Importante', info: 'Informativa' };
 const GRUPOS = [['critica', 'Requieren atención'], ['importante', 'Importantes'], ['info', 'Informativas']];
 const hora = iso => new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
@@ -19,19 +19,21 @@ export default function NotificationBell() {
   const [abierto, setAbierto] = useState(false);
   const [menuSilencio, setMenuSilencio] = useState(false);
   const ref = useRef(null);
+  const [abiertos, setAbiertos] = useState(() => new Set());                     // avisos abiertos (completos) ahora mismo
   const ir = useNavigate();
   const { cambiar } = useEfectos();
   useEffect(() => {
-    const fuera = e => { if (ref.current && !ref.current.contains(e.target)) { setAbierto(false); setMenuSilencio(false); } };
+    const fuera = e => { if (ref.current && !ref.current.contains(e.target)) { setAbierto(false); setMenuSilencio(false); setAbiertos(new Set()); n.soltar(); } };
     document.addEventListener('mousedown', fuera); return () => document.removeEventListener('mousedown', fuera);
   }, []);
-  const abrirCerrar = () => { setAbierto(o => !o); setMenuSilencio(false); if (!abierto) n.marcarVistas(); };
+  const abrirCerrar = () => { setAbierto(o => !o); setMenuSilencio(false); if (!abierto) n.marcarVistas(); else { setAbiertos(new Set()); n.soltar(); } };
+  const alternar = x => { setAbiertos(a => { const c = new Set(a); if (c.has(x.id)) c.delete(x.id); else { c.add(x.id); n.leer(x); } return c; }); };
   const accion = x => {
     if (x.accion.tipo === 'activar_fiesta') {                                  // la invitación festiva: se activa desde aquí y no se vuelve a ofrecer este año
       try { localStorage.setItem(x.accion.dato, '1'); } catch { /* sin almacenamiento */ }
       cambiar({ activo: true, modo: 'auto' }); n.eliminar(x.id); setAbierto(false); setTimeout(celebrar, 300); return;
     }
-    n.marcarLeida(x.id); setAbierto(false); ir(x.accion.ruta);
+    n.leer(x); setAbierto(false); n.soltar(); ir(x.accion.ruta);
   };
   const descartar = x => { if (x.accion?.dato) { try { localStorage.setItem(x.accion.dato, '1'); } catch { /* sin almacenamiento */ } } n.eliminar(x.id); };
 
@@ -67,11 +69,19 @@ export default function NotificationBell() {
                 <section key={sev} className="nt-grupo" aria-label={nombre}>
                   <h4 className={`nt-grupo-t nt-gt-${sev}`}>{nombre}<span>{items.length}</span></h4>
                   {items.map(x => (
-                    <article key={x.id} className={`nt-item nt-${x.severidad} ${n.leidas.has(x.id) && x.severidad !== 'critica' ? 'leida' : ''}`}>
+                    <article key={x.id} className={`nt-item nt-${x.severidad} ${abiertos.has(x.id) ? 'abierto' : ''} ${n.leidas.has(x.id) && x.severidad !== 'critica' ? 'leida' : ''}`}>
                       <span className="nt-icono-sev"><i className={`fa-solid ${x.icono}`}></i></span>
                       <div className="nt-cuerpo">
-                        <div className="nt-titulo"><strong>{x.titulo}</strong>{x.severidad !== 'info' && <em>{ETIQUETA[x.severidad]}</em>}</div>
-                        <p>{x.descripcion}</p>
+                        <div className="nt-tocable" role="button" tabIndex={0} aria-expanded={abiertos.has(x.id)} onClick={() => alternar(x)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); alternar(x); } }}>
+                          <div className="nt-titulo"><strong>{x.titulo}</strong>{x.severidad !== 'info' && <em>{ETIQUETA[x.severidad]}</em>}<i className={`fa-solid fa-chevron-down nt-flecha`}></i></div>
+                          <p className="nt-desc">{x.descripcion}</p>
+                          {abiertos.has(x.id) && (
+                            <div className="nt-detalle">
+                              {x.detalle?.length > 0 && <ul>{x.detalle.map((t, i) => <li key={i}>{t}</li>)}</ul>}
+                              <div className="nt-leida"><i className="fa-solid fa-circle-check"></i> Leído: no volverá a aparecer mientras todo siga igual.</div>
+                            </div>)}
+                          {!abiertos.has(x.id) && <span className="nt-mas">Toca para ver todo</span>}
+                        </div>
                         <div className="nt-pie">
                           <span className="nt-hora"><i className="fa-regular fa-clock"></i> {tiempoRelativo(x.fecha, n.ahora)}</span>
                           {x.accion && <button className="nt-accion" onClick={() => accion(x)}>{x.accion.etiqueta} <i className="fa-solid fa-arrow-right"></i></button>}

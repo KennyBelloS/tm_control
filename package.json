@@ -1,12 +1,13 @@
 {
   "name": "torremolinos-control",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "verificar-arranque": "node scripts/verificar-arranque.mjs",
     "verificar-manual": "node scripts/verificar-manual.mjs",
     "verificar-arquitectura": "node scripts/verificar-arquitectura.mjs",
     "revisar-instalacion": "node scripts/revisar-instalacion.cjs",
@@ -22,6 +23,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-apexcharts": "^1.9.0",
     "react-dom": "^18.3.1",

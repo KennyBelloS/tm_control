@@ -32,7 +32,7 @@ function fila(p, i, metaHora) {
 }
 
 /** ranking: salida de agregarRankingPorPersona (ya ordenado). tipo: 'historico' | 'actual'. */
-export function htmlRankingImagen({ tipo, ranking, metaHora = 470, fecha, generado, logo }) {
+export function htmlRankingImagen({ tipo, ranking, metaHora = 470, fecha, generado, logo, horas }) {
   const promedio = ranking.length ? Math.round(ranking.reduce((s, p) => s + p.promedioRend, 0) / ranking.length) : 0;
   const tallos = ranking.reduce((s, p) => s + (p.totalTallos || 0), 0);
   const cuenta = Object.fromEntries(ORDEN.map(k => [k, 0]));
@@ -47,6 +47,7 @@ export function htmlRankingImagen({ tipo, ranking, metaHora = 470, fecha, genera
         <div style="color:#fff;font-size:14px;margin-top:2px;">${titulo}</div>
         <div style="color:rgba(255,255,255,.75);font-size:11.5px;margin-top:4px;">Generado el ${escaparHtml(generado)} ${fecha ? `· Fecha: ${escaparHtml(fecha)}` : '· Todas las fechas'} · Meta: ${metaHora} tallos/h</div>
       </div>
+      ${horas ? `<div style="margin-left:auto;text-align:right;"><div style="font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.7);">Horario</div><div style="display:inline-block;margin-top:4px;padding:7px 16px;border-radius:22px;background:#FDF3DF;color:#0F3D22;font-size:16px;font-weight:900;">🕒 ${escaparHtml(horas)}</div></div>` : ''}
     </div>
     <div style="padding:22px 30px 0;display:flex;gap:16px;">
       <div style="flex:1.4;background:${DORADO_CLARO};border:2px solid ${DORADO};border-radius:14px;padding:18px 24px;display:flex;align-items:center;gap:18px;">

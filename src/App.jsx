@@ -1,35 +1,41 @@
-import { useEffect, useState } from 'react';
+import { lazy, useEffect, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import SplashScreen from './components/SplashScreen';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Personas from './pages/Personas';
-import Rendimientos from './pages/Rendimientos';
-import Reportes from './pages/Reportes';
-import Ranking from './pages/Ranking';
-import Lineas from './pages/Lineas';
-import Configuracion from './pages/Configuracion';
-import Indirectos from './pages/Indirectos';
-import Gerencia from './pages/Gerencia';
-import Tableros from './pages/Tableros';
-import Clasificacion from './pages/Clasificacion';
-import Devoluciones from './pages/Devoluciones';
-import TableroColaborador from './pages/TableroColaborador';
-import Usuarios from './pages/Usuarios';
-import Auditoria from './pages/Auditoria';
-import Resumenes from './pages/Resumenes';
-import Ayuda from './pages/Ayuda';
 import { useSesion } from './lib/useSesion';
-const TIEMPO_MINIMO_SPLASH = 1300;
+import { cargadores } from './lib/paginas';
+
+// Cada pantalla se descarga solo cuando se entra a ella (y se precarga al acercarse al menú); el inicio carga la suya en paralelo con la sesión.
+const Dashboard = lazy(cargadores['/']);
+const Personas = lazy(cargadores['/personas']);
+const Rendimientos = lazy(cargadores['/rendimientos']);
+const Reportes = lazy(cargadores['/reportes']);
+const Ranking = lazy(cargadores['/ranking']);
+const Lineas = lazy(cargadores['/lineas']);
+const Configuracion = lazy(cargadores['/configuracion']);
+const Indirectos = lazy(cargadores['/indirectos']);
+const Gerencia = lazy(cargadores['/gerencia']);
+const Tableros = lazy(cargadores['/tableros']);
+const Clasificacion = lazy(cargadores['/clasificacion']);
+const Devoluciones = lazy(cargadores['/devoluciones']);
+const TableroColaborador = lazy(cargadores['/colaborador']);
+const Usuarios = lazy(cargadores['/usuarios']);
+const Auditoria = lazy(cargadores['/auditoria']);
+const Resumenes = lazy(cargadores['/resumenes']);
+const Ayuda = lazy(cargadores['/ayuda']);
+if (typeof window !== 'undefined') cargadores['/']();
+const TIEMPO_MINIMO_SPLASH = 600;                                              // la presentación dura lo justo, y solo la primera vez de la sesión
+const yaVistoSplash = () => { try { return sessionStorage.getItem('tm_splash') === '1'; } catch { return false; } };
 export default function App() {
-  const [mostrarSplash, setMostrarSplash] = useState(true);
+  const [mostrarSplash, setMostrarSplash] = useState(() => !yaVistoSplash());
   const {
     cargando,
     sesion
   } = useSesion();
   useEffect(() => {
+    try { sessionStorage.setItem('tm_splash', '1'); } catch { /* sin almacenamiento */ }
     const t = setTimeout(() => setMostrarSplash(false), TIEMPO_MINIMO_SPLASH);
     return () => clearTimeout(t);
   }, []);

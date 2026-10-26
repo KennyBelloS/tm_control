@@ -29,3 +29,12 @@
 .nt-vacio{ display:flex; flex-direction:column; align-items:center; gap:6px; padding:44px 12px; color:var(--gray); text-align:center; } .nt-vacio i{ font-size:42px; color:var(--ok); } .nt-vacio b{ color:var(--text); font-size:15px; } .nt-vacio span{ font-size:12.5px; }
 @media (max-width:640px){ .nt-panel{ max-height:82vh; } }
 @media (prefers-reduced-motion:reduce){ .notif-badge.nt-nivel-critica, .nt-panel, .nt-item{ animation:none; } }
+
+/* aviso que se abre al tocarlo */
+.nt-tocable{ cursor:pointer; border-radius:12px; outline-offset:3px; } .nt-tocable:focus-visible{ outline:2px solid var(--primary); }
+.nt-flecha{ margin-left:auto; font-size:11px; color:var(--gray); transition:transform .25s; } .nt-item.abierto .nt-flecha{ transform:rotate(180deg); }
+.nt-item:not(.abierto) .nt-desc{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.nt-mas{ display:inline-block; margin:-4px 0 8px; font-size:11.5px; font-weight:800; color:var(--sev); }
+.nt-detalle{ margin:2px 0 10px; padding:10px 12px; border-radius:14px; background:color-mix(in srgb, var(--sev) 8%, var(--panel,#fff)); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--sev) 18%, transparent); animation:nt-abre .25s var(--ease-resorte, ease-out) both; }
+.nt-detalle ul{ margin:0; padding-left:18px; display:flex; flex-direction:column; gap:5px; font-size:12.5px; line-height:1.45; color:var(--text); } .nt-detalle li::marker{ color:var(--sev); }
+.nt-leida{ margin-top:8px; font-size:11.5px; font-weight:800; color:#1F8A4C; display:flex; align-items:center; gap:6px; }

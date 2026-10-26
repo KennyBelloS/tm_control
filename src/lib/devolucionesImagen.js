@@ -40,28 +40,53 @@ function graficos(g) {
   return izq || der ? `<div style="padding:6px 30px 8px;display:flex;gap:20px;">${izq}${der}</div>` : '';
 }
 
-export function htmlImagenTop5({ periodoNombre, rango, mas, menos, personasConDevoluciones, minDias, generado, logo, grafico }) {
-  const maxMas = Math.max(1, ...mas.map(e => e.devol));
-  const filasMas = mas.length ? mas.map((e, i) => `<div style="display:flex;align-items:center;gap:14px;padding:10px 4px;border-bottom:1px solid #F1E3E1;">
-      ${puesto(i, ROJO)}
-      <div style="min-width:130px;display:flex;align-items:baseline;gap:8px;"><span style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8A9A90;">Código</span><span style="font-size:36px;font-weight:900;color:#1A2A20;letter-spacing:-.02em;">${cod(e.codigo)}</span></div>
-      ${barra((e.devol / maxMas) * 100, '#D4473A')}
-      <div style="min-width:54px;text-align:right;font-size:32px;font-weight:900;color:${ROJO};">${fmt(e.devol)}</div></div>`).join('')
-    : '<div style="padding:50px 10px;text-align:center;font-size:18px;font-weight:700;color:#6B7C71;">Sin devoluciones en este período 🎉</div>';
-  const filasMenos = menos.length ? menos.map((e, i) => `<div style="display:flex;align-items:center;gap:14px;padding:10px 4px;border-bottom:1px solid #DDEFE3;">
-      ${puesto(i, VERDE)}
-      <div style="flex:1;min-width:0;"><div style="font-size:21px;font-weight:800;color:#1A2A20;">${esc(e.nombre)}</div><div style="font-size:12.5px;font-weight:600;color:#7A8A80;">Código ${cod(e.codigo)} · ${fmt(e.diasTrab)} día${e.diasTrab === 1 ? '' : 's'} trabajado${e.diasTrab === 1 ? '' : 's'}</div></div>
-      <div style="min-width:54px;text-align:right;font-size:32px;font-weight:900;color:${VERDE};">${fmt(e.devol)}</div></div>`).join('')
-    : `<div style="padding:50px 10px;text-align:center;font-size:16px;font-weight:700;color:#6B7C71;">Nadie cumple el mínimo de ${fmt(minDias)} día${minDias === 1 ? '' : 's'} trabajado${minDias === 1 ? '' : 's'} en este período</div>`;
+const nombreCorto = n => {
+  const t = String(n ?? '').replace(/\{\}/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (!t.length) return '—'; if (t.length === 1) return t[0];
+  return `${t[0]} ${(t.length >= 4 ? t[2] : t[1])[0]}.`;                 // primer nombre + inicial del primer apellido
+};
+const num = n => Number(n).toLocaleString('es-CO', { maximumFractionDigits: 1 });
+
+/** El gráfico de la app (barras con el valor arriba, código/nombre debajo y líneas guía punteadas) para el Top 5. modo: 'codigo' | 'nombre' | 'ambos'. */
+function graficoTop(items, color, modo) {
+  const A = 190, max = Math.max(1, ...items.map(e => e.devol));
+  const guias = [max, max / 2, 0].map(t => `<div style="position:absolute;left:52px;right:0;bottom:${Math.round((t / max) * A)}px;border-top:2px dashed #DAD6CC;"></div><div style="position:absolute;left:0;width:44px;bottom:${Math.round((t / max) * A) - 10}px;text-align:right;font-size:15px;color:#8A9A90;">${num(t)}</div>`).join('');
+  const columnas = items.map(e => `<div style="width:${Math.floor(92 / items.length)}%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;">
+      <div style="font-size:23px;font-weight:900;color:#1A2A20;line-height:34px;">${num(e.devol)}</div>
+      <div style="width:82%;height:${e.devol > 0 ? Math.max(6, Math.round((e.devol / max) * A)) : 0}px;border-radius:10px 10px 0 0;background:${color};"></div></div>`).join('');
+  const etiquetas = items.map(e => `<div style="width:${Math.floor(92 / items.length)}%;text-align:center;">
+      ${modo !== 'nombre' ? `<div style="font-size:22px;font-weight:900;color:#1A2A20;line-height:1.1;">${cod(e.codigo)}</div>` : ''}
+      ${modo !== 'codigo' ? `<div style="font-size:${modo === 'nombre' ? 15 : 13}px;font-weight:${modo === 'nombre' ? 800 : 500};color:${modo === 'nombre' ? '#1A2A20' : '#7A8A80'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(nombreCorto(e.nombre))}</div>` : ''}</div>`).join('');
+  return `<div style="position:relative;height:${A + 34}px;margin:8px 0 6px;">${guias}<div style="position:absolute;left:52px;right:0;bottom:0;height:${A + 34}px;display:flex;justify-content:space-around;align-items:flex-end;">${columnas}</div></div>
+    <div style="display:flex;justify-content:space-around;margin-left:52px;margin-bottom:14px;">${etiquetas}</div>`;
+}
+/** La tabla de debajo: # · colaborador · código · devoluciones (· días en "menos"). */
+function tablaTop(items, color, modo, conDias) {
+  const th = 'font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#6B7C71;';
+  const cab = `<div style="display:flex;align-items:center;gap:10px;padding:8px 4px;${th}"><div style="width:34px;">#</div>${modo !== 'codigo' ? '<div style="flex:1;">Colaborador</div>' : '<div style="flex:1;"></div>'}${modo !== 'nombre' ? '<div style="width:64px;text-align:right;">Código</div>' : ''}<div style="width:62px;text-align:right;">Devol.</div>${conDias ? '<div style="width:44px;text-align:right;">Días</div>' : ''}</div>`;
+  const filas = items.map((e, i) => `<div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid #ECE8DF;">
+      ${puesto(i, color)}
+      ${modo !== 'codigo' ? `<div style="flex:1;min-width:0;font-size:14.5px;font-weight:800;color:#1A2A20;text-transform:uppercase;">${esc(e.nombre || '—')}</div>` : '<div style="flex:1;"></div>'}
+      ${modo !== 'nombre' ? `<div style="width:64px;text-align:right;"><span style="display:inline-block;min-width:34px;text-align:center;padding:3px 9px;border-radius:9px;background:#EFEDE6;font-size:14px;font-weight:900;color:#3A4A40;">${cod(e.codigo)}</span></div>` : ''}
+      <div style="width:62px;text-align:right;font-size:17px;font-weight:900;color:#1A2A20;">${fmt(e.devol)}</div>
+      ${conDias ? `<div style="width:44px;text-align:right;font-size:14px;font-weight:700;color:#2F6FB3;">${fmt(e.diasTrab ?? 0)}</div>` : ''}</div>`).join('');
+  return cab + filas;
+}
+
+/** Top 5: izquierda MÁS devoluciones, derecha MENOS devoluciones, cada una con su gráfico de barras y su tabla (como en la app). modo: 'ambos' (predeterminado), 'codigo' o 'nombre'. */
+export function htmlImagenTop5({ periodoNombre, rango, mas, menos, personasConDevoluciones, minDias, generado, logo, grafico, elegibles, empatadosFuera, quintoDevol, modo = 'ambos' }) {
+  const vacioMas = '<div style="padding:60px 10px;text-align:center;font-size:18px;font-weight:700;color:#6B7C71;">Sin devoluciones en este período 🎉</div>';
+  const vacioMenos = `<div style="padding:60px 10px;text-align:center;font-size:16px;font-weight:700;color:#6B7C71;">Nadie cumple el mínimo de ${fmt(minDias)} día${minDias === 1 ? '' : 's'} trabajado${minDias === 1 ? '' : 's'} en este período</div>`;
+  const notaMenos = Number.isFinite(elegibles) ? `Elegibles: <b>${fmt(elegibles)}</b> (mínimo ${fmt(minDias)} día${minDias === 1 ? '' : 's'} trabajado${minDias === 1 ? '' : 's'} y fuera del Top 5 de “más”)${empatadosFuera > 0 ? ` · <b>${fmt(empatadosFuera)}</b> más empatan con ${fmt(quintoDevol ?? 0)} devol. en el 5.º puesto (desempate: más días trabajados, luego código)` : ''}` : `Mínimo ${fmt(minDias)} día${minDias === 1 ? '' : 's'} trabajado${minDias === 1 ? '' : 's'}`;
+  const tarjeta = (titulo, icono, color, claro, sub, cuerpo, nota) => `<div style="flex:1;min-width:0;background:linear-gradient(180deg,${claro},#fff 38%);border-top:6px solid ${color};border-radius:18px;padding:16px 20px 14px;box-shadow:0 6px 18px -10px rgba(0,0,0,.3);">
+      <div style="font-size:21px;font-weight:900;color:${color};">${icono} ${titulo}</div><div style="font-size:11.5px;font-weight:800;color:#3A4A40;text-transform:uppercase;letter-spacing:.06em;margin:4px 0 4px;">${sub}</div>${cuerpo}
+      <div style="margin-top:8px;font-size:12px;line-height:1.4;color:#6B7C71;">${nota}</div></div>`;
   return `${cabecera({ titulo: `Top 5 de devoluciones — ${periodoNombre}`, subtitulo: rango, generado, logo })}
     <div style="padding:22px 30px 8px;display:flex;gap:20px;">
-      <div style="flex:1;background:linear-gradient(180deg,${ROJO_CLARO},#fff 40%);border-top:6px solid ${ROJO};border-radius:18px;padding:16px 20px;box-shadow:0 6px 18px -10px rgba(0,0,0,.3);">
-        <div style="font-size:22px;font-weight:900;color:${ROJO};">▲ Más devoluciones</div><div style="font-size:11.5px;font-weight:700;color:#6B7C71;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Solo se muestra el código</div>${filasMas}</div>
-      <div style="flex:1;background:linear-gradient(180deg,${VERDE_CLARO},#fff 40%);border-top:6px solid ${VERDE};border-radius:18px;padding:16px 20px;box-shadow:0 6px 18px -10px rgba(0,0,0,.3);">
-        <div style="font-size:22px;font-weight:900;color:${VERDE};">▼ Menos devoluciones</div><div style="font-size:11.5px;font-weight:700;color:#6B7C71;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Mínimo ${fmt(minDias)} día${minDias === 1 ? '' : 's'} trabajado${minDias === 1 ? '' : 's'}</div>${filasMenos}</div>
+      ${tarjeta('Más devoluciones', '▲', ROJO, ROJO_CLARO, `Más — ${esc(periodoNombre)}`, mas.length ? graficoTop(mas, '#C0392B', modo) + tablaTop(mas, ROJO, modo, false) : vacioMas, `Personas con devoluciones: <b>${fmt(personasConDevoluciones)}</b>`)}
+      ${tarjeta('Menos devoluciones', '▼', VERDE, VERDE_CLARO, `Menos — ${esc(periodoNombre)}`, menos.length ? graficoTop(menos, '#1B7F43', modo) + tablaTop(menos, VERDE, modo, true) : vacioMenos, notaMenos)}
     </div>
-    ${graficos(grafico)}
-    <div style="padding:10px 30px 14px;text-align:center;font-size:14px;color:#5E6F65;">Personas con devoluciones en el período: <b style="color:#1A2A20;font-size:17px;">${fmt(personasConDevoluciones)}</b></div>${pie}`;
+    ${graficos(grafico)}${pie}`;
 }
 
 /** Cómo se muestra una persona en la foto: solo código (lo predeterminado, para mostrar en grupo), solo nombre o ambos (para verificar). */

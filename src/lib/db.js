@@ -1,5 +1,6 @@
+import { planGuardado } from './personasPdf';
 import { supabase } from './supabaseClient';
-import { agregarPorPersonaDia } from './excel';
+import { agregarPorPersonaDia } from './agregados';
 import { calcularRendimientoReal, calcularRendimientoBloque, agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from './calculos';
 import { codigoMasCorto } from './personasUtil';
 const SELECT_HISTORICO = 'id,fecha,colaborador_id,total_tallos,total_ramos,tiempo_trabajado_min,tiempo_no_productivo_min,semana,codigos,personas(nombre)';
@@ -222,6 +223,30 @@ export async function insertarPersonasDesdeExcel(personas) {
   }
   if (r.error) throw r.error;
   return { insertados: r.count ?? personas.length };
+}
+
+/**
+ * Personas leídas de un PDF: las que YA existen solo cambian su mesa (no se les toca nombre, rol ni si están activas);
+ * las que no existen se crean con su Emp.Cod, nombre y mesa. Devuelve cuántas de cada una.
+ */
+export async function guardarMesasPersonas(personas) {
+  const existentes = new Map();
+  for (let i = 0; i < personas.length; i += 150) {
+    const ids = personas.slice(i, i + 150).map(p => p.id);
+    const { data, error } = await supabase.from('personas').select('id, mesa').in('id', ids);
+    if (error) throw error;
+    for (const r of data || []) existentes.set(r.id, r.mesa);
+  }
+  const { nuevas, actualizar, iguales } = planGuardado(personas, [...existentes.keys()], existentes);
+  for (let i = 0; i < actualizar.length; i += 10) {                       // de a 10 a la vez, para no saturar la conexión
+    const res = await Promise.all(actualizar.slice(i, i + 10).map(p => supabase.from('personas').update({ mesa: p.mesa }).eq('id', p.id)));
+    const fallo = res.find(r => r.error); if (fallo) throw fallo.error;
+  }
+  if (nuevas.length) {
+    const { error } = await supabase.from('personas').upsert(nuevas.map(p => ({ id: p.id, nombre: p.nombre, codigo_empleado: String(p.id), mesa: p.mesa, rol: p.rol || null, activo: true })), { onConflict: 'id', ignoreDuplicates: true });
+    if (error) throw error;
+  }
+  return { actualizadas: actualizar.length, nuevas: nuevas.length, iguales: iguales.length };
 }
 
 /** Agrega una persona a mano. "id" es su Emp.Cod (el código con el que la identifica el boncheo). */

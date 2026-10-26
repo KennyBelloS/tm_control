@@ -1,5 +1,6 @@
 /* Vista previa de las imágenes: se ve igual que la foto que se descarga, y grande */
-.vp-marco{ width:100%; overflow:auto; background:#fff; border-radius:14px; box-shadow:var(--elev-2, 0 6px 18px -10px rgba(0,0,0,.35)), var(--borde-fino, 0 0 0 1px rgba(0,0,0,.06)); }
+.vp-zona{ position:relative; width:100%; }
+.vp-marco{ width:100%; overflow:auto; touch-action:pan-x pan-y; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; background:#fff; border-radius:14px; box-shadow:var(--elev-2, 0 6px 18px -10px rgba(0,0,0,.35)), var(--borde-fino, 0 0 0 1px rgba(0,0,0,.06)); }
 .vp-interno{ transform-origin:top left; }
 .vp-overlay{ padding:10px !important; }
 .vb-modal.vp-modal{ width:min(1560px,98vw); max-width:98vw; max-height:97vh; display:flex; flex-direction:column; padding:16px 18px 14px; }
@@ -17,3 +18,13 @@
 .vp-seccion-cab{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 .rs-imagen.ampliable{ cursor:zoom-in; }
 @media (max-width:760px){ .vb-modal.vp-modal{ width:100vw; max-width:100vw; max-height:100vh; border-radius:0; } .vp-overlay{ padding:0 !important; } .vp-expandir span{ display:none; } }
+
+/* zoom de las vistas previas */
+.vp-zoom{ position:absolute; right:10px; bottom:10px; z-index:3; display:flex; align-items:center; gap:2px; padding:4px; border-radius:26px; background:color-mix(in srgb, var(--panel,#fff) 92%, transparent); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); box-shadow:0 8px 22px -8px rgba(0,0,0,.5), 0 0 0 1px rgba(0,0,0,.1); }
+.vp-zoom button{ min-width:40px; height:40px; border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:var(--text); } .vp-zoom button:hover:not(:disabled){ background:var(--superficie-2); } .vp-zoom button:disabled{ opacity:.35; }
+.vp-zoom .vp-zoom-pct{ min-width:78px; font-size:12.5px; padding:0 8px; color:var(--primary); }
+.vp-marco-img{ background:transparent; box-shadow:none; } .vp-zona-img .vp-foto{ display:block; border-radius:10px; }
+/* iPhone/Android: la ventana usa la altura REAL visible (sin la barra del navegador) y respeta la muesca */
+@supports (height:100dvh){ .vb-modal.vp-modal{ max-height:97dvh; } .vb-modal.vp-completa{ height:100dvh; max-height:100dvh; } }
+.vb-modal.vp-completa{ padding-top:max(16px, env(safe-area-inset-top, 0px)); padding-bottom:max(14px, env(safe-area-inset-bottom, 0px)); padding-left:max(18px, env(safe-area-inset-left, 0px)); padding-right:max(18px, env(safe-area-inset-right, 0px)); }
+@media (max-width:760px){ .vb-modal.vp-modal{ height:100dvh; max-height:100dvh; padding-top:max(14px, env(safe-area-inset-top, 0px)); padding-bottom:max(12px, env(safe-area-inset-bottom, 0px)); padding-left:max(12px, env(safe-area-inset-left, 0px)); padding-right:max(12px, env(safe-area-inset-right, 0px)); } .vp-ventana{ padding:0; } .vp-aviso{ font-size:11.5px; } .rs-acciones{ position:sticky; bottom:0; } }

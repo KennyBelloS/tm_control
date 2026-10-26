@@ -7,14 +7,16 @@
  * realmente necesita el contenido, con margen alrededor (para que no se corten
  * sombras ni bordes), y de esa copia sale la imagen.
  */
-export async function capturarElemento(nodo, fondo = '#ffffff') {
+import { descargarBlob } from './descargas';
+
+export async function capturarElemento(nodo, fondo = '#ffffff', { anchoMinimo = 900, relleno = 28 } = {}) {
   if (!nodo) throw new Error('No hay nada para descargar todavía.');
   const { default: html2canvas } = await import('html2canvas');
 
   const envoltura = document.createElement('div');
   Object.assign(envoltura.style, {
     position: 'fixed', left: '-100000px', top: '0', zIndex: '-1', pointerEvents: 'none',
-    width: 'max-content', minWidth: '900px', maxWidth: 'none', padding: '28px', background: fondo, boxSizing: 'content-box'
+    width: 'max-content', minWidth: `${anchoMinimo}px`, maxWidth: 'none', padding: `${relleno}px`, background: fondo, boxSizing: 'content-box'
   });
   const copia = nodo.cloneNode(true);
   Object.assign(copia.style, { width: 'auto', maxWidth: 'none', minWidth: '0', margin: '0' });
@@ -39,20 +41,20 @@ export async function capturarElemento(nodo, fondo = '#ffffff') {
   }
 }
 
-export async function exportarElemento(nodo, nombreBase, formato = 'png', fondo = '#ffffff') {
-  const canvas = await capturarElemento(nodo, fondo);
+export async function exportarElemento(nodo, nombreBase, formato = 'png', fondo = '#ffffff', opciones = {}) {
+  const canvas = await capturarElemento(nodo, fondo, opciones);
   if (formato === 'pdf') {
     const { default: jsPDF } = await import('jspdf');
     const w = canvas.width / 2, h = canvas.height / 2;
     const pdf = new jsPDF({ orientation: w >= h ? 'l' : 'p', unit: 'pt', format: [w, h] });
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, w, h);
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, w, h, undefined, 'FAST');       // JPEG: el mismo PDF pesa ~30 veces menos que con PNG sin comprimir
     pdf.save(`${nombreBase}.pdf`);
     return;
   }
-  const enlace = document.createElement('a');
-  enlace.download = `${nombreBase}.png`;
-  enlace.href = canvas.toDataURL('image/png');
-  enlace.click();
+  // Como archivo en memoria (blob): una dirección data: de más de ~2 MB la rechaza Chrome y la descarga fallaría en silencio con imágenes grandes.
+  const blob = await new Promise(ok => canvas.toBlob(ok, 'image/png'));
+  if (!blob) throw new Error('No se pudo generar la imagen.');
+  descargarBlob(blob, `${nombreBase}.png`);
 }
 
 /** La foto que se descargaría, lista para mostrarla en pantalla (data-URL del PNG). */

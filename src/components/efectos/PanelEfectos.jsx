@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useEfectos } from '../../lib/efectos';
 import { FIESTAS, fiestaDelDia, proximaFiesta } from '../../lib/fiestas';
-import { fechaLocalISO } from '../../lib/clasificacionCalculos';
+import { fechaLocalISO } from '../../lib/efectos';
 import { celebrar } from '../../lib/confeti';
 
 const NIVELES = [

@@ -3,8 +3,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import { useSesion } from '../lib/useSesion';
 import { puedeEditar } from '../lib/roles';
-import { listarPersonasModulo, insertarPersonasDesdeExcel, agregarPersonaManual, actualizarPersonaModulo, cambiarActivoPersona, getHorasTotalesPorPersona } from '../lib/db';
+import { listarPersonasModulo, insertarPersonasDesdeExcel, guardarMesasPersonas, agregarPersonaManual, actualizarPersonaModulo, cambiarActivoPersona, getHorasTotalesPorPersona } from '../lib/db';
 import { parsearReportePersonas } from '../lib/excel';
+import { parsearPersonasPdf } from '../lib/personasPdf';
+import { extraerLineasPdf, validarArchivoPdf } from '../lib/pdfTexto';
 import { esFilaMesaLegada, coincidePersona } from '../lib/personasUtil';
 import { validarArchivoExcel, limpiarTexto } from '../lib/seguridad';
 import { EstadoVacio, FilasEsqueleto } from '../components/Estados';
@@ -49,8 +51,7 @@ export default function Personas() {
   useEffect(() => { cargar(); }, []);
 
   // Filas guardadas por una versión anterior con la mesa como id: se esconden (las corrige el SQL).
-  const legadas = useMemo(() => personas.filter(esFilaMesaLegada), [personas]);
-  const vigentes = useMemo(() => personas.filter(p => !esFilaMesaLegada(p)), [personas]);
+  const vigentes = useMemo(() => personas.filter(p => !esFilaMesaLegada(p)), [personas]);     // sin avisos: esas filas simplemente no se muestran
 
   const personasFiltradas = useMemo(() => {
     let base = vigentes;
@@ -65,11 +66,20 @@ export default function Personas() {
     setProcesando(true);
     setMensaje(null);
     try {
-      await validarArchivoExcel(file);
-      const lista = parsearReportePersonas(await file.arrayBuffer());
-      const { insertados } = await conTarea(() => insertarPersonasDesdeExcel(lista));
-      const aviso = lista.sinCodigo ? ` (${lista.sinCodigo} fila(s) sin Emp.Cod se ignoraron)` : '';
-      setMensaje({ tipo: 'ok', texto: `Se guardaron ${insertados} personas${aviso}. Cada una queda identificada por su Emp.Cod, igual que en el boncheo, y la mesa es su código.` });
+      const esPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+      if (esPdf) {
+        // PDF: solo se guarda la MESA (el código) de cada persona por su Emp.Cod; lo incompleto se ignora sin avisar.
+        await validarArchivoPdf(file);
+        const { personas } = parsearPersonasPdf(await extraerLineasPdf(await file.arrayBuffer()));
+        if (!personas.length) throw new Error('No encontré personas en el PDF. Debe ser el reporte de Activos Boncheo (columnas Mesa, Nombre, Emp.Cod, Rol).');
+        const r = await conTarea(() => guardarMesasPersonas(personas));
+        setMensaje({ tipo: 'ok', texto: `Listo: ${r.actualizadas} mesa${r.actualizadas === 1 ? '' : 's'} actualizada${r.actualizadas === 1 ? '' : 's'}${r.nuevas ? ` y ${r.nuevas} persona${r.nuevas === 1 ? '' : 's'} nueva${r.nuevas === 1 ? '' : 's'}` : ''}${r.iguales ? ` · ${r.iguales} ya estaban al día` : ''}.` });
+      } else {
+        await validarArchivoExcel(file);
+        const lista = parsearReportePersonas(await file.arrayBuffer());
+        const { insertados } = await conTarea(() => insertarPersonasDesdeExcel(lista));
+        setMensaje({ tipo: 'ok', texto: `Se guardaron ${insertados} personas con su Emp.Cod y su mesa.` });
+      }
       await cargar();
     } catch (e) {
       setMensaje({ tipo: 'err', texto: `Error procesando el archivo: ${e.message}` });
@@ -126,25 +136,17 @@ export default function Personas() {
     <>
       <PageHeader title="Personas" subtitle="Catálogo de colaboradores — el Emp.Cod los une con el boncheo, la mesa es su código." />
       <div className="page">
-        {legadas.length > 0 && (
-          <div className="alert warn">
-            <i className="fa-solid fa-triangle-exclamation"></i>
-            <span>
-              Hay <strong>{legadas.length} persona(s) guardada(s) con la mesa como identificador</strong> (una versión anterior). No se muestran aquí
-              para no duplicarlas. Corre en Supabase el SQL de corrección de Personas para unirlas con sus rendimientos y asignaciones.
-            </span>
-          </div>
-        )}
+        {/* Las filas antiguas (con la mesa como identificador) se esconden sin avisar: la app no pide correr nada en la base de datos. */}
 
         {puedeModificar && (
           <section className="step-panel">
-            <h3><i className="fa-solid fa-file-arrow-up"></i> Cargar Excel de Activos</h3>
+            <h3><i className="fa-solid fa-file-arrow-up"></i> Cargar Activos (Excel o PDF)</h3>
             <p style={{ fontSize: 12.5, color: 'var(--gray)', marginBottom: 12 }}>
-              Sube el reporte de "Activos Boncheo" (columnas Mesa, Nombre, Emp.Cod, Rol). Cada persona se guarda por su <strong>Emp.Cod</strong> —el mismo
-              código que usa el boncheo— y la <strong>mesa</strong> queda como su código visible. Si ya existe, se actualiza.
+              Sube el reporte de "Activos Boncheo" en Excel o en PDF (columnas Mesa, Nombre, Emp.Cod, Rol). Cada persona se identifica por su <strong>Emp.Cod</strong> —el mismo
+              código que usa el boncheo— y la <strong>mesa</strong> es su código visible. Con el <strong>PDF</strong> solo se guarda la mesa de quien ya existe; quien falta se crea.
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              <input ref={fileRef} type="file" accept=".xlsx,.xls" disabled={procesando} onChange={e => manejarArchivo(e.target.files?.[0])} />
+              <input ref={fileRef} type="file" accept=".xlsx,.xls,.pdf,application/pdf" disabled={procesando} onChange={e => manejarArchivo(e.target.files?.[0])} />
               <button className="btn-secondary" onClick={() => setMostrarFormManual(m => !m)}>
                 <i className="fa-solid fa-user-plus"></i> Agregar persona manualmente
               </button>

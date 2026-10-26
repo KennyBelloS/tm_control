@@ -1,3 +1,4 @@
+import { hayConexion } from './conexion';
 import { supabase } from './supabaseClient';
 export const ROLES = ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador'];
 export const ROL_LABEL = {
@@ -98,27 +99,38 @@ export async function iniciarSesion(usuarioOCorreo, password) {
     throw new Error('Usuario/correo o contraseña incorrectos.');
   }
   guardarEstadoLogin({ fallos: 0, hasta: 0 });
+  olvidarDatosLocales();
+  try { localStorage.setItem('tm_bienvenida_pendiente', '1'); } catch { /* sin almacenamiento */ }       // al entrar: pantalla de bienvenida y recorrido
 }
 export async function cerrarSesion() {
+  olvidarDatosLocales();
   await supabase.auth.signOut();
 }
+const CLAVE_PERFIL = 'tm_perfil_cache';
+const perfilGuardado = () => { try { const p = JSON.parse(localStorage.getItem(CLAVE_PERFIL) || 'null'); return p && Date.now() - p.t < 30 * 864e5 ? p.perfil : null; } catch { return null; } };
+/** Los datos guardados para ver la app sin internet son de UNA persona: se borran al entrar y al salir. */
+export function olvidarDatosLocales() { try { localStorage.removeItem(CLAVE_PERFIL); } catch { /* sin almacenamiento */ } try { caches?.delete?.('datos-api'); } catch { /* sin caché */ } }
 export async function getPerfilActual() {
   const {
     data: {
       session
     }
   } = await supabase.auth.getSession();
-  if (!session) return null;
+  // Sin internet no se saca a nadie de la app: se usa el último perfil conocido (solo para ver; guardar exige conexión).
+  if (!session) return hayConexion() ? null : perfilGuardado();
   const {
     data,
     error
   } = await supabase.from('perfiles').select('nombre, rol, activo').eq('id', session.user.id).single();
+  if (error && !hayConexion()) return perfilGuardado();
   if (error || !data || !data.activo) return null;
-  return {
+  const perfil = {
     nombre: data.nombre,
     rol: data.rol,
     email: session.user.email
   };
+  try { localStorage.setItem(CLAVE_PERFIL, JSON.stringify({ t: Date.now(), perfil })); } catch { /* sin almacenamiento */ }
+  return perfil;
 }
 export async function crearUsuario({
   nombre,

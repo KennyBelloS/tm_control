@@ -23,7 +23,7 @@ Cada persona entra con su cuenta y ve solo lo que su **rol** permite (más abajo
 | Módulo | Qué hace | Quién lo ve |
 |---|---|---|
 | **Dashboard** | Resumen del Turno Actual en vivo, avance contra la meta, último Histórico, clasificación y formadoras, tendencia. Botón *Presentar* | Todos |
-| **Personas** | Catálogo de colaboradores: Emp.Cod, mesa (código) y nombre. Carga desde el Excel de Activos | Todos ven · editan Administrador, Ingeniero, Profesional y Digitador |
+| **Personas** | Catálogo de colaboradores: Emp.Cod, mesa (código) y nombre. Carga desde el Excel o el PDF de Activos | Todos ven · editan Administrador, Ingeniero, Profesional y Digitador |
 | **Rendimientos** | Sube el *Reporte Consolidado Boncheo* y consulta el Turno Actual (hora a hora) y el Histórico | Todos ven · suben los que editan |
 | **Reportes** | Filtra, mira la vista previa de la foto y descarga en PNG, JPG, PDF o Excel | Todos |
 | **Ranking** | Quién rinde más, por persona y por formadora, con la distribución por estado | Todos |
@@ -37,12 +37,12 @@ Cada persona entra con su cuenta y ve solo lo que su **rol** permite (más abajo
 | **Configuración** | Metas, jornada, fin de semana del Ranking y descuentos de tiempo | Administrador y Digitador |
 | **Usuarios** | Crea cuentas y asigna roles | Administrador y Digitador |
 | **Auditoría** | Espacio de la base de datos, copias de seguridad, vaciar y depuración semestral | Solo Administrador |
-| **Resúmenes** | Resumen de la finca o de cada equipo, con imagen y texto | Solo Administrador |
+| **Resúmenes** | Resumen ejecutivo de todo (finca y equipos), con forma de correo, para descargar en imagen o PDF | Solo Administrador |
 | **Cómo se usa** | Recorrido animado, manual interactivo con lecciones y simuladores, y las novedades de cada versión | Todos |
 
 ## Primeros pasos
 
-0. **Si es tu primera vez**, abre **Cómo se usa**: el *Recorrido* te enseña la app con dibujos que se mueven y el *Manual* te deja practicar cada módulo con simuladores.
+0. **Cada vez que inicias sesión** aparece una pantalla de bienvenida que te lleva primero al recorrido. **Si es tu primera vez**, abre **Cómo se usa**: el *Recorrido* te enseña la app con dibujos que se mueven y el *Manual* te deja practicar cada módulo con simuladores.
 1. **Entra** con tu cuenta. El Administrador entra con correo; el resto con *usuario* y contraseña (los crea el Administrador en *Usuarios*).
 2. **El menú** de la izquierda (en el celular, el ícono de menú) lleva a cada módulo. Solo aparecen los que tu rol puede ver.
 3. **Buscador rápido:** pulsa `Ctrl + K` (o `⌘ + K` en Mac) y escribe el nombre de un módulo o una acción para saltar a ella.
@@ -59,6 +59,7 @@ Es la pantalla de inicio: el saludo del día y, debajo, **Turno Actual (en vivo)
 1. Quienes pueden cargar datos ven **Subir Reporte Boncheo** arriba a la derecha: lleva a *Rendimientos*.
 2. Pulsa **Presentar** para mostrar la producción en una pantalla grande (ver *Modo Presentar*).
 3. Si el último Histórico está desactualizado, la campana te lo avisa (ver *Notificaciones*).
+4. Arriba, la tarjeta **Novedades** muestra lo nuevo de la versión: siempre está a la vista (se puede plegar a una barra, pero no desaparece) y lleva a *Cómo se usa → Novedades*.
 
 ### Modo Presentar
 
@@ -68,7 +69,7 @@ Pensado para mostrar en una pantalla o televisor: diapositivas a pantalla comple
 
 El catálogo que une todo: el **Emp.Cod** une a la persona con el boncheo y la **mesa** es su código corto.
 
-1. Para cargar muchas personas, usa **Cargar Excel de Activos**.
+1. Para cargar muchas personas, usa **Cargar Activos (Excel o PDF)**. Con el **PDF** del reporte (columnas Mesa, Nombre, Emp.Cod, Rol) solo se guarda la **mesa** de quien ya existe y quien falta se crea; las filas incompletas se ignoran sin avisar. Con el Excel se actualiza todo.
 2. Para agregar o corregir una, llena **Emp.Cod**, **Mesa (código)** y **Nombre completo** y pulsa **Guardar**.
 3. Mantén este catálogo al día: si una persona no está aquí, no aparece bien en los demás módulos.
 
@@ -130,7 +131,7 @@ La calidad de lo que se devuelve. Se alimenta con el Excel de devoluciones; al c
 - **Top 5:** quién tiene más y quién tiene menos devoluciones (la imagen lleva dos gráficos: devoluciones por día o mes y causas que más pesan).
 - **Causas**, **Tendencia**, **Colaborador** (el seguimiento de una persona) y **Formadoras**.
 
-Las imágenes se pueden ver antes con **Vista previa** y bajar con **Descargar imagen**. En el *Top 3 por causa* eliges **Imagen con**: solo código (para mostrar en grupo), solo nombre (para verificar) o código y nombre. Los *mínimos de días trabajados* del Top 5 los fija el Administrador.
+Las imágenes se pueden ver antes con **Vista previa** y bajar con **Descargar imagen**. La foto del *Top 5* trae el gráfico de barras y la tabla, como en la app. En el *Top 5* y en el *Top 3 por causa* eliges **Imagen con**: solo código (para mostrar en grupo), solo nombre (para verificar) o código y nombre. Los *mínimos de días trabajados* del Top 5 los fija el Administrador.
 
 ### TIC — Tablero Integrado del Colaborador
 
@@ -175,7 +176,15 @@ El cuidado de la base de datos:
 
 ### Resúmenes (solo Administrador)
 
-El resumen de la **finca** o de **un equipo** (una formadora), por **semana anterior**, **mes anterior**, **últimos 7 días** o fechas a elección. Trae una imagen con tallos, rendimiento, cumplimiento, devoluciones, calidad y clasificación, comparados con el período anterior, y un texto con lo más importante. Puedes **Descargar imagen**, **Copiar texto** o verla en **Pantalla completa**. La *Firma* ("De parte de…") es opcional y se guarda en tu equipo.
+El **resumen ejecutivo** de todo, con forma de correo: sale solo al abrir la pantalla, sin tocar nada. Trae:
+
+1. **Encabezado y titular:** el logo, «Sistema Integrado de Gestión» y una banda verde con el período y cómo fue (*Se cumplió la meta*, *Muy cerca de la meta*, *Por debajo de la meta*…).
+2. **Indicadores y panorama:** seis indicadores con su tendencia contra el período anterior y un texto redactado con los números reales (producción, meta, equipos, calidad, clasificación y destacados).
+3. **Producción por día** (toca una barra para ver el detalle), **desempeño de cada equipo** (toca uno para desplegarlo), causas de devolución, clasificación por línea y los destacados.
+4. **Conclusiones y recomendaciones**, y el **estado del sistema y pendientes** (lo mismo que avisa la campana).
+5. Una nota, «Cordialmente,» y tu **firma**.
+
+Arriba eliges **semana anterior**, **mes anterior**, **últimos 7 días** o fechas a elección. Puedes **Descargar imagen**, **Descargar PDF** (un documento continuo) o **Copiar texto**. En *Firma del resumen* editas tu nombre, cargo, ubicación y, si quieres, correo y teléfono; se guarda en tu equipo.
 
 ### Cómo se usa (este manual)
 
@@ -189,13 +198,14 @@ Para todos los roles. Tiene tres pestañas:
 
 Arriba a la derecha. **Solo lo crítico interrumpe** (un aviso flotante, una vez al día); lo demás espera en la campana, **ordenado por importancia**: *Requieren atención*, *Importantes* e *Informativas*. Cada aviso trae un botón para ir a resolverlo.
 
+- **Tocar un aviso** lo abre completo, con el detalle de qué pasó y qué hacer, y lo deja **leído**: no vuelve a aparecer mientras la situación siga igual (si empeora, sí). La pestaña **Leídas** los guarda para consultarlos.
 - **Mañana:** te lo recuerda al día siguiente. **✕:** lo descarta.
 - **No molestar** (la lunita): silencia los avisos flotantes durante 1 hora o hasta mañana.
 - Cada rol ve solo lo suyo. Ejemplos: rendimiento bajo sostenido (3 o más días seguidos bajo el 90 % de la meta), devoluciones o Histórico sin cargar (sin contar domingos ni festivos), clasificadores sin asignar, base de datos casi llena, copia mensual pendiente, depuración semestral, el festivo del día y las **novedades de cada versión**.
 
 ## Fotos: vista previa, pantalla completa y descarga
 
-Todo lo que se puede descargar como imagen se puede **ver antes**, igual a como saldrá: ranking de Reportes, Top 5 y Top 3 por causa, Clasificación, tablero de formadoras y Resúmenes. Pulsa **Pantalla completa** para verla más grande y `Esc` para cerrar. Lo que ves y lo que se descarga salen del mismo dibujo, así que no pueden diferir.
+Todo lo que se puede descargar como imagen se puede **ver antes**, igual a como saldrá: ranking de Reportes, Top 5 y Top 3 por causa, Clasificación, tablero de formadoras y Resúmenes. Pulsa **Pantalla completa** para verla más grande y `Esc` para cerrar. Lo que ves y lo que se descarga salen del mismo dibujo, así que no pueden diferir. La vista previa se ajusta al ancho de tu pantalla (se ve entera, sin mover nada) y se **agranda o achica** con los botones **− / Ajustada / +**, pellizcando con dos dedos o con `Ctrl` + rueda. Las fotos de rendimientos dicen arriba el **horario** que cubren (ej. *6:00 a. m. – 11:00 p. m.*).
 
 ## Roles y permisos
 
@@ -217,6 +227,20 @@ Todo lo que se puede descargar como imagen se puede **ver antes**, igual a como 
 5. Cada semana, mira el **Ranking**, los **Resúmenes** y el **TIC** de quien necesites.
 6. Cada mes, el Administrador confirma que se hizo la **copia automática** (*Auditoría*).
 
+## Sin conexión a internet
+
+La app sigue abriendo sin internet y te muestra **lo último que viste**; para guardar cambios necesita conexión.
+
+- Abajo aparece un aviso **«Sin conexión»**. Solo sale cuando de verdad no hay internet (se confirma dos veces); un servidor lento o con un error **no** cuenta como "sin conexión".
+- Sin internet **ver** funciona (con los datos guardados) y **guardar** te avisa con claridad en lugar de quedarse colgado.
+- Al volver el internet el aviso cambia a **«Conexión restablecida»** y la pantalla vuelve a pedir los datos sola.
+- Por seguridad, esos datos guardados se borran al iniciar o cerrar sesión.
+
+## Celulares (iPhone y Android)
+
+- La barra de arriba es de **una sola fila** y queda fija: el menú de **tres líneas** (☰) siempre está a la mano, junto al **logo de la app**, el título, la campana y tu avatar. Los botones de cada pantalla van debajo, sin tapar nada.
+- Los menús respetan la muesca y la barra del iPhone, y las vistas previas ocupan la pantalla completa con zoom.
+
 ## Preguntas frecuentes
 
 **¿Por qué el presentismo de alguien es bajo?** Revisa si es clasificador: solo cuentan los días con asignación. Y recuerda que domingos y festivos no cuentan si no fue citado.
@@ -227,7 +251,7 @@ Todo lo que se puede descargar como imagen se puede **ver antes**, igual a como 
 
 **¿Se manda algo por WhatsApp?** No. Los resúmenes y las imágenes se ven, se descargan o se copian desde la app.
 
-**¿La app funciona sin internet?** Abre sin conexión (es una PWA), pero para ver datos nuevos y subir reportes necesita conexión.
+**¿La app funciona sin internet?** Sí, para **ver** lo último guardado (mira *Sin conexión a internet*); para subir reportes o guardar cambios necesita conexión.
 
 ## Limitaciones honestas
 
@@ -296,6 +320,7 @@ Requisitos: **Node.js 18 o superior**.
 | `npm run build` | Compilación de producción (con service worker) |
 | `npm run build:sin-pwa` | Compilar sin el service worker (diagnóstico) |
 | `npm run verificar-arquitectura` | Comprueba las reglas de dependencia y que no queden marcas de conflicto de Git |
+| `npm run verificar-arranque` | Comprueba que el arranque de la app no cargue librerías pesadas (Excel, PDF, gráficos) |
 | `npm run verificar-manual` | Comprueba que cada módulo y la versión actual estén en este manual |
 | `npm run revisar-instalacion` | Busca archivos `package.json` dañados en `node_modules` |
 | `npm run diagnosticar-build` | Señala qué archivo falló si la compilación se detiene |
@@ -340,6 +365,26 @@ La campana avisa a cada persona, una sola vez por versión, que hay novedades.
 <!-- NOVEDADES:INICIO -->
 
 ## Historial de cambios
+
+### Versión 1.5.0 — 23/10/2026 · Resumen ejecutivo, logo en el celular y novedades siempre a la vista
+
+- **Resumen ejecutivo tipo correo:** Resúmenes ahora genera solo un documento ejecutivo de toda la finca y de cada equipo, con titular, indicadores con tendencia, panorama redactado, gráficos animados, conclusiones, pendientes del sistema y tu firma. Se descarga en imagen o PDF.
+- **Logo en la barra del celular:** el logo de la app aparece junto al menú de tres líneas, en iPhone y en Android.
+- **Novedades siempre visibles:** una tarjeta en el inicio con las novedades de la versión; se puede plegar, pero no desaparece.
+- **Descargas grandes arregladas:** las imágenes largas (como el resumen o un ranking con mucha gente) ya no fallan en silencio y el PDF pesa unas 30 veces menos.
+- **Avisos:** con exactamente tres personas con rendimiento bajo ya no dice «y 0 más».
+
+### Versión 1.4.0 — 23/10/2026 · Bienvenida, sin internet, celulares y más rápida
+
+- **Bienvenida al iniciar sesión:** una pantalla con tu saludo, tu rol y lo que trae tu recorrido, que te lleva primero a *Cómo se usa*.
+- **Funciona sin internet:** muestra lo último guardado, avisa «Sin conexión» solo cuando de verdad no hay internet y se actualiza sola al volver.
+- **Celulares:** barra superior de una fila con el menú de tres líneas siempre visible, menús dentro de la pantalla y vistas previas enteras con zoom (botones y pellizco).
+- **Más rápida:** cada módulo se descarga solo cuando se necesita (el arranque pasó de 1,4 MB a 0,6 MB) y se evita repetir consultas iguales.
+- **Personas por PDF:** se puede cargar el PDF de Activos; en quien ya existe solo se guarda la mesa.
+- **Avisos:** tocar uno lo abre completo y lo deja leído (no vuelve a aparecer).
+- **Fotos:** el Top 5 de devoluciones usa el gráfico de barras de la app, con selector «Imagen con»; las de rendimientos dicen el horario.
+- **Resúmenes con otra cara:** la imagen trae un titular con color según cómo fue el período, un anillo de cumplimiento, el podio de destacados y la barra de turnos que cumplieron la meta; en el celular, tarjetas de cifras con flechas de tendencia.
+- **Novedades en línea de tiempo:** la versión más reciente destacada y las anteriores plegables, cada novedad con su ícono y etiqueta.
 
 ### Versión 1.3.0 — 22/10/2026 · Manual interactivo con simuladores
 

@@ -23,13 +23,36 @@ export function diasOrdinariosPendientes(ultima, hoy) {
  * hechos: { hoy, hora, rol, puedeEditar, bajoRendimiento:[…], almacenamiento:{pct,usoMB,limiteMB}|null, devoluciones:{ultimaFecha}|null,
  *           respaldo:{ultimoMensual, semestral:{disponible,toca,corte}}|null, clasificadores:{existen,asignadosHoy}|null }
  */
+
+/** Los días de trabajo (no domingo ni festivo) que faltan entre la última fecha cargada y hoy, sin incluirlos. */
+const diasFaltantes = (ultima, hoy) => { const l = []; for (let d = sumar(ultima, 1); d < hoy; d = sumar(d, 1)) if (tipoDia(d) === 'ordinario') l.push(d); return l; };
+const RANGO = { critica: 3, importante: 2, info: 1 };
+
+/** Lo que se ve al TOCAR un aviso: el detalle (qué pasó y qué hacer) y la clave estable con la que se recuerda que ya se leyó. */
+function ampliar(n, h, bajos) {
+  const id = n.id, hoy = h.hoy;
+  if (id.startsWith('bajo-rend-grupo-')) return { clave: `bajo-rend-grupo-${bajos[0].ultimaFecha}`, detalle: [...bajos.map(b => `${b.colaborador}: ${b.diasSeguidos} días seguidos · promedio ${b.promedioRend} tallos/hora`), 'El aviso desaparece cuando vuelvan a pasar del 90 % de la meta.'] };
+  if (id.startsWith('bajo-rend-')) { const b = bajos.find(x => id === `bajo-rend-${x.colaborador_id}-${x.ultimaFecha}`); return b ? { detalle: [`Promedio: ${b.promedioRend} tallos por hora.`, `Días seguidos por debajo del 90 % de la meta: ${b.diasSeguidos}.`, `Último día: ${ddmm(b.ultimaFecha)}.`, 'Abre su tablero (TIC) para ver el detalle día por día.'] } : {}; }
+  if (id.startsWith('devol-pendientes-')) { const u = h.devoluciones.ultimaFecha, f = diasFaltantes(u, hoy); return { clave: `devol-pendientes-${u}`, detalle: [`Último día cargado: ${ddmm(u)}.`, `Faltan: ${f.map(ddmm).join(', ') || 'ayer'}.`, 'En Devoluciones sube el Excel de devoluciones; solo se escribe lo nuevo o lo que cambió.'] }; }
+  if (id.startsWith('historico-')) { const u = h.historico.ultimaFecha, f = diasFaltantes(u, hoy); return { clave: `historico-${u}`, detalle: [`Último día cargado: ${ddmm(u)}.`, `Días de trabajo sin cargar: ${f.map(ddmm).join(', ') || 'ayer'}.`, 'En Rendimientos sube el reporte de boncheo y guárdalo en Histórico; revisa también los descuentos de tiempo.'] }; }
+  if (id.startsWith('clasif-sin-asignar-')) return { detalle: ['En Líneas elige un bonchador y un clasificador (se busca por nombre).', 'Ese día el clasificador toma la asistencia, el rendimiento y las devoluciones de su bonchador.'] };
+  if (id.startsWith('almacenamiento-')) { const a = h.almacenamiento; return { clave: n.severidad === 'critica' ? 'almacenamiento-critico' : 'almacenamiento-alto', detalle: [`Usado: ${a.usoMB} MB de ${a.limiteMB} MB (${String(a.pct).replace('.', ',')} %).`, 'En Auditoría ves cuándo se llenaría y qué tablas pesan más.', 'Haz una copia (.tmbackup) y luego depura lo de más de 6 meses.'] }; }
+  if (id.startsWith('backup-pendiente-')) return { detalle: ['La copia mensual se genera sola, una vez al mes.', 'Si no aparece: confirma que el almacenamiento «respaldos» y la tarea programada de Vercel estén configurados.', 'Mientras tanto, haz una copia manual en Auditoría → Copia de seguridad.'] };
+  if (id.startsWith('backup-hecho-')) return { detalle: ['Se guardó en la nube y se puede importar desde Auditoría si hace falta recuperar datos.', 'Se conservan las últimas 12 copias.'] };
+  if (id.startsWith('depuracion-')) return { detalle: ['La depuración borra lo anterior al corte, pero antes descarga dos respaldos (Excel y .tmbackup).', 'Te pedirá escribir una frase de seguridad para confirmar.'] };
+  if (id.startsWith('novedades-')) return { detalle: ['Cada versión trae cosas nuevas o mejoradas.', 'Toca «Ver novedades» para ver todo lo que cambió, con dibujos.'] };
+  if (id.startsWith('festivo-')) return { detalle: ['Domingos y festivos solo cuentan en el presentismo para quien fue citado ese día.', 'Un día sin ningún registro en la finca no se considera trabajado.'] };
+  if (id.startsWith('fiesta-')) return { detalle: ['Cambia los colores y agrega detalles de la temporada.', 'Se apaga cuando quieras desde el menú de tu avatar.'] };
+  return {};
+}
+
 export function construirNotificaciones(h) {
   const out = [], admin = h.rol === 'administrador', hoy = h.hoy;
   const add = n => out.push({ accion: null, caduca: null, fecha: `${hoy}T00:00:00`, ...n });
 
   // Producción: rendimiento bajo sostenido (se agrupa si son varias personas)
   const bajos = [...(h.bajoRendimiento || [])].sort((a, b) => b.diasSeguidos - a.diasSeguidos);
-  if (bajos.length >= 3) add({ id: `bajo-rend-grupo-${hoy}`, severidad: 'importante', categoria: 'produccion', icono: 'fa-triangle-exclamation', titulo: `${bajos.length} personas con rendimiento bajo sostenido`, descripcion: `${bajos.slice(0, 3).map(b => b.colaborador).join(', ')} y ${bajos.length - 3} más llevan 3 o más días seguidos por debajo del 90 % de la meta.`, accion: { ruta: '/ranking', etiqueta: 'Ver ranking' }, fecha: `${bajos[0].ultimaFecha}T12:00:00` });
+  if (bajos.length >= 3) add({ id: `bajo-rend-grupo-${hoy}`, severidad: 'importante', categoria: 'produccion', icono: 'fa-triangle-exclamation', titulo: `${bajos.length} personas con rendimiento bajo sostenido`, descripcion: `${bajos.length === 3 ? `${bajos[0].colaborador}, ${bajos[1].colaborador} y ${bajos[2].colaborador}` : `${bajos.slice(0, 3).map(b => b.colaborador).join(', ')} y ${bajos.length - 3} más`} llevan 3 o más días seguidos por debajo del 90 % de la meta.`, accion: { ruta: '/ranking', etiqueta: 'Ver ranking' }, fecha: `${bajos[0].ultimaFecha}T12:00:00` });
   else for (const b of bajos) add({ id: `bajo-rend-${b.colaborador_id}-${b.ultimaFecha}`, severidad: 'importante', categoria: 'produccion', icono: 'fa-triangle-exclamation', titulo: 'Rendimiento bajo sostenido', descripcion: `${b.colaborador} lleva ${b.diasSeguidos} días seguidos por debajo del 90 % de la meta (promedio ${b.promedioRend} tallos/h).`, accion: { ruta: `/colaborador?id=${b.colaborador_id}`, etiqueta: 'Ver su tablero' }, fecha: `${b.ultimaFecha}T12:00:00` });
 
   // Datos pendientes: devoluciones sin cargar (solo quienes pueden cargarlas)
@@ -66,7 +89,7 @@ export function construirNotificaciones(h) {
     else if (ultimo === mesActual && h.respaldo.ultimoMensual && String(h.respaldo.ultimoMensual).slice(0, 10) >= sumar(hoy, -1)) add({ id: `backup-hecho-${String(h.respaldo.ultimoMensual).slice(0, 10)}`, severidad: 'info', categoria: 'sistema', icono: 'fa-circle-check', titulo: 'Se generó solo el backup del mes', descripcion: h.respaldo.ultimoNombre ? `«${h.respaldo.ultimoNombre}» quedó guardado en la nube y se puede importar si hace falta.` : 'La copia de seguridad de la base de datos de este mes ya quedó guardada en la nube.', accion: { ruta: '/auditoria', etiqueta: 'Ver copias' }, fecha: String(h.respaldo.ultimoMensual), caduca: finDelDia(hoy) });
     if (h.respaldo.semestral?.toca) add({ id: `depuracion-${h.respaldo.semestral.corte}`, severidad: 'importante', categoria: 'sistema', icono: 'fa-broom', titulo: 'Toca la depuración semestral', descripcion: `Hay información anterior al ${ddmm(h.respaldo.semestral.corte)}/${h.respaldo.semestral.corte.slice(0, 4)} que puedes depurar, con respaldo en Excel y en base de datos.`, accion: { ruta: '/auditoria', etiqueta: 'Ir a Auditoría' } });
   }
-  return out;
+  return out.map(n => ({ clave: n.id, detalle: [], ...n, ...ampliar(n, h, bajos) }));
 }
 
 /**
@@ -74,8 +97,11 @@ export function construirNotificaciones(h) {
  * Se quitan las caducadas y las ocultas ("recordar mañana" o eliminadas); orden: críticas, importantes, informativas, y lo más reciente primero.
  */
 export function visibles(items, estado, ahora) {
-  const t = new Date(ahora).getTime(), leidas = new Set(estado.leidas || []);
+  const t = new Date(ahora).getTime(), leidas = new Set(estado.leidas || []), mantener = new Set(estado.mantener || []);
+  // "Leída" = la persona abrió el aviso completo. Mientras la situación siga igual (misma clave) no vuelve; si empeora (más grave) sí.
+  const hecha = n => (estado.hechas?.[n.clave ?? n.id] ?? 0) >= RANGO[n.severidad];
   let l = items.filter(n => !(n.caduca && new Date(n.caduca).getTime() < t) && !(estado.ocultas?.[n.id] && new Date(estado.ocultas[n.id]).getTime() > t));
+  l = estado.filtro === 'leidas' ? l.filter(hecha) : l.filter(n => !hecha(n) || mantener.has(n.id));
   if (estado.filtro === 'importantes') l = l.filter(n => n.severidad !== 'info');
   if (estado.filtro === 'sin_leer') l = l.filter(n => !leidas.has(n.id) || n.severidad === 'critica');
   return l.sort((a, b) => ORDEN[a.severidad] - ORDEN[b.severidad] || (a.fecha < b.fecha ? 1 : -1));

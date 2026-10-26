@@ -15,7 +15,7 @@
  */
 import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SRC = path.join(RAIZ, 'src');
-export const PUROS = ['buscarColaborador', 'calculos', 'colaboradorCalculos', 'devolucionesAnalisis', 'devolucionesCalculos', 'clasificadorCalculos', 'resumenGeneral', 'resumenImagen', 'espacioProyeccion', 'notificaciones', 'respaldoBD', 'devolucionesImagen', 'devolucionesPresentacion', 'festivosColombia', 'fiestas', 'hitos', 'aprende', 'recorrido', 'manualMarkdown', 'imagenBase', 'imagenRanking', 'personasUtil', 'respaldoGlobal', 'seguridad'];
+export const PUROS = ['buscarColaborador', 'calculos', 'colaboradorCalculos', 'devolucionesAnalisis', 'devolucionesCalculos', 'clasificadorCalculos', 'resumenGeneral', 'resumenImagen', 'espacioProyeccion', 'notificaciones', 'respaldoBD', 'devolucionesImagen', 'devolucionesPresentacion', 'festivosColombia', 'fiestas', 'hitos', 'resumenEjecutivo', 'horario', 'personasPdf', 'aprende', 'recorrido', 'manualMarkdown', 'imagenBase', 'imagenRanking', 'personasUtil', 'respaldoGlobal', 'seguridad'];
 const PROHIBIDO_IMPORT = /^(react|react-dom|react-router-dom|exceljs.*|jspdf.*|xlsx|html2canvas|apexcharts|@supabase\/.*)$/;
 const GLOBALES = /\b(document|window|localStorage|sessionStorage|navigator)\s*[.\[]/;
 const sinComentarios = s => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1').replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g, m => (m.startsWith('`') ? '``' : "''"));

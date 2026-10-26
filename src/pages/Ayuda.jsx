@@ -1,31 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import Texto from '../components/TextoMd';
+import Novedades from '../components/Novedades';
 import PageHeader from '../components/PageHeader';
 import manualMd from '../../MANUAL.md?raw';
-import { extraerBloque, parsear, secciones, filtrar, inline, versiones, subseccion } from '../lib/manualMarkdown';
+import { extraerBloque, parsear, secciones, filtrar, versiones, subseccion, novedades } from '../lib/manualMarkdown';
 import { marcarNovedadesVistas } from '../lib/novedades';
 import { useSesion } from '../lib/useSesion';
 import { puedeVer, puedeEditar } from '../lib/roles';
 import { armarPasos } from '../lib/recorrido';
 import Recorrido from '../components/recorrido/Recorrido';
-import Aprende from '../components/aprende/Aprende';
+const Aprende = lazy(() => import('../components/aprende/Aprende'));          // las lecciones y simuladores se cargan al abrir la pestaña Manual
 import { armarLecciones } from '../lib/aprende';
 
 // El manual se lee UNA vez: lo que se ve aquí es exactamente MANUAL.md (zonas USO y NOVEDADES).
 const BLOQUES_USO = parsear(extraerBloque(manualMd, 'USO'));
 const SEC_USO = secciones(BLOQUES_USO);
-const SEC_NOV = secciones(parsear(extraerBloque(manualMd, 'NOVEDADES')));
+const NOVEDADES = novedades(manualMd);
 const VERSION = versiones(manualMd)[0]?.version;
 
-function Texto({ t }) {
-  return inline(t).map((x, i) => {
-    if (x.t === 'b') return <strong key={i}><Texto t={x.v} /></strong>;
-    if (x.t === 'i') return <em key={i}><Texto t={x.v} /></em>;
-    if (x.t === 'code') return <code key={i}>{x.v}</code>;
-    if (x.t === 'link') return x.href.startsWith('/') ? <Link key={i} to={x.href}>{x.v}</Link> : <a key={i} href={x.href} target="_blank" rel="noopener noreferrer">{x.v}</a>;
-    return <span key={i}>{x.v}</span>;
-  });
-}
 function Bloque({ b }) {
   if (b.tipo === 'h') return b.nivel >= 4 ? <h4 id={b.id}>{b.texto}</h4> : <h3 id={b.id}>{b.texto}</h3>;
   if (b.tipo === 'p') return <p><Texto t={b.texto} /></p>;
@@ -54,11 +47,11 @@ export default function Ayuda() {
   const pasos = useMemo(() => armarPasos({ puedeVer: k => puedeVer(rol, k), puedeEditar: puedeEditar(rol) }), [rol]);
   const lecciones = useMemo(() => armarLecciones({ puedeVer: k => puedeVer(rol, k), puedeEditar: puedeEditar(rol) }), [rol]);
   const conLeccion = useMemo(() => new Set(lecciones.map(l => l.id)), [lecciones]);
-  const lista = useMemo(() => filtrar(tab === 'novedades' ? SEC_NOV : SEC_USO, q), [tab, q]);
+  const lista = useMemo(() => filtrar(SEC_USO, q), [q]);
   useEffect(() => { if (tab === 'novedades') marcarNovedadesVistas(); }, [tab]);
   const ir = id => document.getElementById(`ay-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const titulos = lista.filter(s => s.titulo);
-  const leyendo = tab === 'novedades' || texto;
+  const leyendo = texto;
   const guiaDe = l => { const b = subseccion(BLOQUES_USO, l.seccion); return b.length ? <details className="ap-guia"><summary><i className="fa-solid fa-book-open"></i> Leer la guía completa de este módulo</summary><div className="ay-guia">{b.map((x, i) => <Bloque key={i} b={x} />)}</div></details> : null; };
   return (
     <>
@@ -74,7 +67,8 @@ export default function Ayuda() {
           {leyendo && <label className="ay-buscar"><i className="fa-solid fa-magnifying-glass"></i><input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar en el manual…" aria-label="Buscar en el manual" /></label>}
         </div>
         {tab === 'recorrido' && <Recorrido pasos={pasos} practica={conLeccion} onManual={() => setParams({ tab: 'manual' })} onNovedades={() => setParams({ tab: 'novedades' })} />}
-        {tab === 'manual' && !texto && <Aprende lecciones={lecciones} guiaDe={guiaDe} onReferencia={() => setParams({ tab: 'manual', ver: 'texto' })} inicial={{ leccion: params.get('leccion'), etapa: params.get('etapa') }} />}
+        {tab === 'novedades' && <Novedades entradas={NOVEDADES} />}
+        {tab === 'manual' && !texto && <Suspense fallback={<div className="pc" aria-busy="true"><div className="pc-barra"></div><div className="pc-bloque"></div></div>}><Aprende lecciones={lecciones} guiaDe={guiaDe} onReferencia={() => setParams({ tab: 'manual', ver: 'texto' })} inicial={{ leccion: params.get('leccion'), etapa: params.get('etapa') }} /></Suspense>}
         {leyendo && (
           <div className="ay-cuerpo">
             {titulos.length > 1 && (

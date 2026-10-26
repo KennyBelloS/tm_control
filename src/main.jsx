@@ -4,7 +4,9 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { iniciarActualizacionAutomatica } from './lib/actualizacionApp';
 import '@fontsource-variable/inter';                      // tipografía propia (se sirve desde la app)
-import '@fortawesome/fontawesome-free/css/all.min.css';   // íconos servidos desde la propia app (sin depender de un sitio externo)
+import '@fortawesome/fontawesome-free/css/fontawesome.min.css';
+import '@fortawesome/fontawesome-free/css/solid.min.css';
+import '@fortawesome/fontawesome-free/css/regular.min.css';          // sin la tipografía de marcas (ya no se usa)   // íconos servidos desde la propia app (sin depender de un sitio externo)
 import './index.css';
 import './styles/sistema-diseno.css';          // tokens y componentes refinados
 import './styles/navegacion-y-uso.css';
@@ -23,6 +25,11 @@ import './styles/efectos.css';               // capa ambiental, 3D, saludo, pane
 import './styles/auditoria-respaldo.css';    // respaldo global y vaciado de la base de datos
 import './styles/clasificadores.css';        // asigna un clasificador a un bonchador
 import './styles/notificaciones.css';        // campana de notificaciones
+import './styles/ejecutivo.css';            // resumen ejecutivo tipo correo
+import './styles/novedades.css';            // novedades: versión destacada y línea de tiempo
+import './styles/conexion.css';             // aviso de conexión
+import './styles/bienvenida.css';           // pantalla de bienvenida al iniciar sesión
+import './styles/movil-barra.css';          // barra superior compacta del celular
 import './styles/aprende.css';              // manual interactivo (lecciones y simuladores)
 import './styles/recorrido.css';            // recorrido animado de Cómo se usa
 import './styles/ayuda.css';                 // pantalla Cómo se usa (el manual)

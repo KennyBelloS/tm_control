@@ -6,7 +6,9 @@ import { construirNotificaciones, visibles, insignia, paraAvisoFlotante, mananaT
 import { reunirHechos } from './notificacionesDatos';
 
 const CLAVE = 'tm_notif_estado_v2';
-const leer = () => { try { return { leidas: [], ocultas: {}, noMolestarHasta: null, filtro: 'todas', mostradas: {}, ...JSON.parse(localStorage.getItem(CLAVE) || '{}') }; } catch { return { leidas: [], ocultas: {}, noMolestarHasta: null, filtro: 'todas', mostradas: {} }; } };
+const BASE = { leidas: [], hechas: {}, ocultas: {}, noMolestarHasta: null, filtro: 'todas', mostradas: {} };
+const leer = () => { try { return { ...BASE, ...JSON.parse(localStorage.getItem(CLAVE) || '{}'), mantener: [] }; } catch { return { ...BASE, mantener: [] }; } };
+const RANGO = { critica: 3, importante: 2, info: 1 };
 const hoyISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 export const refrescarNotificaciones = () => window.dispatchEvent(new CustomEvent('tm-notif-refrescar'));
 
@@ -18,7 +20,7 @@ export function useNotificaciones() {
   const [estado, setEstado] = useState(leer);
   const [ahora, setAhora] = useState(() => new Date().toISOString());
   const estadoRef = useRef(estado); estadoRef.current = estado;
-  const guardar = useCallback(cambio => setEstado(e => { const n = typeof cambio === 'function' ? cambio(e) : { ...e, ...cambio }; try { localStorage.setItem(CLAVE, JSON.stringify(n)); } catch { /* sin almacenamiento */ } return n; }), []);
+  const guardar = useCallback(cambio => setEstado(e => { const n = typeof cambio === 'function' ? cambio(e) : { ...e, ...cambio }; try { const { mantener, ...resto } = n; localStorage.setItem(CLAVE, JSON.stringify(resto)); } catch { /* sin almacenamiento */ } return n; }), []);
 
   const cargar = useCallback(async () => {
     if (!rol) return;
@@ -44,9 +46,12 @@ export function useNotificaciones() {
   const lista = useMemo(() => visibles(items, estado, ahora), [items, estado, ahora]);
   const globo = useMemo(() => insignia(items, estado, ahora), [items, estado, ahora]);
   return {
-    lista, globo, filtro: estado.filtro, leidas: new Set(estado.leidas), noMolestarHasta: estado.noMolestarHasta && new Date(estado.noMolestarHasta) > new Date() ? estado.noMolestarHasta : null, ahora,
+    lista, globo, leidasN: items.filter(n => (estado.hechas?.[n.clave ?? n.id] ?? 0) >= RANGO[n.severidad]).length, filtro: estado.filtro, leidas: new Set(estado.leidas), noMolestarHasta: estado.noMolestarHasta && new Date(estado.noMolestarHasta) > new Date() ? estado.noMolestarHasta : null, ahora,
     marcarVistas: () => guardar(e => ({ ...e, leidas: [...new Set([...(e.leidas || []), ...lista.map(n => n.id)])].slice(-200) })),
-    marcarLeida: id => guardar(e => ({ ...e, leidas: [...new Set([...(e.leidas || []), id])].slice(-200) })),
+    marcarVista: id => guardar(e => ({ ...e, leidas: [...new Set([...(e.leidas || []), id])].slice(-200) })),
+    /** Abrió el aviso completo: queda LEÍDO (no vuelve) pero sigue a la vista mientras la campana esté abierta. */
+    leer: n => guardar(e => ({ ...e, hechas: { ...e.hechas, [n.clave ?? n.id]: Math.max(e.hechas?.[n.clave ?? n.id] ?? 0, RANGO[n.severidad]) }, mantener: [...new Set([...(e.mantener || []), n.id])] })),
+    soltar: () => guardar({ mantener: [] }),
     recordarManana: id => guardar(e => ({ ...e, ocultas: { ...e.ocultas, [id]: mananaTemprano(new Date()) } })),
     eliminar: id => guardar(e => ({ ...e, ocultas: { ...e.ocultas, [id]: '9999-12-31T00:00:00Z' } })),
     cambiarFiltro: f => guardar({ filtro: f }),

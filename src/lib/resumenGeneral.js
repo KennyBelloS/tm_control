@@ -88,6 +88,24 @@ export function calcularResumen(datos, periodo, destino = { tipo: 'general' }) {
   return { periodo, destino, tallos, rend: horas > 0 ? tallos / horas : 0, diasTrabajados, personasPorDia: diasTrabajados ? porDia.reduce((s, d) => s + d.personas, 0) / diasTrabajados : 0, metaHora: datos.config.metaHora || null, metaDia, cumplimiento, porDia, mejor, peor, cumplenMetaPct: personaDias > 0 ? (cumplen / personaDias) * 100 : null, destacados, devoluciones: { total: devTotal, porMil, causas, diaMas: diaMasDev, filtrada: devFiltrada, hayDatos: dv.length > 0 }, clasificacion };
 }
 
+/**
+ * El TITULAR del resumen: una frase corta que dice cómo fue el período, con su tono (bien / info / atencion) y su ícono.
+ * Con meta diaria se mide por cumplimiento; sin meta (un equipo) por cómo cambió el rendimiento frente al período anterior.
+ */
+export function titular(r, c) {
+  const pd = r.periodo.tipo === 'mensual' ? 'mes' : 'período';
+  if (!r.diasTrabajados) return { tono: 'info', icono: 'fa-circle-info', texto: `Sin producción registrada en este ${pd}`, detalle: 'Cuando se carguen los reportes, aquí aparecerá el resumen.' };
+  if (r.cumplimiento !== null) {
+    const p = Math.round(r.cumplimiento);
+    if (r.cumplimiento >= 100) return { tono: 'bien', icono: 'fa-trophy', texto: `¡Se cumplió la meta! ${p}%`, detalle: `${fmt(r.tallos)} tallos en ${r.diasTrabajados} día${r.diasTrabajados === 1 ? '' : 's'} de trabajo.` };
+    if (r.cumplimiento >= 90) return { tono: 'info', icono: 'fa-bullseye', texto: `Muy cerca de la meta: ${p}%`, detalle: `Faltaron ${fmt(r.metaDia * r.diasTrabajados - r.tallos)} tallos para llegar.` };
+    return { tono: 'atencion', icono: 'fa-triangle-exclamation', texto: `Por debajo de la meta: ${p}%`, detalle: `Faltaron ${fmt(r.metaDia * r.diasTrabajados - r.tallos)} tallos; conviene reforzar.` };
+  }
+  if (c.rend !== null && c.rend >= 3) return { tono: 'bien', icono: 'fa-arrow-trend-up', texto: 'Mejor ritmo que el período anterior', detalle: `${fmt(r.rend)} tallos/hora, ${Math.round(c.rend)}% más.` };
+  if (c.rend !== null && c.rend <= -3) return { tono: 'atencion', icono: 'fa-arrow-trend-down', texto: 'El ritmo bajó frente al período anterior', detalle: `${fmt(r.rend)} tallos/hora, ${Math.abs(Math.round(c.rend))}% menos.` };
+  return { tono: 'info', icono: 'fa-equals', texto: 'Ritmo estable', detalle: `${fmt(r.rend)} tallos/hora, parecido al período anterior.` };
+}
+
 /** Cambio porcentual de un valor respecto al anterior (null si no hay con qué comparar). */
 export const variacion = (a, b) => (b > 0 && a !== null && a !== undefined ? ((a - b) / b) * 100 : null);
 export function comparar(actual, previo) {

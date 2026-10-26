@@ -1,19 +1,29 @@
-/** RESÚMENES — infraestructura del navegador: lee los datos con la sesión y arma el resumen con las reglas puras. */
+/** RESÚMENES — infraestructura del navegador: lee los datos con la sesión del administrador y arma el resumen ejecutivo con las reglas puras. */
 import { supabase } from './supabaseClient';
 import { cargarDatos } from './resumenCarga';
-import { periodoPrevio, calcularResumen, comparar, insights, textoResumen } from './resumenGeneral';
-import { svgResumen } from './resumenImagen';
+import { periodoPrevio, calcularResumen, comparar } from './resumenGeneral';
+import { modeloEjecutivo } from './resumenEjecutivo';
+import { reunirHechos } from './notificacionesDatos';
+import { construirNotificaciones } from './notificaciones';
 import { logoBase64 } from './logoBase64';
 
-export async function listarFormadoras() { const r = await supabase.from('formadoras').select('id, nombre').order('nombre'); return r.error ? [] : r.data || []; }
+const hoyLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
-/** destino: null = general de la finca · { formadora_id, nombre } = equipo de una formadora. */
-export async function armarResumenPantalla({ destino, periodo, remitente, finca }) {
-  const datos = await cargarDatos(supabase, { desde: periodoPrevio(periodo).desde, hasta: periodo.hasta });
-  const dest = destino ? { tipo: 'formadora', formadoraId: destino.formadora_id, nombre: datos.formadoras.get(destino.formadora_id) || destino.nombre } : { tipo: 'general' };
-  const r = calcularResumen(datos, periodo, dest), c = comparar(r, calcularResumen(datos, periodoPrevio(periodo), dest)), frases = insights(r, c);
+/** Una sola lectura de datos: de ahí salen el resumen de la finca, el de cada equipo y los pendientes. */
+export async function armarEjecutivo({ periodo }) {
+  const prev = periodoPrevio(periodo);
+  const datos = await cargarDatos(supabase, { desde: prev.desde, hasta: periodo.hasta });
+  const r = calcularResumen(datos, periodo), c = comparar(r, calcularResumen(datos, prev));
+  const equipos = [...datos.formadoras].map(([id, nombre]) => {
+    const dest = { tipo: 'formadora', formadoraId: id, nombre }, re = calcularResumen(datos, periodo, dest);
+    return { id, nombre, r: re, c: comparar(re, calcularResumen(datos, prev, dest)) };
+  });
+  let alertas = [];
+  try {                                                                      // el estado actual del sistema y lo pendiente (lo mismo que avisa la campana, sin lo informativo)
+    const ahora = new Date(), hechos = await reunirHechos({ rol: 'administrador', puedeEditar: true, hoy: hoyLocal(), hora: ahora.getHours() });
+    alertas = construirNotificaciones(hechos).filter(n => n.severidad !== 'info').map(n => ({ titulo: n.titulo, descripcion: n.descripcion, severidad: n.severidad }));
+  } catch { /* si no se pueden leer, el resumen sale igual sin esa sección */ }
   const generado = new Date().toLocaleString('es-CO', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-  const para = destino?.nombre;
-  const { svg, ancho, alto } = svgResumen({ r, c, frases, para, remitente, finca, generado, logo: await logoBase64() });
-  return { r, c, frases, svg, ancho, alto, texto: textoResumen(r, c, { para, remitente, finca, generado }) };
+  const modelo = modeloEjecutivo({ r, c, equipos, alertas, generado });          // la firma se aplica al dibujar: escribirla no vuelve a leer datos
+  return { modelo, logo: await logoBase64() };
 }

@@ -9,3 +9,27 @@
 .rs-acciones{ display:flex; flex-wrap:wrap; gap:8px; } .rs-acciones i{ margin-right:6px; } .rs-nota{ color:var(--gray); font-size:11.5px; line-height:1.4; }
 .rs-controles{ display:flex; flex-wrap:wrap; gap:14px 22px; align-items:flex-end; margin-bottom:12px; } .rs-controles label{ display:flex; flex-direction:column; gap:4px; font-size:12px; font-weight:700; color:var(--gray); min-width:220px; } .rs-controles .vb-input{ min-height:42px; }
 .rs-firma{ margin-top:12px; } .rs-firma summary{ cursor:pointer; font-size:12.5px; font-weight:700; color:var(--primary); } .rs-firma .rs-form{ margin:10px 0 6px; } .rs-texto{ margin:12px 0; }
+
+/* titular y cifras sobre la imagen */
+.rs-hero{ display:flex; align-items:center; gap:16px; padding:16px 18px; margin-bottom:12px; border-radius:20px; border-left:7px solid var(--t); background:color-mix(in srgb, var(--t) 10%, var(--panel,#fff)); animation:rc-sube .5s cubic-bezier(.2,.8,.2,1) both; }
+.rs-hero-bien{ --t:#2E8C4E; } .rs-hero-info{ --t:#1F5F8B; } .rs-hero-atencion{ --t:#C0392B; }
+.rs-hero-ic{ flex-shrink:0; width:50px; height:50px; border-radius:16px; display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff; background:var(--t); box-shadow:0 10px 20px -10px var(--t); }
+.rs-hero h2{ margin:0; font-size:21px; font-weight:900; line-height:1.15; } .rs-hero p{ margin:3px 0 0; color:var(--gray); font-size:14px; }
+.rs-cifras{ display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:14px; }
+.rs-cifra{ position:relative; display:flex; flex-direction:column; gap:1px; padding:14px 14px 12px; border-radius:18px; background:var(--superficie-2); box-shadow:inset 0 0 0 1px rgba(0,0,0,.05); animation:rc-sube .5s cubic-bezier(.2,.8,.2,1) both; }
+.rs-cifra:nth-child(2){ animation-delay:.06s; } .rs-cifra:nth-child(3){ animation-delay:.12s; } .rs-cifra:nth-child(4){ animation-delay:.18s; }
+.rs-cifra-ic{ width:30px; height:30px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:13px; color:#fff; background:var(--primary); margin-bottom:6px; }
+.rs-cifra small{ font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--gray); } .rs-cifra b{ font-size:28px; font-weight:900; line-height:1.1; font-variant-numeric:tabular-nums; } .rs-cifra em{ font-style:normal; font-size:12px; color:var(--gray); line-height:1.3; }
+.rs-fl{ position:absolute; top:12px; right:12px; font-style:normal; font-size:12px; font-weight:900; padding:2px 8px; border-radius:10px; } .rs-fl-bien{ color:#18703B; background:color-mix(in srgb, #22A455 16%, transparent); } .rs-fl-mal{ color:#B02A1D; background:color-mix(in srgb, #C0392B 14%, transparent); } .rs-fl-igual{ color:var(--gray); background:var(--pista, rgba(0,0,0,.08)); }
+@media (max-width:760px){ .rs-cifras{ grid-template-columns:repeat(2,minmax(0,1fr)); } .rs-hero h2{ font-size:18px; } .rs-cifra b{ font-size:24px; } }
+@media (prefers-reduced-motion:reduce){ .rs-hero, .rs-cifra{ animation:none; } }
+/* en computador la imagen ya trae el titular y las cifras: estas tarjetas son para el celular, donde la imagen se ve pequeña */
+@media (min-width:1024px){ .rs-hero, .rs-cifras{ display:none; } }
+
+/* resumen ejecutivo: barra de controles */
+.rs-barra{ display:flex; flex-direction:column; gap:12px; max-width:760px; margin:0 auto 14px; width:100%; }
+.rs-acciones-barra{ display:flex; flex-wrap:wrap; gap:8px; } .rs-acciones-barra button{ flex:1 1 auto; justify-content:center; }
+.ej-cargando{ max-width:760px; margin:30px auto; text-align:center; color:var(--gray); font-weight:700; } .rs-actualizando{ opacity:.55; transition:opacity .2s; pointer-events:none; }
+@media (min-width:1024px){ .rs-hero, .rs-cifras{ display:none; } }
+/* celular: controles compactos para llegar antes al documento */
+@media (max-width:640px){ .rs-periodos{ flex-wrap:nowrap !important; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none; padding-bottom:2px; } .rs-periodos::-webkit-scrollbar{ display:none; } .rs-periodos button{ flex-shrink:0; white-space:nowrap; } .rs-acciones-barra button{ flex:1 1 calc(50% - 8px); padding-left:8px; padding-right:8px; font-size:13px; } }

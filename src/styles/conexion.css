@@ -1,0 +1,11 @@
+.bc{ position:fixed; left:50%; bottom:max(14px, env(safe-area-inset-bottom, 0px)); transform:translateX(-50%); z-index:1500; max-width:min(520px, calc(100vw - 24px)); display:flex; align-items:center; gap:11px; padding:11px 18px; border-radius:26px; font-size:13px; line-height:1.35; box-shadow:0 16px 34px -14px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.08); animation:bc-sube .4s cubic-bezier(.2,.8,.2,1) both; pointer-events:none; }
+.bc i{ font-size:17px; } .bc-sin{ background:#FFF4DB; color:#7A4B00; } .bc-sin i{ color:#D97706; } .bc-ok{ background:#E3F6EA; color:#14582F; } .bc-ok i{ color:#22A455; }
+@keyframes bc-sube{ from{ opacity:0; transform:translate(-50%, 16px); } to{ opacity:1; transform:translate(-50%, 0); } }
+html[data-tema="oscuro"] .bc-sin{ background:#4A3410; color:#FFE2A8; } html[data-tema="oscuro"] .bc-ok{ background:#12351F; color:#B9F0CB; }
+@media (prefers-reduced-motion:reduce){ .bc{ animation:none; } }
+
+/* esqueleto mientras llega una pantalla */
+.pc{ display:flex; flex-direction:column; gap:14px; } .pc > *{ border-radius:16px; background:linear-gradient(100deg, var(--superficie-2, #eee) 30%, color-mix(in srgb, var(--primary) 10%, var(--superficie-2, #eee)) 50%, var(--superficie-2, #eee) 70%) 0 0 / 250% 100%; animation:pc-brilla 1.4s linear infinite; }
+.pc-barra{ height:46px; width:60%; } .pc-fila{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; background:none !important; animation:none !important; } .pc-fila i{ display:block; height:96px; border-radius:16px; background:inherit; animation:inherit; background:linear-gradient(100deg, var(--superficie-2, #eee) 30%, color-mix(in srgb, var(--primary) 10%, var(--superficie-2, #eee)) 50%, var(--superficie-2, #eee) 70%) 0 0 / 250% 100%; animation:pc-brilla 1.4s linear infinite; } .pc-bloque{ height:220px; } .pc-corto{ height:120px; width:70%; }
+@keyframes pc-brilla{ to{ background-position:-150% 0; } }
+@media (prefers-reduced-motion:reduce){ .pc > *, .pc-fila i{ animation:none; } }

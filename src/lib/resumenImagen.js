@@ -2,6 +2,7 @@
  * IMAGEN DEL RESUMEN — arma un SVG (dibujo vectorial) con la cabecera de quién lo envía, las cifras, los gráficos y las frases.
  * Pura: devuelve texto. En el navegador se convierte a PNG con un canvas. Sin emojis (no los dibujan todas las fuentes).
  */
+import { titular } from './resumenGeneral.js';
 const FUENTE = "'DejaVu Sans', 'Segoe UI', Arial, sans-serif";
 const VERDE = '#166534', VERDE_OSC = '#0F3D22', DORADO = '#C9932B', ROJO = '#C0392B', GRIS = '#6B7C71', TINTA = '#1A2A20', FONDO = '#F5F4EF';
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -17,13 +18,36 @@ export function renglones(texto, max) {
 }
 const delta = v => (v === null || v === undefined ? null : { txt: v > 0.5 ? `▲ ${Math.round(v)}%` : v < -0.5 ? `▼ ${Math.abs(Math.round(v))}%` : '= igual', arriba: v > 0.5, abajo: v < -0.5 });
 
-function tarjeta(x, y, w, h, { etq, valor, sub, d, buenoSiSube = true }) {
+const corto = n => { const t = String(n || '').trim().split(/\s+/).filter(Boolean); return t.length < 2 ? (t[0] || '—') : `${t[0]} ${(t.length >= 4 ? t[2] : t[1])[0]}.`; };
+function anillo(cx, cy, rad, pct, color) {
+  const p = Math.max(0, Math.min(100, pct)), c = 2 * Math.PI * rad;
+  return `<circle cx="${cx}" cy="${cy}" r="${rad}" fill="none" stroke="#E7E4DA" stroke-width="9"/><circle cx="${cx}" cy="${cy}" r="${rad}" fill="none" stroke="${color}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(c * p) / 100} ${c}" transform="rotate(-90 ${cx} ${cy})"/>`;
+}
+function banda(x, y, w, h, t) {
+  const col = TONO[t.tono] || GRIS;
+  return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="20" fill="${col}" opacity=".11"/><rect x="${x}" y="${y}" width="8" height="${h}" rx="4" fill="${col}"/><circle cx="${x + 54}" cy="${y + h / 2}" r="26" fill="${col}"/><text x="${x + 54}" y="${y + h / 2 + 9}" font-size="26" font-weight="800" text-anchor="middle" fill="#fff">${t.tono === 'bien' ? '✓' : t.tono === 'atencion' ? '!' : 'i'}</text>
+    <text x="${x + 100}" y="${y + 34}" font-size="26" font-weight="800" fill="${TINTA}">${esc(t.texto)}</text><text x="${x + 100}" y="${y + 60}" font-size="16" fill="${GRIS}">${esc(t.detalle)}</text></g>`;
+}
+function podio(x, y, w, lista, metaHora) {
+  const ancho = (w - 40 - 2 * 18) / 3, medallas = ['#C9932B', '#8E9BA3', '#B5703B'];
+  return `<g><rect x="${x}" y="${y}" width="${w}" height="170" rx="18" fill="#fff"/><text x="${x + 24}" y="${y + 36}" font-size="19" font-weight="800" fill="${TINTA}">Destacados por rendimiento</text><text x="${x + w - 24}" y="${y + 36}" font-size="13" text-anchor="end" fill="${GRIS}">personas con 3 o más días trabajados</text>
+    ${lista.slice(0, 3).map((p, i) => { const px = x + 20 + i * (ancho + 18), pct = metaHora ? (p.rend / metaHora) * 100 : null;
+      return `<rect x="${px}" y="${y + 56}" width="${ancho}" height="100" rx="14" fill="#F8F7F2"/><circle cx="${px + 34}" cy="${y + 106}" r="22" fill="${medallas[i]}"/><text x="${px + 34}" y="${y + 114}" font-size="22" font-weight="800" text-anchor="middle" fill="#fff">${i + 1}</text>
+      <text x="${px + 68}" y="${y + 92}" font-size="17" font-weight="800" fill="${TINTA}">${esc(corto(p.nombre))}</text><text x="${px + 68}" y="${y + 120}" font-size="26" font-weight="800" fill="${VERDE}">${fmt(p.rend)}<tspan font-size="13" font-weight="600" fill="${GRIS}"> t/h</tspan></text><text x="${px + 68}" y="${y + 143}" font-size="13" fill="${GRIS}">${p.dias} días${pct ? ` · ${Math.round(pct)}% de la meta` : ''}</text>`; }).join('')}</g>`;
+}
+function barraEquipo(x, y, w, pct, metaHora) {
+  const col = pct >= 70 ? '#2E8C4E' : pct >= 50 ? DORADO : ROJO, bw = w - 48;
+  return `<g><rect x="${x}" y="${y}" width="${w}" height="84" rx="18" fill="#fff"/><text x="${x + 24}" y="${y + 34}" font-size="17" font-weight="800" fill="${TINTA}">Turnos que cumplieron la meta por hora${metaHora ? ` (${fmt(metaHora)} t/h)` : ''}</text><text x="${x + w - 24}" y="${y + 34}" font-size="22" font-weight="800" text-anchor="end" fill="${col}">${Math.round(pct)}%</text>
+    <rect x="${x + 24}" y="${y + 50}" width="${bw}" height="16" rx="8" fill="#E7E4DA"/><rect x="${x + 24}" y="${y + 50}" width="${Math.max(8, (bw * Math.min(100, pct)) / 100)}" height="16" rx="8" fill="${col}"/></g>`;
+}
+
+function tarjeta(x, y, w, h, { etq, valor, sub, d, buenoSiSube = true, aro = null }) {
   const dd = delta(d), color = dd ? (dd.arriba === buenoSiSube && !dd.abajo ? '#2E8C4E' : dd.abajo === !buenoSiSube && !dd.arriba ? '#2E8C4E' : (dd.arriba || dd.abajo) ? ROJO : GRIS) : GRIS;
   return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="18" fill="#fff"/><rect x="${x}" y="${y}" width="6" height="${h}" rx="3" fill="${DORADO}"/>
     <text x="${x + 26}" y="${y + 32}" font-size="15" font-weight="700" fill="${GRIS}" letter-spacing="1">${esc(etq.toUpperCase())}</text>
     <text x="${x + 26}" y="${y + 80}" font-size="44" font-weight="800" fill="${TINTA}">${esc(valor)}</text>
     <text x="${x + 26}" y="${y + 108}" font-size="15" fill="${GRIS}">${esc(sub || '')}</text>
-    ${dd ? `<text x="${x + w - 20}" y="${y + 32}" font-size="16" font-weight="800" text-anchor="end" fill="${color}">${esc(dd.txt)}</text>` : ''}</g>`;
+    ${dd ? `<text x="${x + w - 20}" y="${y + 32}" font-size="16" font-weight="800" text-anchor="end" fill="${color}">${esc(dd.txt)}</text>` : ''}${aro !== null ? anillo(x + w - 52, y + h - 46, 24, aro, aro >= 100 ? '#2E8C4E' : aro >= 90 ? DORADO : ROJO) : ''}</g>`;
 }
 function barrasDia(x, y, w, h, porDia, metaDia) {
   if (!porDia.length) return '';
@@ -46,14 +70,17 @@ export function svgResumen({ r, c, frases, para, remitente, finca = 'Finca Torre
   const W = 1080, M = 40, kp = [];
   kp.push({ etq: 'Tallos', valor: fmt(r.tallos), sub: `${r.diasTrabajados} día${r.diasTrabajados === 1 ? '' : 's'} de trabajo`, d: c.tallos });
   kp.push({ etq: 'Rendimiento', valor: `${fmt(r.rend)}`, sub: 'tallos por hora real', d: c.rend });
-  kp.push(r.cumplimiento !== null ? { etq: 'Cumplimiento', valor: `${Math.round(r.cumplimiento)}%`, sub: `meta ${fmt(r.metaDia)} al día`, d: c.cumplimiento } : { etq: 'Turnos con meta', valor: r.cumplenMetaPct === null ? '—' : `${Math.round(r.cumplenMetaPct)}%`, sub: `meta ${fmt(r.metaHora || 0)} t/h` });
+  kp.push(r.cumplimiento !== null ? { etq: 'Cumplimiento', valor: `${Math.round(r.cumplimiento)}%`, sub: `meta ${fmt(r.metaDia)} al día`, d: c.cumplimiento, aro: r.cumplimiento } : { etq: 'Turnos con meta', valor: r.cumplenMetaPct === null ? '—' : `${Math.round(r.cumplenMetaPct)}%`, sub: `meta ${fmt(r.metaHora || 0)} t/h` });
   kp.push({ etq: 'Devoluciones', valor: r.devoluciones.hayDatos ? fmt(r.devoluciones.total) : '—', sub: r.devoluciones.hayDatos ? (r.devoluciones.diaMas ? `más: ${r.devoluciones.diaMas[0].slice(8)}/${r.devoluciones.diaMas[0].slice(5, 7)}` : '') : 'sin cargar', d: c.devoluciones, buenoSiSube: false });
   kp.push({ etq: 'Calidad', valor: r.devoluciones.porMil === null ? '—' : fmt1(r.devoluciones.porMil), sub: 'devoluciones por 1.000 tallos', d: c.porMil, buenoSiSube: false });
   kp.push(r.clasificacion ? { etq: 'Clasificación', valor: fmt(r.clasificacion.porHora), sub: 'tallos por hora (todas las líneas)' } : { etq: 'Personas por día', valor: fmt1(r.personasPorDia), sub: 'promedio con registro' });
   const cw = (W - 2 * M - 40) / 3; let y = 210, partes = [];
+  partes.push(banda(M, y, W - 2 * M, 84, titular(r, c))); y += 106;
   kp.forEach((k, i) => partes.push(tarjeta(M + (i % 3) * (cw + 20), y + Math.floor(i / 3) * 150, cw, 130, k)));
   y += 2 * 150 + 10;
   partes.push(barrasDia(M, y, W - 2 * M, 290, r.porDia, r.metaDia)); y += 310;
+  if (r.destacados?.length) { partes.push(podio(M, y, W - 2 * M, r.destacados, r.metaHora)); y += 190; }
+  if (r.cumplenMetaPct !== null && r.cumplenMetaPct !== undefined) { partes.push(barraEquipo(M, y, W - 2 * M, r.cumplenMetaPct, r.metaHora)); y += 104; }
   const causas = r.devoluciones.causas.map(x => ({ etq: x.nombre, valor: x.cantidad, extra: `${Math.round(x.pct * 100)}%` })), lineas = r.clasificacion ? r.clasificacion.lineas.slice(0, 5).map(l => ({ etq: l.nombre, valor: l.tallos, extra: `${fmt(l.porHora)}/h` })) : [];
   if (causas.length || lineas.length) {
     const alto = 64 + Math.max(causas.length, lineas.length) * 40 + 20;
@@ -70,11 +97,11 @@ export function svgResumen({ r, c, frases, para, remitente, finca = 'Finca Torre
   const marca = logoOk
     ? `<circle cx="92" cy="86" r="54" fill="#fff"/><clipPath id="recorte"><circle cx="92" cy="86" r="50"/></clipPath><image href="${logo}" x="42" y="36" width="100" height="100" preserveAspectRatio="xMidYMid slice" clip-path="url(#recorte)"/>`
     : `<circle cx="92" cy="86" r="46" fill="#fff"/><circle cx="92" cy="86" r="40" fill="none" stroke="#4A9A5E" stroke-width="5"/><path d="M72 96 C72 74 86 70 92 80 C98 70 112 74 112 96" fill="none" stroke="${VERDE}" stroke-width="7" stroke-linecap="round"/><circle cx="92" cy="66" r="7" fill="${ROJO}"/>`;
-  const cab = `<rect width="${W}" height="190" fill="url(#g)"/>${marca}
+  const cab = `<rect width="${W}" height="190" fill="url(#g)"/><circle cx="${W - 90}" cy="20" r="150" fill="#fff" opacity=".06"/><circle cx="${W - 30}" cy="180" r="84" fill="#F5C04A" opacity=".16"/><rect x="${W - M - 168}" y="34" width="168" height="34" rx="17" fill="#fff" opacity=".16"/><text x="${W - M - 84}" y="57" font-size="15" font-weight="800" text-anchor="middle" fill="#fff">${r.destino.tipo === 'formadora' ? 'EQUIPO' : 'FINCA COMPLETA'}</text>${marca}
     <text x="164" y="66" font-size="38" font-weight="800" fill="#fff">${esc(r.periodo.titulo)}${r.destino.tipo === 'formadora' ? ` · Equipo de ${esc(r.destino.nombre)}` : ''}</text>
     <text x="164" y="104" font-size="22" fill="#CDE8D5">${esc(r.periodo.etiqueta)}${para ? ` · Para ${esc(para)}` : ''}</text>
     <text x="164" y="140" font-size="16" fill="#fff">${remitente ? `De parte de ${esc(remitente)} · ` : ''}TMControl · ${esc(finca)}</text>
     <text x="164" y="164" font-size="14" fill="#A9D3B5">${esc(generado || '')}</text>`;
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FUENTE}"><defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="${VERDE_OSC}"/><stop offset="1" stop-color="${VERDE}"/></linearGradient></defs><rect width="${W}" height="${H}" fill="${FONDO}"/>${cab}${partes.join('')}<text x="${W / 2}" y="${H - 28}" font-size="14" text-anchor="middle" fill="${GRIS}">Generado automáticamente · Torremolinos TMControl</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="${FUENTE}"><defs><filter id="sombra" x="-5%" y="-5%" width="110%" height="120%"><feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#0F3D22" flood-opacity=".10"/></filter><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="${VERDE_OSC}"/><stop offset="1" stop-color="${VERDE}"/></linearGradient></defs><rect width="${W}" height="${H}" fill="${FONDO}"/>${cab}${partes.join('').replace(/rx="18" fill="#fff"/g, 'rx="18" fill="#fff" filter="url(#sombra)"')}<text x="${W / 2}" y="${H - 28}" font-size="14" text-anchor="middle" fill="${GRIS}">Generado automáticamente · Torremolinos TMControl</text></svg>`;
   return { svg, ancho: W, alto: H };
 }

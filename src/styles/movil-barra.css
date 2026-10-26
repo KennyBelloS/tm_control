@@ -1,0 +1,20 @@
+/* Celular y tablet pequeña: barra superior de UNA fila, con las tres líneas siempre visibles, y menús que respetan la zona segura del iPhone */
+@media (max-width:1023px){
+  .topbar{ position:sticky !important; top:0 !important; z-index:60 !important; flex-wrap:nowrap !important; align-items:center !important; gap:6px !important; padding:calc(var(--sa-top, 0px) + 6px) max(10px, var(--sa-right, 0px)) 6px max(10px, var(--sa-left, 0px)) !important; min-height:0; }
+  .topbar-title-group{ order:1 !important; flex:1 1 0 !important; min-width:0 !important; gap:8px !important; }
+  .topbar-titulos{ min-width:0; }
+  .topbar .topbar-titulos h1{ font-size:16px !important; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin:0; }
+  .topbar-sub, .topbar-grupo{ display:none !important; }
+  .menu-toggle{ display:flex !important; width:44px !important; height:44px !important; border-radius:13px !important; flex-shrink:0; font-size:18px !important; background:color-mix(in srgb, var(--primary) 11%, var(--panel, #fff)) !important; color:var(--primary) !important; }
+  .topbar-herramientas{ flex:0 0 auto !important; order:2 !important; gap:4px !important; flex-wrap:nowrap !important; }
+  .topbar-herramientas .en-vivo{ display:none; }
+  .topbar-herramientas .cab-icono, .topbar-herramientas .notif-bell{ width:42px; height:42px; }
+  .acciones-movil{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; padding:10px max(12px, var(--sa-right, 0px)) 0 max(12px, var(--sa-left, 0px)); }
+  .acciones-movil > *{ width:100%; justify-content:center; text-align:center; min-width:0; }
+  .menu-usuario-panel{ position:fixed !important; top:calc(var(--sa-top, 0px) + 58px) !important; right:max(10px, var(--sa-right, 0px)) !important; left:auto !important; width:min(300px, calc(100vw - 20px)) !important; max-height:calc(100dvh - var(--sa-top, 0px) - 76px); overflow:auto; }
+  .notif-panel, .nt-panel{ position:fixed !important; left:max(8px, var(--sa-left, 0px)) !important; right:max(8px, var(--sa-right, 0px)) !important; top:calc(var(--sa-top, 0px) + 58px) !important; width:auto !important; max-height:calc(100dvh - var(--sa-top, 0px) - 76px) !important; }
+}
+@media (min-width:1024px){ .acciones-movil{ display:none; } }
+.topbar-logo{ display:none; }
+@media (max-width:1023px){ .topbar-logo{ display:block; flex-shrink:0; width:36px; height:36px; border-radius:50%; background:#fff; padding:2px; object-fit:cover; box-shadow:0 4px 12px -4px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.08); } }
+.horario-chip{ display:inline-flex; align-items:center; gap:7px; margin:2px 0 8px; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:700; color:#0F3D22; background:#FDF3DF; box-shadow:0 0 0 1px #E8C879 inset; } .horario-chip strong{ font-weight:900; }

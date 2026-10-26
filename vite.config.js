@@ -41,15 +41,25 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2}'],
-        globIgnores: ['splash/**'],         // las pantallas de arranque de iPhone no se descargan con la app
+        globIgnores: ['splash/**', '**/pdf.worker*'],   // las pantallas de arranque de iPhone y el lector de PDF (1,4 MB) no se descargan con la app
         sourcemap: false,                    // sin mapa de código del service worker (no hace falta en producción)
         cleanupOutdatedCaches: true,
         clientsClaim: true,                  // la versión instalada controla la pantalla desde el primer momento
         navigateFallback: '/index.html',
         runtimeCaching: [
-          {
+          {                                      // las consultas se piden SIEMPRE a la red; solo si no hay internet se muestra lo último guardado
+            urlPattern: ({ url, request }) => request.method === 'GET' && url.pathname.startsWith('/rest/v1'),
+            handler: 'NetworkFirst',
+            options: { cacheName: 'datos-api', networkTimeoutSeconds: 12, expiration: { maxEntries: 400, maxAgeSeconds: 7 * 24 * 3600 }, cacheableResponse: { statuses: [200] } },
+          },
+          {                                      // guardar cambios y la sesión: nunca desde el caché
             urlPattern: ({ url }) => url.pathname.startsWith('/rest/v1') || url.pathname.startsWith('/auth/v1'),
             handler: 'NetworkOnly',
+          },
+          {                                      // el lector de PDF se guarda la primera vez que se usa
+            urlPattern: ({ url }) => /pdf\.worker/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'lector-pdf', expiration: { maxEntries: 2 } },
           },
         ],
       },

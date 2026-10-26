@@ -111,3 +111,27 @@ export function subseccion(bloques, parte) {
   for (let k = i + 1; k < bloques.length; k++) { if (bloques[k].tipo === 'h' && bloques[k].nivel <= nivel) break; out.push(bloques[k]); }
   return out;
 }
+
+const ICONOS = [[/internet|conexi[oó]n/, 'fa-wifi'], [/celular|iphone|android|barra superior|tres l[ií]neas/, 'fa-mobile-screen'], [/r[aá]pid|velocidad|descarga|peso|arranque/, 'fa-bolt'], [/pdf/, 'fa-file-pdf'], [/aviso|campana|notific/, 'fa-bell'], [/bienvenida/, 'fa-hand-sparkles'], [/manual|recorrido|lecci|simulador|c[oó]mo se usa/, 'fa-graduation-cap'], [/foto|imagen|vista previa|top 5/, 'fa-image'], [/resumen/, 'fa-file-lines'], [/copia|respaldo|base de datos|auditor|depuraci/, 'fa-shield-halved'], [/festiv|calendario/, 'fa-calendar-day'], [/clasific/, 'fa-people-arrows'], [/rol|permiso|formador/, 'fa-user-lock'], [/personas|activos/, 'fa-users'], [/dashboard|presentar/, 'fa-gauge-high']];
+/** Ícono y etiqueta (Nuevo / Mejora / Arreglo) de una novedad, según lo que dice. */
+export function clasificarNovedad(titulo, texto) {
+  const t = normalizar(`${titulo} ${texto}`);
+  const icono = (ICONOS.find(([rx]) => rx.test(t)) || [null, 'fa-star'])[1];
+  const tipo = /corrig|arregl|error|fallo/.test(t) ? 'arreglo' : /mejor|m[aá]s r[aá]pid|ajust|redise|pas[oó] de|ya no |se evita/.test(t) ? 'mejora' : 'nuevo';
+  return { icono, tipo };
+}
+/** El historial de cambios como datos: [{ version, fecha, titulo, items: [{ titulo, texto, icono, tipo }] }], la más nueva primero. */
+export function novedades(md) {
+  const out = []; let act = null;
+  for (const l of extraerBloque(md, 'NOVEDADES').split('\n')) {
+    const h = /^###\s+Versi[oó]n\s+(\d+\.\d+\.\d+)(?:\s+—\s+(?:(\d{2}\/\d{2}\/\d{4})(?:\s+·\s+(.+))?|(.+)))?\s*$/.exec(l.trim());
+    if (h) { act = { version: h[1], fecha: h[2] || null, titulo: (h[3] || h[4] || '').trim(), items: [] }; out.push(act); continue; }
+    const b = /^\s*[-*]\s+(.*)$/.exec(l);
+    if (b && act) {
+      const m = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(b[1].trim());
+      const titulo = m ? m[1].replace(/:$/, '').trim() : '', texto = (m ? m[2] : b[1]).trim();
+      act.items.push({ titulo, texto, ...clasificarNovedad(titulo, texto) });
+    }
+  }
+  return out;
+}

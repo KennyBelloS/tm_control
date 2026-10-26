@@ -9,6 +9,7 @@ import { supabaseConfigurado } from '../lib/supabaseClient';
 const TendenciaTallosChart = lazy(() => import('../components/charts/TendenciaTallosChart'));
 const EstadoDonutChart = lazy(() => import('../components/charts/EstadoDonutChart'));
 import DashboardCarrusel from '../components/DashboardCarrusel';
+import NovedadesInicio from '../components/NovedadesInicio';
 import ModoPresentacion from '../components/ModoPresentacion';
 import NumeroAnimado from '../components/NumeroAnimado';
 import { entrarPantallaCompleta, salirPantallaCompleta } from '../lib/pantallaCompleta';
@@ -150,6 +151,7 @@ export default function Dashboard() {
               { id: 'sec-graficas', etiqueta: 'Visualizaciones', icono: 'fa-chart-simple' }
             ]} />
             <SaludoDia tallos={stats.actual.totalTallos} cumplimiento={stats.actual.cumplimiento} meta={metaHoy} bloques={stats.actual.bloques} />
+            <NovedadesInicio />
             {!metaTablaLista && <div className="alert warn">
                 <i className="fa-solid fa-triangle-exclamation"></i>
                 Falta crear la tabla "metas_diarias" en Supabase — corre <code>supabase/migracion_metas_diarias.sql</code>. Mientras tanto se usa el valor por defecto de Configuración.
