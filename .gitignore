@@ -17,7 +17,3 @@ dev-dist
 .DS_Store
 Thumbs.db
 npm-debug.log*
-
-    # base de datos: la estructura y el SQL NO se suben (se pegan en Supabase desde tu computador)
-   supabase/
-   *.sql

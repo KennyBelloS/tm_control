@@ -10,6 +10,7 @@ import {
   getCargaDia, guardarClasificacionDia, getHistoricoClasificacion
 } from '../lib/clasificacion';
 import { validarArchivoExcel } from '../lib/seguridad';
+import { avisarCarga, horaDeMinutos } from '../lib/avisosFuera';
 
 const fmt = n => (n ?? 0).toLocaleString('es-CO');
 
@@ -72,6 +73,7 @@ export default function Clasificacion() {
     const liberar = iniciarTarea();
     try {
       await guardarClasificacionDia({ fecha, resumen });
+      avisarCarga([{ evento: 'clasificacion', fecha, hora: horaDeMinutos(resumen.corteMin) }]);
       setMensaje({ tipo: 'ok', texto: `Guardado: ${fmt(resumen.totalTallos)} tallos de ${resumen.lineas.length} línea(s) para el ${formatoFecha(fecha)}. El histórico diario se actualizó solo.` });
       setArchivo(null); setParseado(null);
       if (fileRef.current) fileRef.current.value = '';

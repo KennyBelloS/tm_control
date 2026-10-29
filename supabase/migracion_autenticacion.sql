@@ -1341,3 +1341,112 @@ $$;
 revoke all on function seguridad_estado() from public, anon;
 grant execute on function seguridad_estado() to authenticated;
 
+-- ---------------------------------------------------------------------
+-- 38) AVISOS IMPORTANTES: la campana los muestra a TODOS; los avisos fuera de la app (en el celular, aunque la app esté cerrada)
+--     le llegan solo a quien el Administrador active, tipo de aviso por tipo de aviso.
+--     · eventos_app guarda cada aviso (turno cargado, clasificación, histórico, resumen semanal/mensual); lo escribe SOLO el servidor.
+--     · push_suscripciones guarda los celulares que aceptaron recibir avisos (endpoint y llaves del navegador, no contraseñas).
+--     · perfiles.push_eventos dice qué avisos fuera de la app tiene activos cada persona; solo el Administrador lo cambia.
+-- ---------------------------------------------------------------------
+alter table perfiles add column if not exists push_eventos text[] not null default '{}';
+alter table perfiles drop constraint if exists perfiles_push_eventos_validos;
+alter table perfiles add constraint perfiles_push_eventos_validos
+  check (push_eventos <@ array['turno', 'clasificacion', 'historico', 'resumen_semanal', 'resumen_mensual']::text[]);
+
+create or replace function proteger_edicion() returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if (new.edicion is distinct from old.edicion or new.push_eventos is distinct from old.push_eventos)
+     and auth.uid() is not null and not coalesce(es_administrador(), false) then
+    raise exception 'Solo el Administrador puede cambiar este permiso.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+create table if not exists push_suscripciones (
+  id          bigint generated always as identity primary key,
+  usuario_id  uuid not null references perfiles(id) on delete cascade,
+  endpoint    text not null unique,
+  p256dh      text not null,
+  auth        text not null,
+  dispositivo text,
+  creado_en   timestamptz not null default now()
+);
+create index if not exists idx_push_usuario on push_suscripciones (usuario_id);
+alter table push_suscripciones enable row level security;
+drop policy if exists "admin_lee_push" on push_suscripciones;
+create policy "admin_lee_push" on push_suscripciones for select using (coalesce(es_administrador(), false));
+
+create table if not exists eventos_app (
+  id         bigint generated always as identity primary key,
+  clave      text not null unique,
+  tipo       text not null check (tipo in ('turno', 'clasificacion', 'historico', 'resumen_semanal', 'resumen_mensual')),
+  titulo     text not null,
+  detalle    text not null default '',
+  ruta       text not null default '/',
+  fecha      date,
+  creado_por uuid,
+  creado_en  timestamptz not null default now()
+);
+create index if not exists idx_eventos_app_creado on eventos_app (creado_en desc);
+alter table eventos_app enable row level security;
+drop policy if exists "leer_eventos_app" on eventos_app;
+create policy "leer_eventos_app" on eventos_app for select to authenticated using (true);
+revoke all on push_suscripciones, eventos_app from anon;
+
+create or replace function mis_avisos_fuera() returns text[]
+language sql security definer stable set search_path = public, pg_temp
+as $$ select coalesce((select push_eventos from public.perfiles where id = auth.uid() and activo = true), '{}'::text[]) $$;
+revoke all on function mis_avisos_fuera() from public, anon;
+grant execute on function mis_avisos_fuera() to authenticated;
+
+create or replace function guardar_suscripcion_push(p_endpoint text, p_p256dh text, p_auth text, p_dispositivo text default null) returns void
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is null then raise exception 'Debes iniciar sesión.' using errcode = '42501'; end if;
+  if coalesce(array_length(mis_avisos_fuera(), 1), 0) = 0 then raise exception 'El Administrador todavía no te activó avisos fuera de la app.' using errcode = '42501'; end if;
+  if p_endpoint is null or p_endpoint !~ '^https://' or length(p_endpoint) > 700 or coalesce(length(p_p256dh), 0) not between 20 and 200 or coalesce(length(p_auth), 0) not between 8 and 100 then
+    raise exception 'La suscripción no es válida.' using errcode = '22023';
+  end if;
+  insert into push_suscripciones (usuario_id, endpoint, p256dh, auth, dispositivo)
+  values (auth.uid(), p_endpoint, p_p256dh, p_auth, left(coalesce(p_dispositivo, ''), 12))
+  on conflict (endpoint) do update set usuario_id = excluded.usuario_id, p256dh = excluded.p256dh, auth = excluded.auth, dispositivo = excluded.dispositivo;
+  delete from push_suscripciones where usuario_id = auth.uid() and id not in (select id from push_suscripciones where usuario_id = auth.uid() order by creado_en desc limit 5);
+end;
+$$;
+revoke all on function guardar_suscripcion_push(text, text, text, text) from public, anon;
+grant execute on function guardar_suscripcion_push(text, text, text, text) to authenticated;
+
+create or replace function borrar_suscripcion_push(p_endpoint text) returns void
+language sql security definer set search_path = public, pg_temp
+as $$ delete from push_suscripciones where endpoint = p_endpoint and usuario_id = auth.uid() $$;
+revoke all on function borrar_suscripcion_push(text) from public, anon;
+grant execute on function borrar_suscripcion_push(text) to authenticated;
+
+create or replace function cambiar_push_usuario(p_id uuid, p_eventos text[]) returns void
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if not coalesce(es_administrador(), false) then raise exception 'Solo el Administrador puede cambiar este permiso.' using errcode = '42501'; end if;
+  update public.perfiles set push_eventos = coalesce(p_eventos, '{}'::text[]) where id = p_id;
+  if not found then raise exception 'No se encontró esa cuenta.' using errcode = 'P0002'; end if;
+  if coalesce(array_length(p_eventos, 1), 0) = 0 then delete from public.push_suscripciones where usuario_id = p_id; end if;
+end;
+$$;
+revoke all on function cambiar_push_usuario(uuid, text[]) from public, anon;
+grant execute on function cambiar_push_usuario(uuid, text[]) to authenticated;
+
+create or replace function push_dispositivos() returns jsonb
+language plpgsql security definer stable set search_path = public, pg_temp
+as $$
+begin
+  if not coalesce(es_administrador(), false) then raise exception 'Solo el Administrador puede ver esto.' using errcode = '42501'; end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('usuario_id', usuario_id, 'n', n)) from (select usuario_id, count(*) as n from public.push_suscripciones group by usuario_id) x), '[]'::jsonb);
+end;
+$$;
+revoke all on function push_dispositivos() from public, anon;
+grant execute on function push_dispositivos() to authenticated;
+

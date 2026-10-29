@@ -38,7 +38,7 @@ Cada persona entra con su cuenta y ve solo lo que su **rol** permite (más abajo
 | **Usuarios** | Crea cuentas y asigna roles | Administrador y Digitador |
 | **Auditoría** | Espacio de la base de datos, copias de seguridad, vaciar y depuración semestral | Solo Administrador |
 | **Seguridad** | Índice de seguridad, cuentas con su último acceso, mapa de permisos y actividad reciente | Solo Administrador |
-| **Resúmenes** | Resumen ejecutivo de todo (finca y equipos), con forma de correo, para descargar en imagen o PDF | Solo Administrador |
+| **Resúmenes** | Resumen ejecutivo de todo (finca y equipos), con forma de correo, para descargar en imagen o PDF | Administrador, Ingeniero y Supervisor |
 | **Cómo se usa** | Recorrido animado, manual interactivo con lecciones y simuladores, y las novedades de cada versión | Todos |
 
 ## Primeros pasos
@@ -190,7 +190,7 @@ El tablero de seguridad dice **qué tan protegido está el sistema**, con cosas 
 
 Si el servicio de cuentas no está configurado, Seguridad te lo dice y te da los pasos (están también en «Instalación y mantenimiento»). Las revisiones de último acceso, errores y entradas se activan al completar la configuración de la base de datos.
 
-### Resúmenes (solo Administrador)
+### Resúmenes (Administrador, Ingeniero y Supervisor)
 
 El **resumen ejecutivo** de todo, con forma de correo: sale solo al abrir la pantalla, sin tocar nada. Trae:
 
@@ -233,6 +233,35 @@ En **Rendimientos**, **al final del Turno Actual** (separada del resto y plegabl
 
 **A las 6:00 a. m. el Turno Actual se reinicia solo:** se borra todo lo del día anterior —los registros del Turno Actual y sus horas guardadas—, **pero nada del Histórico**. Lo hace la base de datos (a hora de Colombia), una tarea programada a las 6:00 a. m. y la app misma al abrirse. Un día de turno va de 6:00 a. m. a 5:59 a. m. del día siguiente: a medianoche **no** se reinicia. Ojo: si alguien sube un Turno Actual con fecha de un día anterior después de las 6:00 a. m., se borrará.
 
+### Avisos importantes: la campana y los avisos fuera de la app
+
+Cuando alguien **sube** información importante, la app lo avisa. Son cinco avisos:
+
+| Aviso | Cuándo sale |
+|---|---|
+| **Turno hora a hora cargado** | Cuando se sube el rendimiento del Turno Actual (dice hasta qué hora llega) |
+| **Clasificación cargada** | Cuando se guarda la clasificación del día |
+| **Histórico cargado** | Cuando se carga el histórico de un día |
+| **Resumen semanal listo** | Cuando se carga el **último día laboral de la semana** (el sábado, o el viernes si el sábado es festivo) |
+| **Resumen mensual listo** | Cuando se carga el **último día laboral del mes** (el último que no sea domingo ni festivo) |
+
+- **En la campana los ven todos**, durante 3 días, con un botón **Ver** que lleva a la pantalla.
+- **Fuera de la app** (en la pantalla del celular, **aunque la app esté cerrada**) solo le llegan a quien **el Administrador active**: en *Usuarios*, columna **Avisos fuera de la app**, se marca para cada persona cuáles avisos recibe. Cada persona, además, debe **aceptarlos en su propio aparato**: *Mi perfil → Avisos fuera de la app → Activar en este aparato*.
+- **iPhone:** solo funcionan con la app **instalada** (Compartir → *Añadir a pantalla de inicio*, iOS 16.4 o superior) y abierta desde ahí. **Android:** desde Chrome.
+- Un mismo aviso no se repite (por ejemplo, el mismo turno a la misma hora), y **quien cargó no recibe su propio aviso**.
+- Si algo del envío falla, la carga **nunca se estorba**: el aviso es «lo mejor posible».
+- Requiere el SQL de la **sección 38** y las llaves `VITE_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel (ver *Instalación y mantenimiento*).
+
+### Presentar: carteles de eventos
+
+Mientras la presentación está en pantalla, si pasa algo especial aparece un **cartel grande que se sobrepone** (sin salirte de la presentación) durante 7 segundos:
+
+- **Cambio de líder / adelantamiento:** una línea supera a otra o toma el primer puesto (solo con producción real: el líder debe tener al menos 300 tallos).
+- **El rendimiento sube o baja de golpe:** cambia 5 % o más (y 20 tallos por hora o más) entre una actualización y la siguiente. A primera hora (menos del 10 % de la meta) no se anuncia.
+- **La meta del día avanza rápido:** sube 8 puntos o más de golpe.
+- Los carteles no se pisan: si hay varios, salen uno tras otro; y no tapan la celebración de los hitos del 25, 50, 75 y 100 %.
+- En la diapositiva de **Clasificación por línea** una etiqueta dice **qué hora se está viendo** («Clasificación de la hora … · en curso / hora completa»).
+
 ## Notificaciones (la campana)
 
 Arriba a la derecha. **Solo lo crítico interrumpe** (un aviso flotante, una vez al día); lo demás espera en la campana, **ordenado por importancia**: *Requieren atención*, *Importantes* e *Informativas*. Cada aviso trae un botón para ir a resolverlo.
@@ -251,11 +280,11 @@ Todo lo que se puede descargar como imagen se puede **ver antes**, igual a como 
 | Rol | Qué puede hacer |
 |---|---|
 | **Administrador** | Todo, incluida Auditoría, Seguridad, Resúmenes, Configuración y Usuarios |
-| **Ingeniero** | Ver todo y cargar/editar datos; ve Gerencia con su clave |
+| **Ingeniero** | Ver todo y cargar/editar datos, incluidos los Resúmenes; ve Gerencia con su clave |
 | **Profesional** | Solo visualización: ve todo, no edita nada |
 | **Digitador** | Cargar/editar datos; además Configuración y Usuarios |
-| **Supervisor** | Solo **ver** (sin botones de subir, editar ni borrar) |
-| **Formador** | Solo **ver**, igual que el Supervisor |
+| **Supervisor** | Solo **ver** (sin botones de subir, editar ni borrar); además ve y descarga los **Resúmenes** |
+| **Formador** | Solo **ver**, igual que el Supervisor pero sin los Resúmenes |
 
 ## Flujo recomendado del día
 
@@ -298,7 +327,7 @@ La app sigue abriendo sin internet y te muestra **lo último que viste**; para g
 
 - La **copia mensual automática** depende de que la tarea programada de Vercel esté configurada; si no, la campana avisa desde el día 3 que falta.
 - El **PDF** y el **Excel** de Reportes no tienen vista previa propia (las imágenes sí).
-- **Resúmenes** es solo para el Administrador porque muestra cifras de todo el personal.
+- **Resúmenes** lo ven el Administrador, el Ingeniero y el Supervisor porque muestra cifras de todo el personal; el Supervisor lo ve y lo descarga, pero no edita nada.
 - Lo que **no** está probado en dispositivos reales (iPhone/Android) ni en una base de Supabase con Storage real se indica en las notas de cada versión.
 
 <!-- USO:FIN -->
@@ -341,6 +370,7 @@ Requisitos: **Node.js 18 o superior**.
    - `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` (como en `.env`).
    - `SUPABASE_SERVICE_ROLE_KEY` (solo en Vercel): la usan crear/gestionar usuarios y la copia automática.
    - `CRON_SECRET` (una clave larga inventada por ti): protege la tarea programada.
+   - `VAPID_PRIVATE_KEY` (secreta) y `VAPID_SUBJECT` (`mailto:tucorreo@ejemplo.com`), más `VITE_VAPID_PUBLIC_KEY` (pública, se incrusta al compilar): son las llaves de los **avisos fuera de la app**. Se generan con `npx web-push generate-vapid-keys`.
 3. Pulsa **Deploy**. Cada `git push` republica sola.
 
 ### Copia mensual automática (tarea programada)
@@ -415,6 +445,16 @@ La campana avisa a cada persona, una sola vez por versión, que hay novedades.
 - `npm run verificar-secretos` revisa que no haya llaves escritas en el proyecto y que `.gitignore` proteja los `.env`.
 
 ## Historial de cambios
+
+### Versión 1.9.0 — 29/10/2026 · Avisos fuera de la app, carteles en la presentación y Resúmenes para más roles (≈ 3 días)
+
+- **Avisos importantes fuera de la app:** cuando se sube el turno hora a hora, la clasificación o un histórico, y cuando ya está el último día laboral de la semana o del mes (resumen semanal y mensual listos), llega un aviso al celular **aunque la app esté cerrada**. El Administrador decide, **persona por persona y aviso por aviso**, a quién le llega (Usuarios → «Avisos fuera de la app»); cada persona lo acepta en su aparato desde Mi perfil.
+- **La campana muestra los mismos avisos a todos,** con botón «Ver».
+- **Presentación más visual:** un cartel grande se sobrepone cuando una línea supera a otra o toma el liderazgo, cuando el rendimiento sube o baja de golpe o cuando la meta avanza rápido. La clasificación dice qué hora se está viendo.
+- **Mejora: Resúmenes también para Ingenieros y Supervisores** (el Supervisor los ve y descarga, no edita).
+- **Mejora: sin conexión en el celular:** ya no se muestra el texto técnico del navegador (`FetchEvent… no-response… supabase.co`) ni «Error conectando con Supabase»; sale un mensaje claro.
+- **Arreglo:** en Usuarios, el permiso de cada persona («Solo ver / Puede editar») ahora se lee de la base y se ve como está guardado.
+- **SQL nuevo:** sección 38 (avisos). Llaves nuevas en Vercel: `VITE_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
 
 ### Versión 1.8.0 — 28/10/2026 · Funciona mejor sin internet, seguridad más completa y rosas (≈ 2,5 días)
 

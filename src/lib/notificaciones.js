@@ -50,6 +50,12 @@ export function construirNotificaciones(h) {
   const out = [], admin = h.rol === 'administrador', hoy = h.hoy;
   const add = n => out.push({ accion: null, caduca: null, fecha: `${hoy}T00:00:00`, ...n });
 
+  // Avisos importantes (turno, clasificación y histórico cargados; resumen semanal y mensual listos): los ve TODA la gente en la campana, durante 3 días.
+  for (const e of (h.eventosApp || [])) {
+    const ini = new Date(e.creado_en).getTime(); if (!Number.isFinite(ini)) continue;
+    add({ id: `evento-${e.clave}`, severidad: 'info', categoria: 'datos', icono: e.icono || 'fa-bell', titulo: e.titulo, descripcion: e.detalle, accion: { ruta: e.ruta || '/', etiqueta: 'Ver' }, fecha: new Date(ini).toISOString(), caduca: new Date(ini + 72 * 3600e3).toISOString() });
+  }
+
   // Producción: rendimiento bajo sostenido (se agrupa si son varias personas)
   const bajos = [...(h.bajoRendimiento || [])].sort((a, b) => b.diasSeguidos - a.diasSeguidos);
   if (bajos.length >= 3) add({ id: `bajo-rend-grupo-${hoy}`, severidad: 'importante', categoria: 'produccion', icono: 'fa-triangle-exclamation', titulo: `${bajos.length} personas con rendimiento bajo sostenido`, descripcion: `${bajos.length === 3 ? `${bajos[0].colaborador}, ${bajos[1].colaborador} y ${bajos[2].colaborador}` : `${bajos.slice(0, 3).map(b => b.colaborador).join(', ')} y ${bajos.length - 3} más`} llevan 3 o más días seguidos por debajo del 90 % de la meta.`, accion: { ruta: '/ranking', etiqueta: 'Ver ranking' }, fecha: `${bajos[0].ultimaFecha}T12:00:00` });

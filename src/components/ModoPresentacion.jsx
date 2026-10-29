@@ -11,6 +11,8 @@ import { vistasDevolucionesHoy, minimosDeDatos } from '../lib/devolucionesPresen
 import { CapaFestiva, IntroFestiva, CelebracionHito } from './presentacion/FestivoPresentacion';
 import { useEfectos } from '../lib/efectos';
 import { hitoAlcanzado, hitoNuevo } from '../lib/hitos';
+import { detectarEventosPresentacion, sinRepetidos } from '../lib/eventosPresentacion';
+import EventoPresentacion from './presentacion/EventoPresentacion';
 import { leerHito, guardarHito } from '../lib/hitosAlmacen';
 import { getRankingRango, getUltimaFechaHistorico } from '../lib/db';
 import { getDetalleRendimientoTurnoActual, getDetalleRendimientoAsignaciones } from '../lib/lineas';
@@ -253,6 +255,7 @@ function SlideLineas({ datos, etiquetas, porPagina }) {
     <div className="pres-lineas">
       <h2 className="slide-titulo"><i className="fa-solid fa-boxes-stacked"></i> Clasificación por línea</h2>
       <p className="pres-slide-sub">{formatoLargo(datos.fechaHoy)}{datos.parcial ? ` · ${etiquetaHora(datos.ultimaHoy)} en curso` : ''}{hayAyer && hayBase ? ' · comparado con ayer en las horas completas' : ''}</p>
+      {datos.ultimaHoy != null && <div className="pres-hora-chip" role="status"><i className="fa-solid fa-clock"></i><span>Clasificación de la hora <b>{etiquetaHora(datos.ultimaHoy)}</b>{datos.parcial ? ' · en curso' : ' · hora completa'}</span></div>}
       <div className="pres-lineas-cuerpo">
         {lider ? (
           <div className="pres-lider">
@@ -539,6 +542,17 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
   }, []);
   const vistasDev = useMemo(() => vistasDevolucionesHoy(devDatos, fechaLocal(new Date()), minimosDeDatos(devDatos)), [devDatos]);
 
+  // Eventos especiales (una línea supera a otra, el rendimiento sube o baja de golpe, la meta avanza rápido): cartel grande sobre la presentación.
+  const [cola, setCola] = useState([]); const refSnap = useRef(null), refVistos = useRef(new Map());
+  useEffect(() => {
+    const act = { cumplimiento: Number.isFinite(cumplimiento) ? cumplimiento : null, rend: Number(rendimientoPromedio) || null, lineas: clasif ? clasif.datos.porLinea.filter(l => l.linea !== LINEA_SUPPORT && l.totalHoy > 0).map(l => ({ id: l.linea, nombre: clasif.etiquetas[l.linea]?.nombre || nombreLineaClasificacion(l.linea), tallos: l.totalHoy })) : [] };
+    if (refSnap.current) { const evs = sinRepetidos(detectarEventosPresentacion(refSnap.current, act), refVistos.current, Date.now()); if (evs.length) setCola(c => [...c, ...evs].slice(-4)); }
+    refSnap.current = act;
+  }, [clasif, cumplimiento, rendimientoPromedio]);
+  useEffect(() => {                                      // también se puede lanzar un evento a mano (pruebas): window.dispatchEvent(new CustomEvent('tm-pres-evento', { detail: { titulo, detalle, tipo, tono, icono } }))
+    const f = e => { const d = e.detail; if (d && d.titulo) setCola(c => [...c, { clave: String(d.clave || `x-${Date.now()}-${c.length}`), tipo: d.tipo || 'supera', tono: d.tono || 'oro', icono: d.icono || '⭐', titulo: String(d.titulo).slice(0, 80), detalle: String(d.detalle || '').slice(0, 140) }].slice(-4)); };
+    window.addEventListener('tm-pres-evento', f); return () => window.removeEventListener('tm-pres-evento', f);
+  }, []);
   const slides = [
     {
       id: 'podio', nombre: 'Podio',
@@ -649,6 +663,7 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
         )}
       </div>
       {intro && fiesta && festivo && <IntroFestiva fiesta={fiesta} onFin={() => setIntro(false)} />}
+      {!hito && cola[0] && <EventoPresentacion evento={cola[0]} conConfeti={!quieto} onFin={() => setCola(c => c.slice(1))} />}
       {hito && <CelebracionHito hito={hito} tallos={totalTallos} meta={metaHoy} fiesta={fiesta && festivo ? fiesta : null} conConfeti={!quieto} onFin={() => setHito(null)} />}
       {guiaTeclas && !intro && <div className="pf-atajos" aria-hidden="true"><span><kbd>←</kbd><kbd>→</kbd>cambiar vista</span><span><kbd>Espacio</kbd>pausa</span><span><kbd>+</kbd><kbd>−</kbd>tamaño</span>{fiesta && <span><kbd>F</kbd>decoración</span>}</div>}
       {avisoTamano && <div className="pres-aviso-tamano">Tamaño {Math.round(tamano * 100)} %</div>}

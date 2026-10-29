@@ -25,6 +25,8 @@ import './styles/efectos.css';               // capa ambiental, 3D, saludo, pane
 import './styles/auditoria-respaldo.css';    // respaldo global y vaciado de la base de datos
 import './styles/clasificadores.css';        // asigna un clasificador a un bonchador
 import './styles/notificaciones.css';        // campana de notificaciones
+import './components/presentacion/eventos-presentacion.css';   // cartel de eventos y hora de la clasificación en la presentación
+import './styles/avisos.css';                // avisos fuera de la app (Usuarios y Mi perfil)
 import './styles/perfil.css';               // avatares de flores, Mi perfil y festejo
 import './styles/seguridad.css';             // tablero de seguridad
 import './styles/evolucion.css';            // evolución por hora del Turno Actual

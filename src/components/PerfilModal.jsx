@@ -5,6 +5,7 @@ import { FLORES, florPorId, validarNombre } from '../lib/avatares';
 import { guardarPerfil } from '../lib/perfil';
 import { avisar } from '../lib/avisos';
 import AvatarFlor from './AvatarFlor';
+import AvisosFuera from './AvisosFuera';
 
 /** Mi perfil: cambiar el nombre y elegir una flor como avatar. Se abre desde el menú de la persona. */
 export default function PerfilModal() {
@@ -39,6 +40,7 @@ export default function PerfilModal() {
         <div className="pf-flores" role="radiogroup" aria-label="Rosa del avatar">
           {FLORES.map((f, i) => <button key={f.id} role="radio" aria-checked={flor === f.id} className={`pf-flor ${flor === f.id ? 'on' : ''}`} style={{ '--i': i }} onClick={() => setFlor(f.id)} title={f.nombre}><AvatarFlor id={f.id} tam={58} /><span>{f.nombre}</span>{flor === f.id && <i className="pf-ok fa-solid fa-circle-check"></i>}</button>)}
         </div>
+        <AvisosFuera />
         {(error || (!v.ok && nombre !== sesion.nombre)) && <p className="pf-error"><i className="fa-solid fa-circle-exclamation"></i> {error || v.error}</p>}
         <footer className="pf-pie"><button className="btn-secondary" onClick={() => setAbierto(false)}>Cancelar</button><button className="btn-primary" onClick={guardar} disabled={!hayCambios || !v.ok || guardando}><i className={`fa-solid ${guardando ? 'fa-spinner fa-spin' : 'fa-seedling'}`}></i> {guardando ? 'Guardando…' : 'Guardar mi perfil'}</button></footer>
       </div>

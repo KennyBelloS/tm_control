@@ -16,6 +16,8 @@ export const FUNCIONES_NUEVAS = {
   seguridad: '1.8.0',                  // el tablero de seguridad (con uso de la app, errores y permisos)
   'uso-app': '1.8.0',                  // quién usa la app (ranking) y el comportamiento por persona
   'permiso-persona': '1.8.0',          // Usuarios: solo ver / puede editar por persona
+  'avisos-fuera': '1.9.0',             // avisos importantes fuera de la app, a quien el Administrador active
+  'eventos-presentacion': '1.9.0',     // la presentación muestra cuándo una línea supera a otra o el rendimiento cambia de golpe
   rosas: '1.8.0'                       // Mi perfil con avatares de rosas y el festejo con la acción
 };
 const ms = iso => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10));

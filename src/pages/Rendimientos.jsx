@@ -5,6 +5,8 @@ import { getConfig, getHistorico, getActual, insertarHistorico, reemplazarActual
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { parsearReporteBoncheo } from '../lib/excel';
 import EvolucionTurno from '../components/EvolucionTurno';
+import { avisarCarga, avisosDeHistorico, maxHora } from '../lib/avisosFuera';
+import { mensajeAmigable } from '../lib/mensajesError';
 import { calcularPorcentajeMeta, clasificarEstado, horasAMinutos, minutosAHoras, agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from '../lib/calculos';
 import { supabaseConfigurado } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
@@ -58,7 +60,7 @@ export default function Rendimientos() {
     } catch (e) {
       setMensaje({
         tipo: 'err',
-        texto: `Error conectando con Supabase: ${e.message}`
+        texto: mensajeAmigable(e).texto
       });
     } finally {
       setCargando(false);
@@ -140,6 +142,7 @@ export default function Rendimientos() {
         const {
           insertados
         } = await conTarea(() => insertarHistorico(registrosFinales));
+        avisarCarga(avisosDeHistorico(registrosFinales.map(x => x.fecha || fechaCarga)));
         setMensaje({
           tipo: 'ok',
           texto: `Histórico actualizado: ${insertados} persona(s) con su total del día para ${fechaCarga}${semana ? ` (semana ${semana})` : ''}. Recuerda editar el tiempo trabajado de cada quien para ver el rendimiento real.`
@@ -148,6 +151,7 @@ export default function Rendimientos() {
         const {
           insertados
         } = await conTarea(() => reemplazarActual(registrosFinales));
+        avisarCarga([{ evento: 'turno', fecha: fechaCarga, hora: maxHora(registrosFinales) }]);
         setMensaje({
           tipo: 'ok',
           texto: `Se reemplazó automáticamente la carga anterior: ${insertados} registros nuevos guardados para ${fechaCarga}.`

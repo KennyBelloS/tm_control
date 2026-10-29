@@ -1,7 +1,7 @@
 {
   "name": "torremolinos-control",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -29,6 +29,7 @@
     "react-apexcharts": "^1.9.0",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.4",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

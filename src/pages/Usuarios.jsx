@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import { avisar } from '../lib/avisos';
 import Nuevo from '../components/Nuevo';
-import { EDICION, puedeEditar, cambiarEdicionPerfil } from '../lib/roles';
+import { EDICION, puedeEditar, cambiarEdicionPerfil, cambiarPushPerfil, celularesPorUsuario } from '../lib/roles';
+import PushUsuario from '../components/PushUsuario';
 import { ROLES, ROL_LABEL, listarPerfiles, crearUsuario, cambiarEstadoPerfil, cambiarRolPerfil, eliminarUsuario, cambiarPasswordUsuario, cambiarNombreUsuario } from '../lib/roles';
 import { EstadoVacio, FilasEsqueleto } from '../components/Estados';
 export default function Usuarios() {
   const [perfiles, setPerfiles] = useState([]);
+  const [celulares, setCelulares] = useState({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [mensaje, setMensaje] = useState(null);
@@ -21,6 +23,7 @@ export default function Usuarios() {
     setCargando(true);
     try {
       setPerfiles(await listarPerfiles());
+      celularesPorUsuario().then(setCelulares);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -65,6 +68,10 @@ export default function Usuarios() {
     } catch (e) {
       setError(e.message);
     }
+  }
+  async function cambiarPush(p, eventos) {
+    try { await cambiarPushPerfil(p.id, eventos); await cargar(); avisar(eventos.length ? `${p.nombre}: avisos fuera de la app activados (${eventos.length}).` : `${p.nombre}: sin avisos fuera de la app.`); }
+    catch (e) { setError(e.message); avisar(e.message, 'error'); }
   }
   async function cambiarEdicion(p, valor) {
     try {
@@ -204,10 +211,10 @@ export default function Usuarios() {
           </div>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>Nombre</th><th>Rol</th><th title="Si la persona solo ve o también puede cargar y editar">Permiso <Nuevo id="permiso-persona" /></th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Rol</th><th title="Si la persona solo ve o también puede cargar y editar">Permiso <Nuevo id="permiso-persona" /></th><th title="Qué avisos le llegan FUERA de la app, aunque esté cerrada">Avisos fuera de la app <Nuevo id="avisos-fuera" /></th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
               <tbody>
-                {cargando && <FilasEsqueleto columnas={6} />}
-                {!cargando && perfiles.length === 0 && <tr><td colSpan={6}><EstadoVacio icono="fa-users" titulo="Todavía no hay cuentas creadas" /></td></tr>}
+                {cargando && <FilasEsqueleto columnas={7} />}
+                {!cargando && perfiles.length === 0 && <tr><td colSpan={7}><EstadoVacio icono="fa-users" titulo="Todavía no hay cuentas creadas" /></td></tr>}
                 {perfiles.map(p => {
                   const protegido = p.es_super_admin;
                   const editando = editandoId === p.id;
@@ -245,6 +252,7 @@ export default function Usuarios() {
                           </div>
                         )}
                       </td>
+                      <td><PushUsuario nombre={p.nombre} eventos={p.push_eventos || []} celulares={celulares[p.id] || 0} onCambiar={ev => cambiarPush(p, ev)} deshabilitado={!p.activo} /></td>
                       <td><span className={`status ${p.activo ? 'success' : 'danger'}`}>{p.activo ? 'Activo' : 'Desactivado'}</span></td>
                       <td>{new Date(p.creado_en).toLocaleDateString('es-CO')}</td>
                       <td>

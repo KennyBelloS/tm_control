@@ -77,6 +77,7 @@ export default defineConfig(({ mode }) => ({
         globIgnores: ['splash/**', '**/pdf.worker*'],   // las pantallas de arranque de iPhone y el lector de PDF (1,4 MB) no se descargan con la app
         sourcemap: false,                    // sin mapa de código del service worker (no hace falta en producción)
         cleanupOutdatedCaches: true,
+        importScripts: ['push-sw.js'],       // avisos fuera de la app (public/push-sw.js): se muestran aunque la app esté cerrada
         clientsClaim: true,                  // la versión instalada controla la pantalla desde el primer momento
         navigateFallback: '/index.html',
         runtimeCaching: [

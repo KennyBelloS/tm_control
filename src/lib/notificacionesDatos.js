@@ -1,3 +1,4 @@
+import { EVENTOS } from './eventosApp';
 /** NOTIFICACIONES — infraestructura: consulta los hechos a la base de datos. Las reglas están en notificaciones.js. */
 import { supabase } from './supabaseClient';
 import { getAlertasBajoRendimiento, getConfig, getAlmacenamientoUsadoMB, getUltimaFechaHistorico } from './db';
@@ -19,8 +20,11 @@ export async function reunirHechos({ rol, puedeEditar, hoy, hora }) {
     puedeEditar ? (async () => { const [hoyPares, previos] = await Promise.all([listarParesDia(hoy), idsDeClasificadores(new Date(Date.now() - 120 * 864e5).toISOString().slice(0, 10))]); return hoyPares.disponible ? { existen: previos.size > 0 || hoyPares.pares.length > 0, asignadosHoy: hoyPares.pares.length } : null; })().catch(vacio) : null,
     puedeEditar ? getUltimaFechaHistorico().then(f => (f ? { ultimaFecha: String(f).slice(0, 10) } : null)).catch(() => null) : null
   ]);
+  // Avisos importantes de los últimos 3 días (los escribe el servidor al cargar turno, clasificación o histórico; si falta el SQL, simplemente no hay)
+  let eventosApp = [];
+  try { const { data } = await supabase.from('eventos_app').select('clave, tipo, titulo, detalle, ruta, creado_en').gte('creado_en', new Date(Date.now() - 72 * 3600e3).toISOString()).order('creado_en', { ascending: false }).limit(15); eventosApp = (data || []).map(e => ({ ...e, icono: EVENTOS.find(x => x.id === e.tipo)?.icono })); } catch { eventosApp = []; }
   // Invitación festiva: solo si el ambiente festivo está apagado y todavía no se ofreció esta festividad este año
   let fiesta = null;
   try { const f = !leerAjustesEfectos().activo && fiestaDelDia(hoy); if (f) { const clave = `tm_fiesta_inv_${f.id}_${hoy.slice(0, 4)}`; if (!localStorage.getItem(clave)) fiesta = { id: f.id, nombre: f.nombre, emoji: f.emoji, clave }; } } catch { /* sin almacenamiento */ }
-  return { hoy, hora, rol, puedeEditar, bajoRendimiento: bajoRendimiento || [], almacenamiento, devoluciones, respaldo, clasificadores, fiesta, historico, novedades: novedadesPendientes() };
+  return { hoy, hora, rol, puedeEditar, eventosApp, bajoRendimiento: bajoRendimiento || [], almacenamiento, devoluciones, respaldo, clasificadores, fiesta, historico, novedades: novedadesPendientes() };
 }

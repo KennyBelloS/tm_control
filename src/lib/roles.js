@@ -1,5 +1,6 @@
 import { hayConexion } from './conexion';
 import { florValida } from './avatares';
+import { eventosValidos } from './eventosApp';
 import { supabase } from './supabaseClient';
 export const ROLES = ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador'];
 export const ROL_LABEL = {
@@ -63,8 +64,8 @@ export const MODULOS = {
     roles: ['administrador']
   },
   resumenes: {
-    // Resúmenes de la finca (con cifras de todo el personal) → solo Administrador.
-    roles: ['administrador']
+    // Resúmenes de la finca (con cifras de todo el personal) → Administrador, Ingeniero y Supervisor (el Supervisor los ve y los descarga; no edita nada).
+    roles: ['administrador', 'ingeniero', 'supervisor']
   },
   ayuda: {
     // Cómo se usa: el manual dentro de la app, para todos.
@@ -199,15 +200,26 @@ async function leerRespuestaSegura(resp) {
     return { error: `Respuesta inesperada del servidor (código ${resp.status}).` };
   }
 }
+/** La lista de cuentas con su permiso de edición y sus avisos fuera de la app. Si todavía falta algún SQL (columnas nuevas), se lee con lo que haya: la pantalla nunca se rompe. */
 export async function listarPerfiles() {
-  const {
-    data,
-    error
-  } = await supabase.from('perfiles').select('id, nombre, rol, activo, creado_en, es_super_admin').order('creado_en', {
-    ascending: false
-  });
-  if (error) throw error;
-  return data || [];
+  const base = 'id, nombre, rol, activo, creado_en, es_super_admin';
+  let ultimo = null;
+  for (const cols of [`${base}, edicion, push_eventos`, `${base}, edicion`, base]) {
+    const { data, error } = await supabase.from('perfiles').select(cols).order('creado_en', { ascending: false });
+    if (!error) return data || [];
+    ultimo = error;
+    if (!/42703|PGRST204|column|columna|todavía no está activada/i.test(`${error.code || ''} ${error.message || ''}`)) throw error;
+  }
+  throw ultimo;
+}
+/** El Administrador activa, por persona, qué avisos le llegan FUERA de la app (en el celular, aunque esté cerrada). */
+export async function cambiarPushPerfil(id, eventos) {
+  const { error } = await supabase.rpc('cambiar_push_usuario', { p_id: id, p_eventos: eventosValidos(eventos) });
+  if (error) throw new Error(error.message);
+}
+/** { usuario_id: cantidad de celulares registrados } (solo el Administrador; si falta el SQL, vacío). */
+export async function celularesPorUsuario() {
+  try { const { data, error } = await supabase.rpc('push_dispositivos'); if (error) return {}; return Object.fromEntries((data || []).map(x => [x.usuario_id, Number(x.n) || 0])); } catch { return {}; }
 }
 export async function cambiarEstadoPerfil(id, activo) {
   const {
