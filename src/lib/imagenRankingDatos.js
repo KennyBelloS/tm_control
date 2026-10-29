@@ -4,6 +4,6 @@ import { htmlRankingImagen } from './imagenRanking';
 import { logoBase64 } from './logoBase64';
 import { rangoHoras } from './horario';
 
-export async function htmlRankingParaImagen({ tipo, filas, cfg, fecha }) {
-  return htmlRankingImagen({ tipo, ranking: agregarRankingPorPersona(filas), metaHora: cfg?.metaHora || 470, horas: rangoHoras(filas, cfg || {}).texto, fecha, generado: new Date().toLocaleString('es-CO'), logo: await logoBase64() });
+export async function htmlRankingParaImagen({ tipo, filas, cfg, fecha, fechaISO = null }) {
+  return htmlRankingImagen({ tipo, ranking: agregarRankingPorPersona(filas), metaHora: cfg?.metaHora || 470, horas: rangoHoras(filas, cfg || {}, { fecha: fechaISO, historico: tipo === 'historico' }).texto, fecha, generado: new Date().toLocaleString('es-CO'), logo: await logoBase64() });
 }

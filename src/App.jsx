@@ -23,6 +23,7 @@ const Devoluciones = lazy(cargadores['/devoluciones']);
 const TableroColaborador = lazy(cargadores['/colaborador']);
 const Usuarios = lazy(cargadores['/usuarios']);
 const Auditoria = lazy(cargadores['/auditoria']);
+const Seguridad = lazy(cargadores['/seguridad']);
 const Resumenes = lazy(cargadores['/resumenes']);
 const Ayuda = lazy(cargadores['/ayuda']);
 if (typeof window !== 'undefined') cargadores['/']();
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="/configuracion" element={<ProtectedRoute modulo="configuracion"><Configuracion /></ProtectedRoute>} />
         <Route path="/usuarios" element={<ProtectedRoute modulo="usuarios"><Usuarios /></ProtectedRoute>} />
         <Route path="/auditoria" element={<ProtectedRoute modulo="auditoria"><Auditoria /></ProtectedRoute>} />
+        <Route path="/seguridad" element={<ProtectedRoute modulo="seguridad"><Seguridad /></ProtectedRoute>} />
         <Route path="/resumenes" element={<ProtectedRoute modulo="resumenes"><Resumenes /></ProtectedRoute>} />
         <Route path="/ayuda" element={<ProtectedRoute modulo="ayuda"><Ayuda /></ProtectedRoute>} />
       </Route>

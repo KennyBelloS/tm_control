@@ -1,4 +1,5 @@
 import { hayConexion } from './conexion';
+import { florValida } from './avatares';
 import { supabase } from './supabaseClient';
 export const ROLES = ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador'];
 export const ROL_LABEL = {
@@ -57,6 +58,10 @@ export const MODULOS = {
     // Auditoría = base de datos, respaldo, optimización — nunca para Digitador.
     roles: ['administrador']
   },
+  seguridad: {
+    // Tablero de seguridad: cuentas, accesos y protecciones → solo Administrador.
+    roles: ['administrador']
+  },
   resumenes: {
     // Resúmenes de la finca (con cifras de todo el personal) → solo Administrador.
     roles: ['administrador']
@@ -69,9 +74,18 @@ export const MODULOS = {
 export function puedeVer(rol, moduloKey) {
   return MODULOS[moduloKey]?.roles.includes(rol) ?? false;
 }
-// Supervisor y Formador son roles de SOLO VISUALIZACIÓN: nunca cargan, editan ni borran nada (la base de datos también lo impide).
-export function puedeEditar(rol) {
-  return rol === 'administrador' || rol === 'ingeniero' || rol === 'profesional' || rol === 'digitador';
+// SOLO Administrador, Ingeniero y Digitador pueden cargar, editar o borrar. Profesional, Supervisor y Formador son roles de SOLO VISUALIZACIÓN
+// (la base de datos también lo impide: ver la función puede_editar() en la sección 33 del SQL).
+export const ROLES_EDITORES = ['administrador', 'ingeniero', 'digitador'];
+// Cada persona puede tener un permiso propio que fija el Administrador (columna perfiles.edicion): 'rol' = el de su rol, 'ver' = solo visualiza,
+// 'editar' = puede cargar y editar. El Administrador siempre edita. Se puede pasar la sesión completa o solo el rol (usa el del rol).
+export const EDICION = ['rol', 'ver', 'editar'];
+export function puedeEditar(quien) {
+  const obj = quien && typeof quien === 'object', rol = obj ? quien.rol : quien, ed = obj ? quien.edicion : 'rol';
+  if (rol === 'administrador') return true;
+  if (ed === 'ver') return false;
+  if (ed === 'editar') return true;
+  return ROLES_EDITORES.includes(rol);
 }
 function correoDesdeEntrada(entrada) {
   const valor = String(entrada || '').trim();
@@ -110,24 +124,27 @@ const CLAVE_PERFIL = 'tm_perfil_cache';
 const perfilGuardado = () => { try { const p = JSON.parse(localStorage.getItem(CLAVE_PERFIL) || 'null'); return p && Date.now() - p.t < 30 * 864e5 ? p.perfil : null; } catch { return null; } };
 /** Los datos guardados para ver la app sin internet son de UNA persona: se borran al entrar y al salir. */
 export function olvidarDatosLocales() { try { localStorage.removeItem(CLAVE_PERFIL); } catch { /* sin almacenamiento */ } try { caches?.delete?.('datos-api'); } catch { /* sin caché */ } }
+const hayTokenLocal = () => { try { return Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k)); } catch { return false; } };
 export async function getPerfilActual() {
   const {
     data: {
       session
     }
   } = await supabase.auth.getSession();
-  // Sin internet no se saca a nadie de la app: se usa el último perfil conocido (solo para ver; guardar exige conexión).
-  if (!session) return hayConexion() ? null : perfilGuardado();
-  const {
-    data,
-    error
-  } = await supabase.from('perfiles').select('nombre, rol, activo').eq('id', session.user.id).single();
-  if (error && !hayConexion()) return perfilGuardado();
-  if (error || !data || !data.activo) return null;
+  // Nunca se saca a nadie de la app por un problema de señal: si no hay internet, o si la sesión no se pudo renovar pero sigue guardada en este
+  // aparato (señal mala en el celular), se usa el último perfil conocido. Solo se sale si la sesión se cerró de verdad (salir, o el servidor la revocó).
+  if (!session) return !hayConexion() || hayTokenLocal() ? perfilGuardado() : null;
+  let r = await supabase.from('perfiles').select('nombre, rol, activo, edicion').eq('id', session.user.id).single();
+  if (r.error && r.error.code === '42703') r = await supabase.from('perfiles').select('nombre, rol, activo').eq('id', session.user.id).single();      // todavía sin la columna de permiso por persona
+  const { data, error } = r;
+  if (error) return error.code === 'PGRST116' ? null : perfilGuardado();                                   // un fallo (señal, tiempo) NO saca a nadie: se usa el último perfil
+  if (!data || !data.activo) return null;                                                                 // cuenta desactivada por el Administrador: ahí sí se sale
   const perfil = {
     nombre: data.nombre,
     rol: data.rol,
-    email: session.user.email
+    email: session.user.email,
+    edicion: EDICION.includes(data.edicion) ? data.edicion : 'rol',
+    avatar: florValida(session.user.user_metadata?.avatar) ? session.user.user_metadata.avatar : null          // la flor que eligió en Mi perfil
   };
   try { localStorage.setItem(CLAVE_PERFIL, JSON.stringify({ t: Date.now(), perfil })); } catch { /* sin almacenamiento */ }
   return perfil;
@@ -174,7 +191,8 @@ export async function crearUsuario({
  */
 async function leerRespuestaSegura(resp) {
   const texto = await resp.text();
-  if (!texto) return { error: `El servidor respondió vacío (código ${resp.status}). Intenta de nuevo en un momento.` };
+  if (resp.status === 404) return { error: 'El servicio de usuarios no responde. Si estás en tu computador, reinicia la app; si estás en internet, avisa al administrador del sistema.' };
+  if (!texto) return { error: resp.status === 404 ? 'El servicio de usuarios no responde. Si estás en tu computador, reinicia la app; si estás en internet, avisa al administrador del sistema.' : 'El servicio de usuarios no respondió. Inténtalo de nuevo en un momento.' };
   try {
     return JSON.parse(texto);
   } catch {
@@ -231,4 +249,11 @@ export async function cambiarPasswordUsuario(idObjetivo, nuevaPassword) {
 
 export async function cambiarNombreUsuario(idObjetivo, nuevoNombre) {
   return llamarGestionarUsuario({ accion: 'cambiar_nombre', idObjetivo, nuevoNombre });
+}
+
+/** El Administrador fija si una persona solo VE, PUEDE EDITAR o vale el de su rol (columna perfiles.edicion, protegida en la base). */
+export async function cambiarEdicionPerfil(id, edicion) {
+  if (!EDICION.includes(edicion)) throw new Error('Ese permiso no es válido.');
+  const { error } = await supabase.rpc('cambiar_edicion', { p_id: id, p_edicion: edicion });
+  if (error) throw new Error(error.message);
 }

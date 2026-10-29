@@ -4,6 +4,8 @@ import { ROL_LABEL, cerrarSesion } from '../lib/roles';
 import { alternarTema, obtenerTema } from '../lib/tema';
 import { alternarDensidad, obtenerAjuste } from '../lib/ajustesUI';
 import { abrirPanelEfectos, useEfectos } from '../lib/efectos';
+import AvatarFlor from './AvatarFlor';
+import Nuevo from './Nuevo';
 
 const iniciales = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
 
@@ -37,15 +39,16 @@ export default function MenuUsuario() {
 
   return (
     <div className="menu-usuario" ref={caja}>
-      <button className="cab-avatar" onClick={() => setAbierto(a => !a)} aria-haspopup="menu" aria-expanded={abierto} aria-label={`Menú de ${sesion.nombre}`} title={`${sesion.nombre} · ${rolTexto}`}>
-        <span>{iniciales(sesion.nombre)}</span><i className="fa-solid fa-chevron-down"></i>
+      <button className={`cab-avatar ${sesion.avatar ? 'con-flor' : ''}`} onClick={() => setAbierto(a => !a)} aria-haspopup="menu" aria-expanded={abierto} aria-label={`Menú de ${sesion.nombre}`} title={`${sesion.nombre} · ${rolTexto}`}>
+        {sesion.avatar ? <AvatarFlor id={sesion.avatar} tam={34} /> : <span>{iniciales(sesion.nombre)}</span>}<i className="fa-solid fa-chevron-down"></i>
       </button>
       {abierto && (
         <div className="menu-usuario-panel" role="menu">
           <div className="menu-usuario-cab">
-            <span className="usuario-avatar">{iniciales(sesion.nombre)}</span>
+            {sesion.avatar ? <span className="usuario-avatar con-flor"><AvatarFlor id={sesion.avatar} tam={46} /></span> : <span className="usuario-avatar">{iniciales(sesion.nombre)}</span>}
             <div><strong>{sesion.nombre}</strong><span className={`rol-pill rol-${sesion.rol}`}>{rolTexto}</span><small>{new Date().toLocaleDateString('es-CO')}</small></div>
           </div>
+          <button role="menuitem" onClick={() => { setAbierto(false); window.dispatchEvent(new Event('tm-abrir-perfil')); }}><i className="fa-solid fa-seedling"></i><span>Mi perfil <Nuevo id="rosas" /></span><small className="menu-estado">Nombre y rosa</small></button>
           <button role="menuitemcheckbox" aria-checked={oscuro} onClick={alternarTema}><i className={`fa-solid ${oscuro ? 'fa-sun' : 'fa-moon'}`}></i><span>Tema oscuro</span><b className={`menu-interruptor ${oscuro ? 'on' : ''}`}></b></button>
           <button role="menuitemcheckbox" aria-checked={compacta} onClick={alternarDensidad}><i className="fa-solid fa-grip-lines"></i><span>Tablas compactas</span><b className={`menu-interruptor ${compacta ? 'on' : ''}`}></b></button>
           <button role="menuitem" onClick={() => { setAbierto(false); abrirPanelEfectos(); }}><i className="fa-solid fa-wand-magic-sparkles"></i><span>Efectos y festividades</span><small className="menu-estado">{fiesta ? fiesta.emoji : ajustes.efectos === 'apagado' ? 'Apagado' : ajustes.efectos === 'suave' ? 'Suave' : 'Alto'}</small></button>

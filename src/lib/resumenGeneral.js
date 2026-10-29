@@ -7,6 +7,7 @@
  *          personas:Map(id→nombre), lineas:Map(id→nombre), razones:[{k,n}], config:{metaHora,metaDia}, devIdPorColaborador?:Map }
  * destino: { tipo:'general' } | { tipo:'formadora', formadoraId, nombre }
  */
+import { tipoDia } from './festivosColombia.js';
 const NOMBRE_DIA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const fmt = n => Math.round(n).toLocaleString('es-CO');
 const fmt1 = n => (Math.round(n * 10) / 10).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -41,6 +42,7 @@ export function calcularResumen(datos, periodo, destino = { tipo: 'general' }) {
   let hist = datos.historico.filter(r => enRango(r.fecha));
   // Formadora: solo las personas que tuvo asignadas cada día
   let permitido = null;
+  if (destino.tipo === 'persona') hist = hist.filter(r => r.colaborador_id === destino.colaboradorId);       // el resumen de UNA persona
   if (destino.tipo === 'formadora') {
     permitido = new Set(datos.asignaciones.filter(a => enRango(a.fecha) && a.formadora_id === destino.formadoraId).map(a => `${a.fecha}|${a.colaborador_id}`));
     hist = hist.filter(r => permitido.has(`${r.fecha}|${r.colaborador_id}`));
@@ -66,7 +68,7 @@ export function calcularResumen(datos, periodo, destino = { tipo: 'general' }) {
   // Devoluciones (de todo el personal; para una formadora, solo de su gente si se conoce la equivalencia)
   let dv = datos.devoluciones.filter(r => enRango(r.fecha));
   let devFiltrada = false;
-  if (destino.tipo === 'formadora' && datos.devIdPorColaborador) {
+  if ((destino.tipo === 'formadora' || destino.tipo === 'persona') && datos.devIdPorColaborador) {
     const ids = new Set([...personas.keys()].map(id => datos.devIdPorColaborador.get(id)).filter(x => x !== undefined)); dv = dv.filter(r => ids.has(r.id)); devFiltrada = true;
   }
   const causasMap = {}; let devTotal = 0;
@@ -85,7 +87,25 @@ export function calcularResumen(datos, periodo, destino = { tipo: 'general' }) {
     const tallosCl = horas2.reduce((s, r) => s + r.tallos, 0);
     if (tallosCl > 0) clasificacion = { tallos: tallosCl, porHora: tallosCl / Math.max(1, franjas.size), lineas: [...porLinea.values()].map(l => ({ linea: l.linea, nombre: datos.lineas?.get(l.linea) || `Línea ${l.linea}`, tallos: l.tallos, porHora: l.tallos / Math.max(1, l.franjas.size) })).sort((a, b) => b.tallos - a.tallos) };
   }
-  return { periodo, destino, tallos, rend: horas > 0 ? tallos / horas : 0, diasTrabajados, personasPorDia: diasTrabajados ? porDia.reduce((s, d) => s + d.personas, 0) / diasTrabajados : 0, metaHora: datos.config.metaHora || null, metaDia, cumplimiento, porDia, mejor, peor, cumplenMetaPct: personaDias > 0 ? (cumplen / personaDias) * 100 : null, destacados, devoluciones: { total: devTotal, porMil, causas, diaMas: diaMasDev, filtrada: devFiltrada, hayDatos: dv.length > 0 }, clasificacion };
+  return { periodo, destino, tallos, rend: horas > 0 ? tallos / horas : 0, diasTrabajados, personasPorDia: diasTrabajados ? porDia.reduce((s, d) => s + d.personas, 0) / diasTrabajados : 0, metaHora: datos.config.metaHora || null, metaDia, cumplimiento, porDia, mejor, peor, cumplenMetaPct: personaDias > 0 ? (cumplen / personaDias) * 100 : null, destacados, devoluciones: { total: devTotal, porMil, causas, diaMas: diaMasDev, filtrada: devFiltrada, hayDatos: dv.length > 0 }, clasificacion,
+    // --- cifras que usa el resumen ejecutivo ---
+    horas, cumplimientoGeneral: datos.config.metaHora > 0 && horas > 0 ? (tallos / horas / datos.config.metaHora) * 100 : null,
+    ...confiables(listaP, datos.config.metaHora),
+    cobertura: coberturaDe(datos, periodo, porDia.length) };
+}
+
+/** Quién puede salir como "destacado": solo cifras CONFIABLES = 3 o más días, 12 o más horas y sin valores atípicos (más de 1,6 veces la meta por hora suele ser un dato mal cargado). */
+export const MIN_DIAS_CONFIABLE = 3, MIN_HORAS_CONFIABLE = 12, TOPE_ATIPICO = 1.6;
+function confiables(listaP, metaHora) {
+  const tope = metaHora > 0 ? metaHora * TOPE_ATIPICO : Infinity, candidatos = listaP.filter(p => p.dias >= MIN_DIAS_CONFIABLE);
+  const ok = candidatos.filter(p => p.horas >= MIN_HORAS_CONFIABLE && p.rend > 0 && p.rend <= tope).sort((a, b) => b.rend - a.rend);
+  return { destacadosConfiables: ok.slice(0, 3), noConfiables: candidatos.length - ok.length };
+}
+/** Cuántos días laborables tenía el período y de cuántos hay datos de cada proceso (para saber qué tan "real" es el resumen). */
+function coberturaDe(datos, periodo, diasBoncheo) {
+  const laborables = []; for (let d = periodo.desde; d <= periodo.hasta; d = sumarDias(d, 1)) if (tipoDia(d) === 'ordinario') laborables.push(d);
+  const dist = lista => new Set(lista.filter(r => r.fecha >= periodo.desde && r.fecha <= periodo.hasta).map(r => r.fecha)).size;
+  return { laborables: laborables.length, boncheo: diasBoncheo, devoluciones: dist(datos.devoluciones || []), clasificacion: dist((datos.clasificacionHora || []).filter(r => r.linea !== 99)) };
 }
 
 /**

@@ -20,17 +20,18 @@ function poner(v) {
   else if (!temporizador) temporizador = setInterval(() => { verificar().then(ok => { if (ok) poner(true); }); }, 6000);
 }
 /** ¿Se llega al servidor? Cualquier respuesta (aunque sea un error HTTP) cuenta como "sí": lo único que no cuenta es no poder conectar. */
-export async function verificar(ms = 5000) {
+export async function verificar(ms = 3500) {
   const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
   try { await fetch(`${BASE || ''}/auth/v1/health`, { method: 'GET', mode: 'no-cors', cache: 'no-store', signal: c.signal }); return true; } catch { return false; } finally { clearTimeout(t); }
 }
 /** Un fetch falló por la red: se confirma con dos verificaciones antes de declarar "sin conexión". */
-export function confirmarFalloRed() {
+export function confirmarFalloRed(rapido = false) {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) { poner(false); return Promise.resolve(); }
+  const ms = rapido ? 2500 : 3500, pausa = rapido ? 500 : 800;
   comprobando ||= (async () => {
-    if (await verificar()) return;
-    await new Promise(r => setTimeout(r, 1500));
-    if (!(await verificar())) poner(false);
+    if (await verificar(ms)) return;
+    await new Promise(r => setTimeout(r, pausa));
+    if (!(await verificar(ms))) poner(false);
   })().finally(() => { comprobando = null; });
   return comprobando;
 }
@@ -39,6 +40,8 @@ if (typeof window !== 'undefined') {
   window.addEventListener('online', async () => { for (let i = 0; i < 3; i++) { if (await verificar()) { poner(true); return; } await new Promise(r => setTimeout(r, 1200)); } });
   if (!enLinea) poner(false);                                    // la app abrió sin internet
 }
+/** Avisa cuando cambia la conexión (true/false); devuelve cómo dejar de escuchar. */
+export const alCambiarConexion = f => { oyentes.add(f); return () => oyentes.delete(f); };
 export function useConexion() {
   const [v, setV] = useState(enLinea);
   useEffect(() => { oyentes.add(setV); setV(enLinea); return () => oyentes.delete(setV); }, []);

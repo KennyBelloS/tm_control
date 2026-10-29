@@ -12,6 +12,11 @@ import VolverArriba from './VolverArriba';
 import AtajosTeclado from './AtajosTeclado';
 import Bienvenida from './Bienvenida';
 import BannerConexion from './BannerConexion';
+import PerfilModal from './PerfilModal';
+import Festejo from './Festejo';
+import { limpiarTurnoActual } from '../lib/db';
+import { registrarAcceso, instalarRegistro } from '../lib/registroActividad';
+import { avisar } from '../lib/avisos';
 import { precargar, precargarEnSegundoPlano } from '../lib/paginas';
 
 /** Mientras llega la pantalla (casi siempre ya precargada) se ve un esqueleto: el menú y la barra no se mueven. */
@@ -32,7 +37,17 @@ export default function Layout() {
     const parar = precargarEnSegundoPlano();
     return () => { document.removeEventListener('pointerover', cerca); document.removeEventListener('touchstart', cerca); parar(); };
   }, []);
-  const [recarga, setRecarga] = useState(0);                                    // al volver el internet se vuelve a pedir lo que se estaba viendo
+  const [recarga, setRecarga] = useState(0);
+  useEffect(() => {                                                              // quién entra y qué errores ven (para el tablero de Seguridad)
+    registrarAcceso(); const off = instalarRegistro(); const v = () => { if (document.visibilityState === 'visible') registrarAcceso(); };
+    document.addEventListener('visibilitychange', v); return () => { off(); document.removeEventListener('visibilitychange', v); };
+  }, []);
+  useEffect(() => {                                                              // 6:00 a. m.: el Turno Actual del día anterior se borra solo (la base lo hace a hora de Colombia)
+    let vivo = true;
+    const limpiar = () => limpiarTurnoActual().then(n => { if (vivo && n > 0) { window.dispatchEvent(new Event('tm-conexion-restablecida')); avisar('Se reinició el Turno Actual (6:00 a. m.): se borró lo del día anterior.'); } });
+    limpiar(); const t = setInterval(limpiar, 10 * 60 * 1000);
+    return () => { vivo = false; clearInterval(t); };
+  }, []);                                    // al volver el internet se vuelve a pedir lo que se estaba viendo
   useEffect(() => { const f = () => setRecarga(r => r + 1); window.addEventListener('tm-conexion-restablecida', f); return () => window.removeEventListener('tm-conexion-restablecida', f); }, []);
   useRespaldoAutomatico();                       // copia mensual automática (solo si quien abre la app es administrador)
   const [open, setOpen] = useState(false);
@@ -50,6 +65,8 @@ export default function Layout() {
       <AtajosTeclado />
       <Bienvenida />
       <BannerConexion />
+      <PerfilModal />
+      <Festejo />
       <PanelEfectos />
       <Sidebar open={open} onNavigate={() => setOpen(false)} onClose={() => setOpen(false)} />
       <main className="main">

@@ -12,7 +12,7 @@
 .vp-expandir:hover{ background:color-mix(in srgb, var(--primary) 22%, transparent); }
 .vp-ventana{ overflow:auto; flex:1; min-height:120px; border-radius:14px; background:color-mix(in srgb, var(--superficie-2, #eee) 70%, transparent); padding:6px; }
 .vp-foto{ display:block; width:100%; height:auto; margin:0 auto; border-radius:10px; background:#fff; }
-.vp-aviso{ font-size:12.5px; color:var(--gray); margin:2px 0 8px; display:flex; align-items:center; gap:7px; }
+.vp-aviso{ font-size:12.5px; line-height:1.35; color:var(--gray); margin:2px 0 8px; display:flex; align-items:flex-start; gap:7px; min-width:0; } .vp-aviso i{ margin-top:2px; flex-shrink:0; } .vp-aviso span{ min-width:0; overflow-wrap:anywhere; }
 .vp-seccion .vp-marco{ max-height:82vh; }
 .vp-nota{ font-size:12.5px; color:var(--gray); margin:0 0 10px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
 .vp-seccion-cab{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
@@ -28,3 +28,7 @@
 @supports (height:100dvh){ .vb-modal.vp-modal{ max-height:97dvh; } .vb-modal.vp-completa{ height:100dvh; max-height:100dvh; } }
 .vb-modal.vp-completa{ padding-top:max(16px, env(safe-area-inset-top, 0px)); padding-bottom:max(14px, env(safe-area-inset-bottom, 0px)); padding-left:max(18px, env(safe-area-inset-left, 0px)); padding-right:max(18px, env(safe-area-inset-right, 0px)); }
 @media (max-width:760px){ .vb-modal.vp-modal{ height:100dvh; max-height:100dvh; padding-top:max(14px, env(safe-area-inset-top, 0px)); padding-bottom:max(12px, env(safe-area-inset-bottom, 0px)); padding-left:max(12px, env(safe-area-inset-left, 0px)); padding-right:max(12px, env(safe-area-inset-right, 0px)); } .vp-ventana{ padding:0; } .vp-aviso{ font-size:11.5px; } .rs-acciones{ position:sticky; bottom:0; } }
+
+/* la vista previa se ajusta a la imagen (sin el hueco vacío de abajo) y el zoom no tapa las últimas filas */
+.vp-marco{ padding-bottom:62px; } .vp-marco-img{ padding-bottom:62px; }
+@media (max-width:760px){ .vp-ventana{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; } .vp-zona{ flex:1 1 auto; min-height:0; display:flex; } .vp-marco{ flex:1 1 auto; max-height:none; } }

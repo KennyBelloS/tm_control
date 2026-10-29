@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Texto from '../components/TextoMd';
 import Novedades from '../components/Novedades';
+import Nuevo from '../components/Nuevo';
 import PageHeader from '../components/PageHeader';
 import manualMd from '../../MANUAL.md?raw';
 import { extraerBloque, parsear, secciones, filtrar, versiones, subseccion, novedades } from '../lib/manualMarkdown';
@@ -44,8 +45,8 @@ export default function Ayuda() {
   const tab = params.get('tab') === 'novedades' ? 'novedades' : params.get('tab') === 'manual' ? 'manual' : 'recorrido';
   const texto = tab === 'manual' && params.get('ver') === 'texto';
   const [q, setQ] = useState('');
-  const pasos = useMemo(() => armarPasos({ puedeVer: k => puedeVer(rol, k), puedeEditar: puedeEditar(rol) }), [rol]);
-  const lecciones = useMemo(() => armarLecciones({ puedeVer: k => puedeVer(rol, k), puedeEditar: puedeEditar(rol) }), [rol]);
+  const pasos = useMemo(() => armarPasos({ puedeVer: k => puedeVer(rol, k), puedeEditar: puedeEditar(sesion) }), [rol, sesion?.edicion]);
+  const lecciones = useMemo(() => armarLecciones({ puedeVer: k => puedeVer(rol, k), puedeEditar: puedeEditar(sesion) }), [rol, sesion?.edicion]);
   const conLeccion = useMemo(() => new Set(lecciones.map(l => l.id)), [lecciones]);
   const lista = useMemo(() => filtrar(SEC_USO, q), [q]);
   useEffect(() => { if (tab === 'novedades') marcarNovedadesVistas(); }, [tab]);
@@ -60,7 +61,7 @@ export default function Ayuda() {
         <div className="ay-barra">
           <div className="fuente-toggle" role="tablist" aria-label="Contenido de la guía">
             <button role="tab" aria-selected={tab === 'recorrido'} className={tab === 'recorrido' ? 'activo' : ''} onClick={() => setParams({})}><i className="fa-solid fa-route"></i> Recorrido</button>
-            <button role="tab" aria-selected={tab === 'manual'} className={tab === 'manual' ? 'activo' : ''} onClick={() => setParams({ tab: 'manual' })}><i className="fa-solid fa-graduation-cap"></i> Manual</button>
+            <button role="tab" aria-selected={tab === 'manual'} className={tab === 'manual' ? 'activo' : ''} onClick={() => setParams({ tab: 'manual' })}><i className="fa-solid fa-graduation-cap"></i> Manual<Nuevo id="lecciones-auto" /></button>
             <button role="tab" aria-selected={tab === 'novedades'} className={tab === 'novedades' ? 'activo' : ''} onClick={() => setParams({ tab: 'novedades' })}><i className="fa-solid fa-gift"></i> Novedades</button>
           </div>
           {texto && <button className="btn-secondary" onClick={() => setParams({ tab: 'manual' })}><i className="fa-solid fa-graduation-cap"></i> Volver a las lecciones</button>}

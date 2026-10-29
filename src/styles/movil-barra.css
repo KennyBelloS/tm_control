@@ -15,6 +15,7 @@
   .notif-panel, .nt-panel{ position:fixed !important; left:max(8px, var(--sa-left, 0px)) !important; right:max(8px, var(--sa-right, 0px)) !important; top:calc(var(--sa-top, 0px) + 58px) !important; width:auto !important; max-height:calc(100dvh - var(--sa-top, 0px) - 76px) !important; }
 }
 @media (min-width:1024px){ .acciones-movil{ display:none; } }
+@media (max-width:1023px){ .sidebar .logo img{ display:none; } .sidebar .logo{ padding-left:20px; } }          /* en el celular el único logo es el de la barra, junto al ☰ */
 .topbar-logo{ display:none; }
-@media (max-width:1023px){ .topbar-logo{ display:block; flex-shrink:0; width:36px; height:36px; border-radius:50%; background:#fff; padding:2px; object-fit:cover; box-shadow:0 4px 12px -4px rgba(0,0,0,.35), 0 0 0 1px rgba(0,0,0,.08); } }
+@media (max-width:1023px){ .topbar-logo{ display:block; flex-shrink:0; width:38px; height:38px; border-radius:50%; background:#fff; padding:3px; object-fit:contain; box-shadow:0 0 0 2px var(--primary), 0 6px 14px -6px rgba(15,61,34,.6); } }
 .horario-chip{ display:inline-flex; align-items:center; gap:7px; margin:2px 0 8px; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:700; color:#0F3D22; background:#FDF3DF; box-shadow:0 0 0 1px #E8C879 inset; } .horario-chip strong{ font-weight:900; }

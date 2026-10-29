@@ -117,7 +117,7 @@ export default function Ranking() {
 
   return (
     <>
-      <PageHeader title="Ranking de Operarios" subtitle="Clasificación según rendimiento y productividad." />
+      <PageHeader title="Ranking de Colaboradores" subtitle="Clasificación según rendimiento y productividad." />
       <div className="page">
         {!cargando && lista.length > 0 && (
           <section className="cards">
@@ -128,7 +128,7 @@ export default function Ranking() {
             <div className="card acento-oro"><div className="icon"><i className="fa-solid fa-gauge-high"></i></div>
               <div><span>Cumplimiento de Tallos</span><h2>{resumen.promedioPct}%</h2><small>vs. la meta</small></div></div>
             <div className="card acento-rojo"><div className="icon"><i className="fa-solid fa-trophy"></i></div>
-              <div><span>Meta cumplida</span><h2>{resumen.cumplen}</h2><small>operarios</small></div></div>
+              <div><span>Meta cumplida</span><h2>{resumen.cumplen}</h2><small>colaboradores</small></div></div>
             <div className="card card-real-vs-meta"><div className="icon"><i className="fa-solid fa-layer-group"></i></div>
               <div>
                 <span>Tallos Totales vs. Meta</span>
@@ -198,7 +198,7 @@ export default function Ranking() {
             <div className="panel-header">
               <div>
                 <h2><i className="fa-solid fa-chart-pie" style={{ color: 'var(--primary)', marginRight: 8 }}></i>Distribución por Estado</h2>
-                <p>Cuántos operarios están en cada nivel de desempeño.</p>
+                <p>Cuántos colaboradores están en cada nivel de desempeño.</p>
               </div>
             </div>
             <Suspense fallback={<p style={{ color: 'var(--gray)', fontSize: 12.5 }}>Cargando gráfica...</p>}>

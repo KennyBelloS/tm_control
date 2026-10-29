@@ -26,7 +26,7 @@ const TABS = [['resumen', 'Resumen', 'fa-table-cells'], ['top', 'Top 5', 'fa-ran
 
 export default function Devoluciones() {
   const { sesion } = useSesion();
-  const puedeCargar = puedeEditar(sesion?.rol);
+  const puedeCargar = puedeEditar(sesion);
   const [datos, setDatos] = useState(undefined);
   const [error, setError] = useState('');
   const [tab, setTab] = useState('resumen');

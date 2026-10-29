@@ -3,10 +3,11 @@ import { fmt, fFecha, fCorta } from './util';
 import { BarrasVerticales, COLORES } from './Graficos';
 import { NombreCodigo, etiquetaGrafico } from './NombreCodigo';
 import { exportarImagenTop5, htmlTop5Vista } from '../../lib/exportImagenDevoluciones';
-import { MODOS_IMAGEN } from '../../lib/devolucionesImagen';
+import { MODOS_TOP5 } from '../../lib/devolucionesImagen';
 import { ModalVistaImagen } from '../VistaPreviaImagen';
 import { serieDevoluciones, topCausas } from '../../lib/devolucionesAnalisis';
 import { avisar } from '../../lib/avisos';
+import Nuevo from '../Nuevo';
 
 const NOMBRES = { dia: 'Día', semana: 'Semana', mes: 'Mes', historico: 'Histórico' };
 const TITULO = { dia: 'día seleccionado', semana: 'semana seleccionada', mes: 'mes seleccionado', historico: 'histórico' };
@@ -40,8 +41,8 @@ export default function TopDev({ rankings, periodos, minimos, diaSinCargar, ulti
   const rango = p === 'dia' ? fFecha(P.desde) : p === 'historico' ? 'todo el historial' : `${fCorta(P.desde)} al ${fCorta(P.hasta)}`;
   const datos = lista => lista.map(e => ({ ...etiquetaGrafico(e.nombre, e.codigo, modo), valor: e.devol, titulo: `${e.nombre} (código ${e.codigo ?? '—'})` }));
   const sinDato = p === 'dia' && diaSinCargar;
-  const [modoImg, setModoImg] = useState(() => { try { return localStorage.getItem('tm_dev_img_modo_top5') || 'ambos'; } catch { return 'ambos'; } });
-  const cambiarModoImg = v => { setModoImg(v); try { localStorage.setItem('tm_dev_img_modo_top5', v); } catch { /* sin almacenamiento */ } };
+  const [modoImg, setModoImg] = useState(() => { try { return localStorage.getItem('tm_dev_img_modo_top5_v2') || 'predeterminado'; } catch { return 'predeterminado'; } });
+  const cambiarModoImg = v => { setModoImg(v); try { localStorage.setItem('tm_dev_img_modo_top5_v2', v); } catch { /* sin almacenamiento */ } };
   const armar = () => {
     const c = datosCrudos ? topCausas(datosCrudos, razones || [], P.desde, P.hasta, 6) : null;
     const grafico = datosCrudos ? { serie: serieDevoluciones(datosCrudos, P.desde, P.hasta), causas: c.filas } : null;
@@ -64,7 +65,7 @@ export default function TopDev({ rankings, periodos, minimos, diaSinCargar, ulti
         <div className="fuente-toggle" role="tablist" aria-label="Período">
           {Object.entries(NOMBRES).map(([k, n]) => <button key={k} className={p === k ? 'activo' : ''} onClick={() => setP(k)} role="tab" aria-selected={p === k}>{n}</button>)}
         </div>
-        <label className="dev-img-modo" title="Qué se ve de cada persona en la imagen: el código (para mostrar en grupo), el nombre (para verificar) o ambos">Imagen con<select value={modoImg} onChange={e => cambiarModoImg(e.target.value)} aria-label="Qué mostrar de cada persona en la imagen">{Object.entries(MODOS_IMAGEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+        <label className="dev-img-modo" title="Qué se ve de cada persona en la imagen: el código (para mostrar en grupo), el nombre (para verificar) o ambos">Imagen con<Nuevo id="top5-imagen" /><select value={modoImg} onChange={e => cambiarModoImg(e.target.value)} aria-label="Qué mostrar de cada persona en la imagen">{Object.entries(MODOS_TOP5).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
         <button className="btn-secondary dev-descargar" onClick={verPrevia} disabled={bajando || sinDato} title="Mira cómo quedará la imagen antes de descargarla"><i className="fa-solid fa-eye"></i> Vista previa</button>
         <button className="btn-secondary dev-descargar" onClick={descargar} disabled={bajando || sinDato} title="Descarga una imagen con gráficos: más devoluciones solo con el código, menos devoluciones con el nombre"><i className={`fa-solid ${bajando ? 'fa-spinner fa-spin' : 'fa-image'}`}></i> Descargar imagen</button>
         <span className="dev-rango">{rango} · en las barras: {modo === 'codigo' ? 'el código' : modo === 'nombre' ? 'el nombre' : 'el código y el nombre'} de cada persona</span>
@@ -88,7 +89,7 @@ export default function TopDev({ rankings, periodos, minimos, diaSinCargar, ulti
           </p>
         </section>
       </div>}
-      {previa && <ModalVistaImagen titulo="Vista previa — Top 5 de devoluciones" html={previa.html} onCerrar={() => setPrevia(null)} pie={<label className="dev-img-modo vp-modo">Imagen con<select value={modoImg} onChange={e => cambiarModoImg(e.target.value)}>{Object.entries(MODOS_IMAGEN).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>} acciones={[
+      {previa && <ModalVistaImagen titulo="Vista previa — Top 5 de devoluciones" html={previa.html} onCerrar={() => setPrevia(null)} pie={<label className="dev-img-modo vp-modo">Imagen con<select value={modoImg} onChange={e => cambiarModoImg(e.target.value)}>{Object.entries(MODOS_TOP5).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>} acciones={[
         { texto: 'Descargar imagen', icono: 'fa-image', onClick: descargar, deshabilitado: bajando || !previa.html }]} />}
     </div>
   );

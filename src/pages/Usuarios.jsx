@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
+import { avisar } from '../lib/avisos';
+import Nuevo from '../components/Nuevo';
+import { EDICION, puedeEditar, cambiarEdicionPerfil } from '../lib/roles';
 import { ROLES, ROL_LABEL, listarPerfiles, crearUsuario, cambiarEstadoPerfil, cambiarRolPerfil, eliminarUsuario, cambiarPasswordUsuario, cambiarNombreUsuario } from '../lib/roles';
 import { EstadoVacio, FilasEsqueleto } from '../components/Estados';
 export default function Usuarios() {
@@ -62,6 +65,12 @@ export default function Usuarios() {
     } catch (e) {
       setError(e.message);
     }
+  }
+  async function cambiarEdicion(p, valor) {
+    try {
+      await cambiarEdicionPerfil(p.id, valor); await cargar();
+      avisar(valor === 'ver' ? `${p.nombre} ahora solo puede VER (no edita nada).` : valor === 'editar' ? `${p.nombre} ahora puede VER y EDITAR.` : `${p.nombre} vuelve al permiso de su rol (${ROL_LABEL[p.rol]}).`);
+    } catch (e) { setError(e.message); avisar(e.message, 'error'); }
   }
   async function cambiarRol(p, nuevoRol) {
     try {
@@ -195,10 +204,10 @@ export default function Usuarios() {
           </div>
           <div className="table-scroll">
             <table>
-              <thead><tr><th>Nombre</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Rol</th><th title="Si la persona solo ve o también puede cargar y editar">Permiso <Nuevo id="permiso-persona" /></th><th>Estado</th><th>Creado</th><th>Acciones</th></tr></thead>
               <tbody>
-                {cargando && <FilasEsqueleto columnas={5} />}
-                {!cargando && perfiles.length === 0 && <tr><td colSpan={5}><EstadoVacio icono="fa-users" titulo="Todavía no hay cuentas creadas" /></td></tr>}
+                {cargando && <FilasEsqueleto columnas={6} />}
+                {!cargando && perfiles.length === 0 && <tr><td colSpan={6}><EstadoVacio icono="fa-users" titulo="Todavía no hay cuentas creadas" /></td></tr>}
                 {perfiles.map(p => {
                   const protegido = p.es_super_admin;
                   const editando = editandoId === p.id;
@@ -223,6 +232,18 @@ export default function Usuarios() {
                         }}>
                           {ROLES.map(r => <option key={r} value={r}>{ROL_LABEL[r]}</option>)}
                         </select>
+                      </td>
+                      <td>
+                        {p.rol === 'administrador' || protegido ? (
+                          <span className="perm-chip edita" title="El Administrador siempre puede editar"><i className="fa-solid fa-pen"></i> Siempre edita</span>
+                        ) : (
+                          <div className="perm-celda">
+                            <select value={EDICION.includes(p.edicion) ? p.edicion : 'rol'} onChange={e => cambiarEdicion(p, e.target.value)} aria-label={`Permiso de ${p.nombre}`}>
+                              <option value="rol">Según su rol</option><option value="ver">Solo ver</option><option value="editar">Puede editar</option>
+                            </select>
+                            <span className={`perm-chip ${puedeEditar(p) ? 'edita' : 've'}`}><i className={`fa-solid ${puedeEditar(p) ? 'fa-pen' : 'fa-eye'}`}></i> {puedeEditar(p) ? 'Edita' : 'Solo ve'}</span>
+                          </div>
+                        )}
                       </td>
                       <td><span className={`status ${p.activo ? 'success' : 'danger'}`}>{p.activo ? 'Activo' : 'Desactivado'}</span></td>
                       <td>{new Date(p.creado_en).toLocaleDateString('es-CO')}</td>

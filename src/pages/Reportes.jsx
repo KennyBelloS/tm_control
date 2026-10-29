@@ -166,7 +166,7 @@ export default function Reportes() {
     try {
       const { exportarImagenProfesional } = await import('../lib/exportImagenProfesional');
       const etiqueta = verSoloConfiables ? `${rango.etiqueta} (sin poco tiempo)` : rango.etiqueta;
-      await exportarImagenProfesional({ tipo: fuenteExportar, filas: filasParaExportar, cfg, fecha: etiqueta, formato });
+      await exportarImagenProfesional({ tipo: fuenteExportar, filas: filasParaExportar, cfg, fecha: etiqueta, fechaISO: rango.inicio === rango.fin ? rango.inicio : null, formato });
     } catch (e) {
       setMensaje({ tipo: 'err', texto: `Error generando la imagen: ${e.message}` });
     } finally {
@@ -396,7 +396,7 @@ export default function Reportes() {
           ) : rankingParaMostrar.length === 0 ? (
             <EstadoVacio icono="fa-inbox" titulo="Sin datos para este filtro" />
           ) : (
-            <PreviaRanking tipo={fuenteExportar} filas={filasParaExportar} cfg={cfg} fecha={verSoloConfiables ? `${rango.etiqueta} (sin poco tiempo)` : rango.etiqueta} titulo={fuenteExportar === 'historico' ? `Vista previa — ${rango.etiqueta}` : 'Vista previa — Turno Actual'} />
+            <PreviaRanking tipo={fuenteExportar} filas={filasParaExportar} cfg={cfg} fechaISO={rango.inicio === rango.fin ? rango.inicio : null} fecha={verSoloConfiables ? `${rango.etiqueta} (sin poco tiempo)` : rango.etiqueta} titulo={fuenteExportar === 'historico' ? `Vista previa — ${rango.etiqueta}` : 'Vista previa — Turno Actual'} />
           )}
         </section>
 

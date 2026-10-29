@@ -175,7 +175,7 @@ export default function FormadoresLineasPanel({ metaHora = 470 }) {
                 <span className={`fl2-avatar ${cumple ? 'fl2-avatar-ok' : 'fl2-avatar-mal'}`}>{iniciales(g.nombre)}</span>
                 <span className="fl2-titulo">
                   <strong>{g.nombre}{esLider && <i className="fl2-corona-mini" title="Lidera la clasificación"> 👑</i>}</strong>
-                  <small>{g.operarios.length} operarios{g.clasif?.disponible ? ` · ${nombresLineas(g.clasif.lineas)}` : ''}</small>
+                  <small>{g.operarios.length} colaboradores{g.clasif?.disponible ? ` · ${nombresLineas(g.clasif.lineas)}` : ''}</small>
                 </span>
                 <span className="fl2-barras">
                   <span className="fl2-barra-fila">

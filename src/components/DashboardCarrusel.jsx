@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ventanaCarrusel } from '../lib/carruselVentana';
 import { calcularPorcentajeMeta, clasificarEstado } from '../lib/calculos';
 
 const SEGUNDOS_POR_PERSONA = 7;
@@ -55,12 +56,17 @@ export default function DashboardCarrusel({ personasHoy, personasAyer, metaHora,
   useEffect(() => { setGrupoIndex(0); setVuelta(0); setManual(false); }, [grupos.length]);
 
   const grupoActual = grupos[grupoIndex];
-  const duracion = grupoActual ? grupoActual.personas.length * SEGUNDOS_POR_PERSONA : 0;
+  // Se dibujan solo MAX_FILAS personas por vuelta (cientos de filas de golpe congelaban el celular): cada vuelta muestra las siguientes, hasta recorrer a todas.
+  const total = grupoActual ? grupoActual.personas.length : 0;
+  const vent = ventanaCarrusel(total, vuelta, { minimo: VUELTAS_ANTES_DE_CAMBIAR });
+  const filas = grupoActual ? grupoActual.personas.slice(vent.desde, vent.hasta) : [];
+  const duracion = filas.length * SEGUNDOS_POR_PERSONA;
+  const vueltasGrupo = vent.vueltas;
 
   useEffect(() => {
     if (!grupoActual || duracion === 0 || manual) return;
     const t = setTimeout(() => {
-      if (vuelta + 1 < VUELTAS_ANTES_DE_CAMBIAR) {
+      if (vuelta + 1 < vueltasGrupo) {
         setVuelta(v => v + 1);
       } else {
         setGrupoIndex(g => (g + 1) % grupos.length);
@@ -68,7 +74,7 @@ export default function DashboardCarrusel({ personasHoy, personasAyer, metaHora,
       }
     }, duracion * 1000);
     return () => clearTimeout(t);
-  }, [grupoIndex, vuelta, duracion, grupos.length, manual]);
+  }, [grupoIndex, vuelta, duracion, grupos.length, manual, vueltasGrupo]);
 
   if (!grupoActual) return null;
 
@@ -98,7 +104,7 @@ export default function DashboardCarrusel({ personasHoy, personasAyer, metaHora,
             </button>
           )}
         </div>
-        <span className="carrusel-contador">{grupoActual.personas.length} personas</span>
+        <span className="carrusel-contador">{vent.texto}</span>
       </div>
 
       <div className="carrusel-ventana">
@@ -107,10 +113,10 @@ export default function DashboardCarrusel({ personasHoy, personasAyer, metaHora,
           className="carrusel-lista-scroll"
           style={{ animationDuration: `${duracion}s` }}
         >
-          {grupoActual.personas.map((p, i) => (
+          {filas.map((p, i) => (
             <Fila key={`a-${i}`} persona={p} metaHora={metaHora} />
           ))}
-          {grupoActual.personas.map((p, i) => (
+          {filas.map((p, i) => (
             <Fila key={`b-${i}`} persona={p} metaHora={metaHora} />
           ))}
         </div>

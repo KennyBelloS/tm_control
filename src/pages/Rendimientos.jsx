@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader';
 import { getConfig, getHistorico, getActual, insertarHistorico, reemplazarActual, borrarTablaHistorico, borrarTablaActual, actualizarRegistroHistorico, eliminarRegistroHistorico, actualizarRegistroActual, eliminarRegistroActual, eliminarPersonaDeActual, getMetaTotalPeriodo, getUltimaFechaHistorico, getRangoHorarioHistorico, getResumenHistoricoCompleto, getDescansosDiariosRango } from '../lib/db';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { parsearReporteBoncheo } from '../lib/excel';
+import EvolucionTurno from '../components/EvolucionTurno';
 import { calcularPorcentajeMeta, clasificarEstado, horasAMinutos, minutosAHoras, agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from '../lib/calculos';
 import { supabaseConfigurado } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
@@ -25,7 +26,7 @@ export default function Rendimientos() {
     sesion
   } = useSesion();
   const rol = sesion?.rol;
-  const puedeModificar = puedeEditar(rol);
+  const puedeModificar = puedeEditar(sesion);
   const [cfg, setCfg] = useState(null);
   const [historico, setHistorico] = useState([]);
   const [actual, setActual] = useState([]);
@@ -423,6 +424,7 @@ export default function Rendimientos() {
           await cargarTodo();
         }} procesando={procesando} promedioGeneral={promedioActual} soloLectura={!puedeModificar} onEditandoCambio={setEditandoActual} />
         </div>
+        <EvolucionTurno filas={actualFiltrado} metaHora={cfg?.metaHora || 470} />
       </div>
     </>;
 }

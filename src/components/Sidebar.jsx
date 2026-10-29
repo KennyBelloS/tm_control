@@ -4,6 +4,7 @@ import { alternarMenu } from '../lib/ajustesUI';
 import logo from '../assets/logo-icon.png';
 import { puedeVer } from '../lib/roles';
 import { useSesion } from '../lib/useSesion';
+import { esNuevaFuncion } from '../lib/novedades';
 // Insignia "Nuevo": se muestra hasta que la persona entra una vez al módulo (se recuerda en el navegador).
 const CLAVE_VISTOS = 'tm_modulos_vistos';
 const yaVisto = k => { try { return (JSON.parse(localStorage.getItem(CLAVE_VISTOS)) || []).includes(k); } catch { return false; } };
@@ -97,6 +98,11 @@ export const MODULOS_TECNICOS = [{
   label: 'Auditoría',
   key: 'auditoria'
 }, {
+  to: '/seguridad',
+  icon: 'fa-lock',
+  label: 'Seguridad',
+  key: 'seguridad'
+}, {
   to: '/resumenes',
   icon: 'fa-file-lines',
   label: 'Resúmenes',
@@ -181,7 +187,7 @@ export default function Sidebar({
               <NavLink to={m.to} end={m.end} data-tip={m.titulo || m.label} onClick={onNavigate} className={({
             isActive
           }) => isActive ? 'nav-active' : ''}>
-                <i className={`fa-solid ${m.icon}`}></i><span className="nav-etq">{m.label}{m.sub && <small className="nav-sub">{m.sub}</small>}</span>{m.nuevo && !yaVisto(m.key) && <em className="nav-nuevo">Nuevo</em>}
+                <i className={`fa-solid ${m.icon}`}></i><span className="nav-etq">{m.label}{m.sub && <small className="nav-sub">{m.sub}</small>}</span>{esNuevaFuncion(m.key) && <em className="nav-nuevo">Nuevo</em>}
               </NavLink>
             </li>)}
         </ul>
@@ -193,7 +199,7 @@ export default function Sidebar({
                   <NavLink to={m.to} data-tip={m.titulo || m.label} onClick={onNavigate} className={({
               isActive
             }) => isActive ? 'nav-active' : ''}>
-                    <i className={`fa-solid ${m.icon}`}></i><span className="nav-etq">{m.label}{m.sub && <small className="nav-sub">{m.sub}</small>}</span>{m.nuevo && !yaVisto(m.key) && <em className="nav-nuevo">Nuevo</em>}
+                    <i className={`fa-solid ${m.icon}`}></i><span className="nav-etq">{m.label}{m.sub && <small className="nav-sub">{m.sub}</small>}</span>{esNuevaFuncion(m.key) && <em className="nav-nuevo">Nuevo</em>}
                   </NavLink>
                 </li>)}
             </ul>
@@ -206,7 +212,7 @@ export default function Sidebar({
                   <NavLink to={m.to} data-tip={m.titulo || m.label} onClick={onNavigate} className={({
               isActive
             }) => isActive ? 'nav-active' : ''}>
-                    <i className={`fa-solid ${m.icon}`}></i><span className="nav-etq">{m.label}{m.sub && <small className="nav-sub">{m.sub}</small>}</span>{m.nuevo && !yaVisto(m.key) && <em className="nav-nuevo">Nuevo</em>}
+                    <i className={`fa-solid ${m.icon}`}></i><span className="nav-etq">{m.label}{m.sub && <small className="nav-sub">{m.sub}</small>}</span>{esNuevaFuncion(m.key) && <em className="nav-nuevo">Nuevo</em>}
                   </NavLink>
                 </li>)}
             </ul>

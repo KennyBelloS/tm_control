@@ -74,7 +74,10 @@ function tablaTop(items, color, modo, conDias) {
 }
 
 /** Top 5: izquierda MÁS devoluciones, derecha MENOS devoluciones, cada una con su gráfico de barras y su tabla (como en la app). modo: 'ambos' (predeterminado), 'codigo' o 'nombre'. */
-export function htmlImagenTop5({ periodoNombre, rango, mas, menos, personasConDevoluciones, minDias, generado, logo, grafico, elegibles, empatadosFuera, quintoDevol, modo = 'ambos' }) {
+export const MODOS_TOP5 = { predeterminado: 'Más con código · Menos con nombre', codigo: 'Solo código', nombre: 'Solo nombre', ambos: 'Código y nombre en los dos' };
+export function htmlImagenTop5({ periodoNombre, rango, mas, menos, personasConDevoluciones, minDias, generado, logo, grafico, elegibles, empatadosFuera, quintoDevol, modo = 'predeterminado' }) {
+  // Predeterminado: quienes MÁS devuelven se muestran solo con su código (para mostrar en grupo); quienes MENOS, con su nombre y código.
+  const modoMas = modo === 'predeterminado' ? 'codigo' : modo, modoMenos = modo === 'predeterminado' ? 'ambos' : modo;
   const vacioMas = '<div style="padding:60px 10px;text-align:center;font-size:18px;font-weight:700;color:#6B7C71;">Sin devoluciones en este período 🎉</div>';
   const vacioMenos = `<div style="padding:60px 10px;text-align:center;font-size:16px;font-weight:700;color:#6B7C71;">Nadie cumple el mínimo de ${fmt(minDias)} día${minDias === 1 ? '' : 's'} trabajado${minDias === 1 ? '' : 's'} en este período</div>`;
   const notaMenos = Number.isFinite(elegibles) ? `Elegibles: <b>${fmt(elegibles)}</b> (mínimo ${fmt(minDias)} día${minDias === 1 ? '' : 's'} trabajado${minDias === 1 ? '' : 's'} y fuera del Top 5 de “más”)${empatadosFuera > 0 ? ` · <b>${fmt(empatadosFuera)}</b> más empatan con ${fmt(quintoDevol ?? 0)} devol. en el 5.º puesto (desempate: más días trabajados, luego código)` : ''}` : `Mínimo ${fmt(minDias)} día${minDias === 1 ? '' : 's'} trabajado${minDias === 1 ? '' : 's'}`;
@@ -83,8 +86,8 @@ export function htmlImagenTop5({ periodoNombre, rango, mas, menos, personasConDe
       <div style="margin-top:8px;font-size:12px;line-height:1.4;color:#6B7C71;">${nota}</div></div>`;
   return `${cabecera({ titulo: `Top 5 de devoluciones — ${periodoNombre}`, subtitulo: rango, generado, logo })}
     <div style="padding:22px 30px 8px;display:flex;gap:20px;">
-      ${tarjeta('Más devoluciones', '▲', ROJO, ROJO_CLARO, `Más — ${esc(periodoNombre)}`, mas.length ? graficoTop(mas, '#C0392B', modo) + tablaTop(mas, ROJO, modo, false) : vacioMas, `Personas con devoluciones: <b>${fmt(personasConDevoluciones)}</b>`)}
-      ${tarjeta('Menos devoluciones', '▼', VERDE, VERDE_CLARO, `Menos — ${esc(periodoNombre)}`, menos.length ? graficoTop(menos, '#1B7F43', modo) + tablaTop(menos, VERDE, modo, true) : vacioMenos, notaMenos)}
+      ${tarjeta('Más devoluciones', '▲', ROJO, ROJO_CLARO, `Más — ${esc(periodoNombre)}`, mas.length ? graficoTop(mas, '#C0392B', modoMas) + tablaTop(mas, ROJO, modoMas, false) : vacioMas, `Personas con devoluciones: <b>${fmt(personasConDevoluciones)}</b>`)}
+      ${tarjeta('Menos devoluciones', '▼', VERDE, VERDE_CLARO, `Menos — ${esc(periodoNombre)}`, menos.length ? graficoTop(menos, '#1B7F43', modoMenos) + tablaTop(menos, VERDE, modoMenos, true) : vacioMenos, notaMenos)}
     </div>
     ${graficos(grafico)}${pie}`;
 }

@@ -24,7 +24,7 @@ export function useNotificaciones() {
 
   const cargar = useCallback(async () => {
     if (!rol) return;
-    const f = new Date(); const hechos = await reunirHechos({ rol, puedeEditar: puedeEditar(rol), hoy: hoyISO(), hora: f.getHours() });
+    const f = new Date(); const hechos = await reunirHechos({ rol, puedeEditar: puedeEditar(sesion), hoy: hoyISO(), hora: f.getHours() });
     setItems(construirNotificaciones(hechos)); setAhora(f.toISOString());
   }, [rol]);
   useEffect(() => {

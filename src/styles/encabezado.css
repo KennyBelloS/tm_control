@@ -89,3 +89,9 @@
 /* La campana toma el mismo fondo que los demás botones de la barra (en oscuro se veía blanca) */
 .topbar .notif-bell{ background:var(--panel) !important; color:var(--text-soft); }
 .topbar .notif-bell:hover{ color:var(--primary); }
+
+/* RENDIMIENTO EN CELULARES: lo que está debajo de la primera pantalla del Dashboard no se dibuja ni se mide hasta que se acerca.
+   (Antes el navegador calculaba el diseño de TODA la página de golpe: ~1,6 s congelado en un celular modesto.) */
+#sec-historico ~ section, #sec-historico ~ div:not(.alert),
+#sec-clasificacion ~ section, #sec-clasificacion ~ div:not(.alert),
+#sec-graficas ~ section, #sec-graficas ~ div:not(.alert) { content-visibility:auto; contain-intrinsic-size:auto 380px; }

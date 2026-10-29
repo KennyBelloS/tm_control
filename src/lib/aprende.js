@@ -48,6 +48,9 @@ export const LECCIONES = [
     reto: { t: '¿Quién puede ver Resúmenes?', o: ['Todos los roles', 'Solo el Administrador', 'Solo los Formadores'], c: 1, x: 'Resúmenes muestra cifras de todo el personal, por eso es solo del Administrador.' } },
   { id: 'auditoria', lab: 'espacio', seccion: 'Auditoría', minutos: 3,
     reto: { t: '¿Cada cuánto se guarda la copia automática?', o: ['Cada hora', 'Una vez al mes', 'Solo si la pides'], c: 1, x: 'Una vez al mes se guarda sola; se conservan las últimas 12.' } },
+  { id: 'seguridad', lab: 'toca', seccion: 'Seguridad', minutos: 2,
+    cartas: [C('fa-shield-halved', 'Índice de 0 a 100', 'Resume cuántas revisiones pasan y cuánto pesa cada una.'), C('fa-list-check', 'Qué conviene hacer', 'Cada pendiente dice qué arreglar y por qué.'), C('fa-satellite-dish', 'Radar de cuentas', 'Último acceso de cada cuenta y quién puede editar.'), C('fa-key', 'Mapa de permisos', 'Qué ve y qué edita cada rol, módulo por módulo.')],
+    reto: { t: '¿Quién puede ver el tablero de Seguridad?', o: ['Todos los roles', 'Solo el Administrador', 'Administrador e Ingeniero'], c: 1, x: 'El tablero muestra cuentas, accesos y protecciones: por eso es solo del Administrador.' } },
   { id: 'campana', lab: 'campana', seccion: 'Notificaciones', minutos: 3,
     reto: { t: '¿Qué interrumpe con un aviso flotante?', o: ['Todo lo nuevo', 'Solo lo crítico, una vez al día', 'Nada, nunca'], c: 1, x: 'Solo lo crítico interrumpe; lo demás espera en la campana, ordenado por importancia.' } }
 ];
@@ -73,6 +76,12 @@ export function nivel(hechas, total) {
   return { emoji: '🌱', nombre: 'Principiante' };
 }
 /** La primera lección que todavía no se domina (para el botón "Continuar"). */
+/** La lección que sigue a la actual: la primera sin dominar después de ella (y si no queda ninguna, null). Es la que se abre sola al terminar una. */
+export function proxima(lecciones, dominadas, idActual) {
+  const i = lecciones.findIndex(l => l.id === idActual);
+  for (let k = 1; k <= lecciones.length; k++) { const l = lecciones[(i + k) % lecciones.length]; if (l.id !== idActual && !dominadas.includes(l.id)) return l; }
+  return null;
+}
 export const siguiente = (lecciones, dominadas) => lecciones.find(l => !dominadas.includes(l.id)) || null;
 
 /** Faltas de las lecciones (para el verificador y las pruebas): módulos sin lección, retos mal armados, textos largos. */

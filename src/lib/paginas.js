@@ -18,6 +18,7 @@ export const cargadores = {
   '/configuracion': () => import('../pages/Configuracion'),
   '/usuarios': () => import('../pages/Usuarios'),
   '/auditoria': () => import('../pages/Auditoria'),
+  '/seguridad': () => import('../pages/Seguridad'),
   '/resumenes': () => import('../pages/Resumenes'),
   '/ayuda': () => import('../pages/Ayuda')
 };
@@ -30,14 +31,29 @@ export function precargar(ruta) {
   if (!pedidas.has(base)) pedidas.set(base, f().catch(() => { pedidas.delete(base); }));
   return pedidas.get(base);
 }
-const conexionLenta = () => { const c = typeof navigator !== 'undefined' && navigator.connection; return !!c && (c.saveData || /(^|-)2g$/.test(c.effectiveType || '')); };
-/** En ratos libres, de una en una y las más usadas primero (así no compite con lo que se está viendo). */
+const conexionLenta = () => { const c = typeof navigator !== 'undefined' && navigator.connection; return !!c && (c.saveData || /(^|-)[23]g$/.test(c.effectiveType || '')); };
+/** Celulares, tabletas pequeñas y equipos modestos: ahí NO se precarga nada (la app instalada ya guarda sus archivos y, mientras tanto, cada pantalla se baja al abrirla). */
+export const equipoLimitado = () => {
+  if (typeof navigator === 'undefined') return false;
+  const n = navigator;
+  return conexionLenta() || (typeof matchMedia === 'function' && matchMedia('(max-width: 1023px)').matches) || /Android|iPhone|iPad|iPod|Mobile/i.test(n.userAgent || '') || (n.deviceMemory && n.deviceMemory <= 2) || (n.hardwareConcurrency && n.hardwareConcurrency <= 2);
+};
+/**
+ * En computadores, en ratos REALMENTE libres, de una en una y las más usadas primero. Se detiene mientras la persona toca, teclea o desplaza,
+ * y nunca fuerza al navegador (sin «timeout»): lo que se está haciendo siempre va primero. En celulares no hace nada.
+ */
 export function precargarEnSegundoPlano() {
-  if (conexionLenta()) return () => {};
+  if (equipoLimitado()) return () => {};
   const orden = ['/reportes', '/personas', '/rendimientos', '/ranking', '/devoluciones', '/clasificacion', '/lineas', '/colaborador', '/resumenes', '/ayuda'];
-  let i = 0, t;
-  const idle = typeof requestIdleCallback === 'function' ? requestIdleCallback : f => setTimeout(f, 300);
-  const sig = () => { if (i >= orden.length) return; precargar(orden[i++])?.finally?.(() => { t = setTimeout(() => idle(sig), 400); }) ?? idle(sig); };
-  t = setTimeout(() => idle(sig), 3500);
-  return () => clearTimeout(t);
+  let i = 0, t, parado = false, ultima = -1e9;
+  const marcar = () => { ultima = performance.now(); };
+  const eventos = ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'];
+  eventos.forEach(e => window.addEventListener(e, marcar, { passive: true, capture: true }));
+  const libre = () => performance.now() - ultima > 1500;
+  const cuando = f => { if (parado) return; const ok = () => { if (parado) return; if (libre()) f(); else t = setTimeout(() => cuando(f), 700); }; if (typeof requestIdleCallback === 'function') requestIdleCallback(ok); else t = setTimeout(ok, 300); };
+  // Primero lo pesado que comparten varias pantallas (Excel y gráficos), para que ninguna lo descargue en frío al abrirse.
+  const calentar = () => { import('xlsx').catch(() => {}); import('react-apexcharts').catch(() => {}); };
+  const sig = () => { if (parado || i >= orden.length) return; const p = precargar(orden[i++]); const seguir = () => { t = setTimeout(() => cuando(sig), 250); }; if (p && p.finally) p.finally(seguir); else seguir(); };
+  t = setTimeout(() => cuando(() => { calentar(); cuando(sig); }), 2500);
+  return () => { parado = true; clearTimeout(t); eventos.forEach(e => window.removeEventListener(e, marcar, { capture: true })); };
 }

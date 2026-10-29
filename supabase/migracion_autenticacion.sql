@@ -1076,3 +1076,268 @@ do $$ declare t text; pol record; begin
   end if;
 end $$;
 NOTIFY pgrst, 'reload schema';
+
+-- ---------------------------------------------------------------------
+-- 33) SOLO Administrador, Ingeniero y Digitador pueden editar
+--     Profesional, Supervisor y Formador quedan en SOLO VISUALIZACIÓN: la base de datos
+--     también lo impide (todas las políticas de escritura usan puede_editar()).
+-- ---------------------------------------------------------------------
+create or replace function puede_editar()
+returns boolean language sql security definer stable set search_path = public, pg_temp
+as $$ select exists (select 1 from public.perfiles where id = auth.uid() and activo = true and rol in ('administrador', 'ingeniero', 'digitador')); $$;
+
+revoke all on function puede_editar() from public, anon;
+grant execute on function puede_editar() to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 34) TURNO ACTUAL: las horas se guardan y todo se reinicia solo a las 6 a. m.
+--     · turno_actual_horas conserva cada bloque horario de cada persona del día, aunque un reporte nuevo reemplace al anterior
+--       (de ahí sale la evaluación "cómo mejoró o empeoró hora por hora").
+--     · limpiar_turno_actual() borra SOLO lo del Turno Actual (rendimiento_actual y turno_actual_horas) de días anteriores.
+--       El "día del turno" cambia a las 6:00 a. m. (hora de Colombia). No toca el Histórico.
+-- ---------------------------------------------------------------------
+create table if not exists turno_actual_horas (
+  fecha                 date    not null,
+  colaborador_id        integer not null references personas(id) on delete cascade,
+  hora_inicio           time    not null,
+  hora_fin              time    not null,
+  total_tallos          integer not null default 0,
+  tiempo_trabajado_min  numeric,
+  rend_tallos           integer not null default 0,
+  guardado_en           timestamptz not null default now(),
+  primary key (fecha, colaborador_id, hora_inicio)
+);
+create index if not exists idx_turno_horas_fecha on turno_actual_horas (fecha);
+alter table turno_actual_horas enable row level security;
+drop policy if exists "leer_turno_horas" on turno_actual_horas;
+drop policy if exists "escribir_turno_horas" on turno_actual_horas;
+drop policy if exists "actualizar_turno_horas" on turno_actual_horas;
+drop policy if exists "borrar_turno_horas" on turno_actual_horas;
+create policy "leer_turno_horas" on turno_actual_horas for select using (auth.role() = 'authenticated');
+create policy "escribir_turno_horas" on turno_actual_horas for insert with check (puede_editar());
+create policy "actualizar_turno_horas" on turno_actual_horas for update using (puede_editar());
+create policy "borrar_turno_horas" on turno_actual_horas for delete using (puede_editar());
+
+create or replace function turno_fecha() returns date language sql stable
+as $$ select ((now() at time zone 'America/Bogota') - interval '6 hours')::date $$;
+
+create or replace function limpiar_turno_actual() returns integer language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare a integer := 0; b integer := 0;
+begin
+  delete from rendimiento_actual where fecha < turno_fecha();   get diagnostics a = row_count;
+  delete from turno_actual_horas where fecha < turno_fecha();   get diagnostics b = row_count;
+  return a + b;
+end;
+$$;
+revoke all on function limpiar_turno_actual() from public, anon;
+grant execute on function limpiar_turno_actual() to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 35) TABLERO DE SEGURIDAD (solo Administrador)
+--     seguridad_estado() junta lo que la app no puede leer sola: el último acceso de cada cuenta (auth.users) y si cada tabla
+--     tiene la seguridad por filas (RLS) activa. Si quien llama no es Administrador, falla con "permiso denegado".
+-- ---------------------------------------------------------------------
+create or replace function seguridad_estado()
+returns jsonb
+language plpgsql security definer stable set search_path = public, auth, pg_temp
+as $$
+declare r jsonb;
+begin
+  if not es_administrador() then
+    raise exception 'Solo el Administrador puede ver el tablero de seguridad.' using errcode = '42501';
+  end if;
+  select jsonb_build_object(
+    'ahora', now(),
+    'usuarios', coalesce((select jsonb_agg(jsonb_build_object(
+        'id', p.id, 'nombre', p.nombre, 'rol', p.rol, 'activo', p.activo,
+        'ultimo_acceso', u.last_sign_in_at, 'creado', u.created_at) order by p.nombre)
+      from public.perfiles p left join auth.users u on u.id = p.id), '[]'::jsonb),
+    'tablas', coalesce((select jsonb_agg(jsonb_build_object(
+        'tabla', c.relname, 'rls', c.relrowsecurity,
+        'politicas', (select count(*) from pg_policies pp where pp.schemaname = 'public' and pp.tablename = c.relname)) order by c.relname)
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r'), '[]'::jsonb)
+  ) into r;
+  return r;
+end;
+$$;
+revoke all on function seguridad_estado() from public, anon;
+grant execute on function seguridad_estado() to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 36) MI PERFIL: cada persona puede cambiar SU propio nombre (nada más: ni el rol ni si está activa)
+--     El avatar de flores se guarda en los datos de la cuenta (user_metadata), no necesita SQL.
+-- ---------------------------------------------------------------------
+create or replace function actualizar_mi_nombre(p_nombre text)
+returns text
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+declare n text := regexp_replace(btrim(coalesce(p_nombre, '')), '\s+', ' ', 'g');
+begin
+  if auth.uid() is null then raise exception 'Debes iniciar sesión.' using errcode = '42501'; end if;
+  if char_length(n) < 2 or char_length(n) > 60 then raise exception 'El nombre debe tener entre 2 y 60 letras.' using errcode = '22023'; end if;
+  if n ~ '[<>]' then raise exception 'El nombre no puede llevar los signos < ni >.' using errcode = '22023'; end if;
+  update public.perfiles set nombre = n where id = auth.uid() and activo = true;
+  if not found then raise exception 'No se encontró tu perfil.' using errcode = 'P0002'; end if;
+  return n;
+end;
+$$;
+revoke all on function actualizar_mi_nombre(text) from public, anon;
+grant execute on function actualizar_mi_nombre(text) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 37) ACTIVIDAD DE LAS CUENTAS, REGISTRO DE ERRORES Y PERMISO DE EDICIÓN POR PERSONA
+--     · perfiles.edicion: el Administrador decide por persona si SOLO VE ('ver'), si PUEDE EDITAR ('editar') o si vale el de su rol ('rol').
+--       El Administrador siempre edita. Nadie más puede cambiar este permiso (lo impide un candado en la base).
+--     · accesos: cada entrada a la app (una cada 20 minutos por persona) → ranking de quién entra más y menos.
+--     · errores_app: los errores que ven las personas (sin datos personales) → el Administrador los ve por persona en Seguridad.
+--     Estas tablas no se leen directo (sin políticas): solo las funciones de abajo, y las de lectura son solo del Administrador.
+-- ---------------------------------------------------------------------
+alter table perfiles add column if not exists edicion text not null default 'rol';
+alter table perfiles drop constraint if exists perfiles_edicion_valida;
+alter table perfiles add constraint perfiles_edicion_valida check (edicion in ('rol', 'ver', 'editar'));
+
+create or replace function puede_editar()
+returns boolean
+language sql security definer stable set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from public.perfiles
+    where id = auth.uid() and activo = true
+      and (rol = 'administrador' or edicion = 'editar' or (edicion = 'rol' and rol in ('administrador', 'ingeniero', 'digitador')))
+  );
+$$;
+revoke all on function puede_editar() from public, anon;
+grant execute on function puede_editar() to authenticated;
+
+create or replace function proteger_edicion() returns trigger
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if new.edicion is distinct from old.edicion and auth.uid() is not null and not coalesce(es_administrador(), false) then
+    raise exception 'Solo el Administrador puede cambiar el permiso de edición.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists trg_proteger_edicion on perfiles;
+create trigger trg_proteger_edicion before update on perfiles for each row execute function proteger_edicion();
+
+create or replace function cambiar_edicion(p_id uuid, p_edicion text) returns void
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if not coalesce(es_administrador(), false) then raise exception 'Solo el Administrador puede cambiar este permiso.' using errcode = '42501'; end if;
+  if p_edicion not in ('rol', 'ver', 'editar') then raise exception 'Valor no válido.' using errcode = '22023'; end if;
+  update public.perfiles set edicion = p_edicion where id = p_id;
+  if not found then raise exception 'No se encontró esa cuenta.' using errcode = 'P0002'; end if;
+end;
+$$;
+revoke all on function cambiar_edicion(uuid, text) from public, anon;
+grant execute on function cambiar_edicion(uuid, text) to authenticated;
+
+create table if not exists accesos (
+  id bigint generated always as identity primary key,
+  usuario_id uuid not null,
+  fecha timestamptz not null default now(),
+  dispositivo text
+);
+create index if not exists idx_accesos_usuario_fecha on accesos (usuario_id, fecha desc);
+create index if not exists idx_accesos_fecha on accesos (fecha);
+alter table accesos enable row level security;
+drop policy if exists "admin_lee_accesos" on accesos;
+create policy "admin_lee_accesos" on accesos for select using (coalesce(es_administrador(), false));    -- solo el Administrador las puede leer; se escribe únicamente con las funciones de abajo
+
+create table if not exists errores_app (
+  id bigint generated always as identity primary key,
+  usuario_id uuid,
+  fecha timestamptz not null default now(),
+  ruta text, dispositivo text, mensaje text, ref text, origen text
+);
+create index if not exists idx_errores_fecha on errores_app (fecha desc);
+create index if not exists idx_errores_usuario on errores_app (usuario_id, fecha desc);
+alter table errores_app enable row level security;
+drop policy if exists "admin_lee_errores" on errores_app;
+create policy "admin_lee_errores" on errores_app for select using (coalesce(es_administrador(), false));
+
+create or replace function registrar_acceso(p_dispositivo text default null) returns void
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is null then return; end if;
+  if exists (select 1 from accesos where usuario_id = auth.uid() and fecha > now() - interval '20 minutes') then return; end if;
+  insert into accesos (usuario_id, dispositivo) values (auth.uid(), left(coalesce(p_dispositivo, ''), 12));
+  delete from accesos where fecha < now() - interval '120 days';
+end;
+$$;
+revoke all on function registrar_acceso(text) from public, anon;
+grant execute on function registrar_acceso(text) to authenticated;
+
+create or replace function registrar_error(p_ruta text, p_mensaje text, p_ref text default null, p_dispositivo text default null, p_origen text default null) returns void
+language plpgsql security definer set search_path = public, pg_temp
+as $$
+begin
+  if auth.uid() is null then return; end if;
+  if (select count(*) from errores_app where usuario_id = auth.uid() and fecha > now() - interval '1 hour') >= 40 then return; end if;
+  insert into errores_app (usuario_id, ruta, dispositivo, mensaje, ref, origen)
+  values (auth.uid(), left(coalesce(p_ruta, ''), 120), left(coalesce(p_dispositivo, ''), 12), left(coalesce(p_mensaje, ''), 300), left(coalesce(p_ref, ''), 8), left(coalesce(p_origen, ''), 20));
+  delete from errores_app where fecha < now() - interval '60 days';
+end;
+$$;
+revoke all on function registrar_error(text, text, text, text, text) from public, anon;
+grant execute on function registrar_error(text, text, text, text, text) to authenticated;
+
+create or replace function seguridad_actividad(p_dias integer default 30) returns jsonb
+language plpgsql security definer stable set search_path = public, pg_temp
+as $$
+declare d integer := greatest(1, least(coalesce(p_dias, 30), 120)); r jsonb;
+begin
+  if not coalesce(es_administrador(), false) then raise exception 'Solo el Administrador puede ver la actividad.' using errcode = '42501'; end if;
+  select jsonb_build_object(
+    'dias', d, 'ahora', now(),
+    'accesos', coalesce((select jsonb_agg(x) from (
+        select usuario_id, count(*) as entradas, count(distinct (fecha at time zone 'America/Bogota')::date) as dias_activos, max(fecha) as ultimo,
+               count(*) filter (where dispositivo = 'movil') as movil, count(*) filter (where dispositivo = 'pc') as pc
+        from accesos where fecha > now() - make_interval(days => d) group by usuario_id) x), '[]'::jsonb),
+    'ultimos', coalesce((select jsonb_agg(x) from (select usuario_id, max(fecha) as ultimo from accesos group by usuario_id) x), '[]'::jsonb),
+    'errores', coalesce((select jsonb_agg(x) from (
+        select usuario_id, count(*) as total, max(fecha) as ultimo, count(distinct ref) as distintos
+        from errores_app where fecha > now() - make_interval(days => d) group by usuario_id) x), '[]'::jsonb),
+    'recientes', coalesce((select jsonb_agg(x) from (
+        select fecha, usuario_id, ruta, dispositivo, mensaje, ref, origen from errores_app order by fecha desc limit 25) x), '[]'::jsonb)
+  ) into r;
+  return r;
+end;
+$$;
+revoke all on function seguridad_actividad(integer) from public, anon;
+grant execute on function seguridad_actividad(integer) to authenticated;
+
+-- seguridad_estado() (sección 35) ahora también dice el permiso de edición de cada cuenta
+create or replace function seguridad_estado()
+returns jsonb
+language plpgsql security definer stable set search_path = public, auth, pg_temp
+as $$
+declare r jsonb;
+begin
+  if not coalesce(es_administrador(), false) then
+    raise exception 'Solo el Administrador puede ver el tablero de seguridad.' using errcode = '42501';
+  end if;
+  select jsonb_build_object(
+    'ahora', now(),
+    'usuarios', coalesce((select jsonb_agg(jsonb_build_object(
+        'id', p.id, 'nombre', p.nombre, 'rol', p.rol, 'activo', p.activo, 'edicion', p.edicion,
+        'ultimo_acceso', u.last_sign_in_at, 'creado', u.created_at) order by p.nombre)
+      from public.perfiles p left join auth.users u on u.id = p.id), '[]'::jsonb),
+    'tablas', coalesce((select jsonb_agg(jsonb_build_object(
+        'tabla', c.relname, 'rls', c.relrowsecurity,
+        'politicas', (select count(*) from pg_policies pp where pp.schemaname = 'public' and pp.tablename = c.relname)) order by c.relname)
+      from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind = 'r'), '[]'::jsonb)
+  ) into r;
+  return r;
+end;
+$$;
+revoke all on function seguridad_estado() from public, anon;
+grant execute on function seguridad_estado() to authenticated;
+

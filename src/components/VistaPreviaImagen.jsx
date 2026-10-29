@@ -91,7 +91,7 @@ export function ModalVistaImagen({ titulo, html, src, ancho = 1120, acciones = [
             <button className="vb-cerrar" onClick={onCerrar} aria-label="Cerrar"><i className="fa-solid fa-xmark"></i></button>
           </div>
         </header>
-        <p className="vp-aviso"><i className="fa-solid fa-circle-info"></i> Así se verá la imagen que descargues. Pellizca o usa + y − para acercar.</p>
+        <p className="vp-aviso"><i className="fa-solid fa-circle-info"></i> <span>Así se verá la imagen. Pellizca o usa + y − para acercar.</span></p>
         <div className="vp-ventana">
           {html ? <VistaPreviaImagen html={html} ancho={ancho} escalaMax={completa ? 3 : 1.7} />
             : src ? <ImagenZoom src={src} />

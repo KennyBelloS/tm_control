@@ -4,7 +4,7 @@
  * `npm run verificar-manual` falla: así una función nueva no queda sin su paso.
  * Descriptivo pero escaneable (también lo vigila el verificador): título ≤ 36 letras, subtítulo ≤ 70, hasta 4 puntos de ≤ 100 letras.
  */
-export const VISUALES = ['bienvenida', 'dashboard', 'rendimientos', 'personas', 'reportes', 'ranking', 'lineas', 'clasificacion', 'devoluciones', 'tic', 'presentar', 'tableros', 'config', 'resumenes', 'auditoria', 'campana', 'listo'];
+export const VISUALES = ['bienvenida', 'dashboard', 'rendimientos', 'personas', 'reportes', 'ranking', 'lineas', 'clasificacion', 'devoluciones', 'tic', 'presentar', 'tableros', 'config', 'resumenes', 'auditoria', 'seguridad', 'campana', 'listo'];
 export const LIMITES = { titulo: 36, subtitulo: 70, puntos: 4, punto: 100 };
 
 export const PASOS = [
@@ -41,6 +41,8 @@ export const PASOS = [
     puntos: ['Sale solo: un resumen ejecutivo, como un correo, de toda la finca y de cada equipo.', 'Panorama redactado, indicadores, producción por día, equipos, calidad y recomendaciones.', 'Cierra con tu firma («Cordialmente, …») y se descarga en imagen o PDF.', 'Elige semana anterior, mes anterior, 7 días o fechas; la firma se edita.'], ruta: '/resumenes', boton: 'Ir a Resúmenes' },
   { id: 'auditoria', emoji: '🛡️', titulo: 'Auditoría', subtitulo: 'Cuida tu base de datos.', visual: 'auditoria', modulos: ['auditoria'],
     puntos: ['Muestra cuánto espacio usa la base de datos y cuándo se llenaría.', 'Exporta e importa copias .tmbackup; cada copia lleva una huella para detectar alteraciones.', 'Cada mes se guarda sola una copia en la nube (se conservan las últimas 12).', 'La depuración semestral borra lo de más de 6 meses, con doble respaldo y frase de seguridad.'], ruta: '/auditoria', boton: 'Ir a Auditoría' },
+  { id: 'seguridad', emoji: '🔒', titulo: 'Seguridad', subtitulo: 'Qué tan protegido está todo.', visual: 'seguridad', modulos: ['seguridad'],
+    puntos: ['Un índice de 0 a 100 dice qué tan protegido está el sistema.', 'Lista lo que conviene arreglar, de lo más urgente a lo menos.', 'Muestra cada cuenta con su último acceso y quién puede editar.', 'Incluye el mapa de permisos por rol y la actividad reciente.'], ruta: '/seguridad', boton: 'Ir a Seguridad' },
   { id: 'campana', emoji: '🔔', titulo: 'La campana', subtitulo: 'Solo lo importante interrumpe.', visual: 'campana', modulos: [],
     puntos: ['Solo lo crítico interrumpe, una vez al día; lo demás espera en la campana.', 'Ordena los avisos en Requieren atención, Importantes e Informativas.', 'Toca un aviso para leerlo completo: un aviso leído no vuelve a aparecer.', 'Mañana lo pospone; No molestar silencia los avisos flotantes.'], ruta: null, boton: null },
   { id: 'listo', emoji: '✅', titulo: '¡Listo!', subtitulo: 'Aquí siempre lo tienes a mano.', visual: 'listo', modulos: ['ayuda'],

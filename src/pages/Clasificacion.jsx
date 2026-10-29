@@ -15,7 +15,7 @@ const fmt = n => (n ?? 0).toLocaleString('es-CO');
 
 export default function Clasificacion() {
   const { sesion } = useSesion();
-  const puedeSubir = puedeEditar(sesion?.rol);
+  const puedeSubir = puedeEditar(sesion);
   const hoy = fechaLocalISO();
   const fileRef = useRef(null);
 

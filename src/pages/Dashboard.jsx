@@ -19,6 +19,7 @@ import AvanceEsperado from '../components/AvanceEsperado';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
 import IndiceSecciones from '../components/IndiceSecciones';
+import Diferido from '../components/Diferido';
 import SaludoDia from '../components/SaludoDia';
 import { TarjetasEsqueleto } from '../components/Estados';
 function hoyISO() {
@@ -130,7 +131,7 @@ export default function Dashboard() {
         <button className="btn-secondary" onClick={() => { entrarPantallaCompleta(); setPresentando(true); }}>
           <i className="fa-solid fa-expand"></i> Presentar
         </button>
-        {puedeEditar(sesion?.rol) && <Link to="/rendimientos" className="btn-primary">
+        {puedeEditar(sesion) && <Link to="/rendimientos" className="btn-primary">
           <i className="fa-solid fa-upload"></i> Subir Reporte Boncheo
         </Link>}
       </PageHeader>
@@ -251,14 +252,15 @@ export default function Dashboard() {
           }}>Rendimientos</Link> (opción "Histórico").
               </div>}
 
-            <DashboardCarrusel personasHoy={carruselHoy} personasAyer={carruselAyer} metaHora={stats.cfg.metaHora} fechaHistorico={fechaHistoricoMostrado} />
+            <Diferido orden={1} alto={520}><DashboardCarrusel personasHoy={carruselHoy} personasAyer={carruselAyer} metaHora={stats.cfg.metaHora} fechaHistorico={fechaHistoricoMostrado} /></Diferido>
 
             <h3 id="sec-clasificacion" className="dashboard-section-title"><i className="fa-solid fa-boxes-stacked"></i> Clasificación y formadoras</h3>
-            <AvanceEsperado metaHora={stats.cfg.metaHora} hoy={hoy} />
-            <ClasificacionLineasDashboard />
-            <FormadoresLineasPanel metaHora={stats.cfg.metaHora} />
+            <Diferido orden={2} alto={220}><AvanceEsperado metaHora={stats.cfg.metaHora} hoy={hoy} /></Diferido>
+            <Diferido orden={3} alto={300}><ClasificacionLineasDashboard /></Diferido>
+            <Diferido orden={4} alto={300}><FormadoresLineasPanel metaHora={stats.cfg.metaHora} /></Diferido>
 
             <h3 id="sec-graficas" className="dashboard-section-title"><i className="fa-solid fa-chart-simple"></i> Visualizaciones</h3>
+            <Diferido orden={5} alto={380}>
             <div className="dashboard-charts-grid">
               <section className="panel">
                 <div className="panel-header">
@@ -296,6 +298,7 @@ export default function Dashboard() {
                 </Suspense>
               </section>
             </div>
+            </Diferido>
           </>}
       </div>
       {presentando && stats && (

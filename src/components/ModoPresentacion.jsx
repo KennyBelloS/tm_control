@@ -339,7 +339,7 @@ function SlideFormadoras({ datos, metaHora, porPagina }) {
                 <span className={`pres-form-avatar ${cumple ? '' : 'pres-form-avatar-mal'}`}>{inicialesDe(g.nombre)}</span>
                 <div>
                   <h3>{g.nombre}{esLider ? ' 👑' : ''}</h3>
-                  <small>{g.operarios.length} operarios{g.clasif?.disponible ? ` · ${g.clasif.lineas.map(etiquetaCortaLinea).join(' + ')}` : ''}</small>
+                  <small>{g.operarios.length} colaboradores{g.clasif?.disponible ? ` · ${g.clasif.lineas.map(etiquetaCortaLinea).join(' + ')}` : ''}</small>
                 </div>
               </header>
               <div className="pres-form-fila">

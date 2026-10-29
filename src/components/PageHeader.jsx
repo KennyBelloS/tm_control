@@ -42,7 +42,7 @@ export default function PageHeader({ title, subtitle, children }) {
         <button className="menu-toggle" onClick={toggleMenu} aria-label="Abrir menú">
           <i className="fa-solid fa-bars"></i>
         </button>
-        <img className="topbar-logo" src={logoUrl} alt="Torremolinos" width="36" height="36" />
+        <img className="topbar-logo" src={logoUrl} alt="Torremolinos" width="38" height="38" />
         <div className="topbar-titulos">
           {ubicacion && <span className="topbar-grupo">{ubicacion.grupo}</span>}
           <h1>{title}</h1>

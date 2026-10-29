@@ -15,7 +15,7 @@ const UMBRAL_POCA_ACTIVIDAD_HORAS = 10;
 
 export default function Personas() {
   const { sesion } = useSesion();
-  const puedeModificar = puedeEditar(sesion?.rol);
+  const puedeModificar = puedeEditar(sesion);
 
   const [personas, setPersonas] = useState([]);
   const [horasPorPersona, setHorasPorPersona] = useState(new Map());

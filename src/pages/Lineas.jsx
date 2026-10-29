@@ -36,7 +36,7 @@ const MEDALLAS = ['🥇', '🥈', '🥉'];
 
 export default function Lineas() {
   const { sesion } = useSesion();
-  const puedeModificar = puedeEditar(sesion?.rol);
+  const puedeModificar = puedeEditar(sesion);
   const hoy = hoyISO();
   const [fechaAsignacion, setFechaAsignacion] = useState(hoyISO());
 
@@ -342,7 +342,7 @@ export default function Lineas() {
           <div className="card"><div className="icon"><i className="fa-solid fa-industry"></i></div>
             <div><span>Total Líneas</span><h2>{lineas.length}</h2><small>{lineasActivas.length} activas</small></div></div>
           <div className="card acento-azul"><div className="icon"><i className="fa-solid fa-users"></i></div>
-            <div><span>Operarios Asignados</span><h2>{asignaciones.length}</h2><small>{fechaAsignacion === hoy ? 'hoy' : 'el'} {formatoFecha(fechaAsignacion)}</small></div></div>
+            <div><span>Colaboradores Asignados</span><h2>{asignaciones.length}</h2><small>{fechaAsignacion === hoy ? 'hoy' : 'el'} {formatoFecha(fechaAsignacion)}</small></div></div>
           <div className="card acento-oro"><div className="icon"><i className="fa-solid fa-gauge-high"></i></div>
             <div><span>Cumplimiento Promedio</span><h2>{resumen.promedioCumplimiento}%</h2><small>líneas con producción</small></div></div>
           <div className="card acento-rojo"><div className="icon"><i className="fa-solid fa-chalkboard-user"></i></div>
@@ -608,14 +608,14 @@ export default function Lineas() {
         {asignacionesPorLinea.length > 0 && (
           <section className="panel">
             <div className="panel-header">
-              <div><h2><i className="fa-solid fa-chart-simple" style={{ color: 'var(--primary)', marginRight: 8 }}></i>Distribución de Operarios por Línea</h2>
-                <p>Cantidad de operarios asignados actualmente a cada línea.</p></div>
+              <div><h2><i className="fa-solid fa-chart-simple" style={{ color: 'var(--primary)', marginRight: 8 }}></i>Distribución de Colaboradores por Línea</h2>
+                <p>Cantidad de colaboradores asignados actualmente a cada línea.</p></div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {asignacionesPorLinea.map(l => (
                 <div key={l.linea}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
-                    <strong>{l.linea}</strong><span>{l.cantidad} operarios</span>
+                    <strong>{l.linea}</strong><span>{l.cantidad} colaboradores</span>
                   </div>
                   <div className="progress" style={{ background: 'var(--border)' }}>
                     <div style={{ width: `${(l.cantidad / maxOperariosLinea) * 100}%`, background: 'linear-gradient(90deg,var(--primary),var(--primary-light))' }}></div>
@@ -630,7 +630,7 @@ export default function Lineas() {
           <section className="panel">
             <div className="panel-header">
               <div><h2><i className="fa-solid fa-trophy" style={{ color: 'var(--gold)', marginRight: 8 }}></i>Top Líneas — Rendimiento de Hoy</h2>
-                <p>Líneas con mayor rendimiento promedio de sus operarios asignados.</p></div>
+                <p>Líneas con mayor rendimiento promedio de sus colaboradores asignados.</p></div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {rendimientoPorLinea.slice(0, 5).map((l, i) => (
@@ -642,7 +642,7 @@ export default function Lineas() {
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontWeight: 800, fontSize: 16 }}>{l.rendimientoPromedio}</div>
-                    <div style={{ fontSize: 10.5, color: 'var(--gray)' }}>tallos/h · {l.operarios} operarios</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--gray)' }}>tallos/h · {l.operarios} colaboradores</div>
                   </div>
                 </div>
               ))}

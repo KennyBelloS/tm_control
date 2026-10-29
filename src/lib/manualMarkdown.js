@@ -125,7 +125,7 @@ export function novedades(md) {
   const out = []; let act = null;
   for (const l of extraerBloque(md, 'NOVEDADES').split('\n')) {
     const h = /^###\s+Versi[oó]n\s+(\d+\.\d+\.\d+)(?:\s+—\s+(?:(\d{2}\/\d{2}\/\d{4})(?:\s+·\s+(.+))?|(.+)))?\s*$/.exec(l.trim());
-    if (h) { act = { version: h[1], fecha: h[2] || null, titulo: (h[3] || h[4] || '').trim(), items: [] }; out.push(act); continue; }
+    if (h) { let tit = (h[3] || h[4] || '').trim(); const ef = /\s*\(≈\s*([\d.,]+)\s*días?\)\s*$/.exec(tit); if (ef) tit = tit.slice(0, ef.index).trim(); act = { version: h[1], fecha: h[2] || null, titulo: tit, esfuerzo: ef ? Number(ef[1].replace(',', '.')) : null, items: [] }; out.push(act); continue; }
     const b = /^\s*[-*]\s+(.*)$/.exec(l);
     if (b && act) {
       const m = /^\*\*(.+?)\*\*\s*:?\s*(.*)$/.exec(b[1].trim());

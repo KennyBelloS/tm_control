@@ -4,10 +4,10 @@ import { ESTILO_FOTO } from './imagenBase';
 import { descargarBlob } from './descargas';
 
 const ESTILO = `position:fixed;left:-9999px;top:0;min-width:1120px;width:max-content;${ESTILO_FOTO}`;
-export async function exportarImagenProfesional({ tipo, filas, cfg, fecha, formato = 'png' }) {
+export async function exportarImagenProfesional({ tipo, filas, cfg, fecha, fechaISO = null, formato = 'png' }) {
   const contenedor = document.createElement('div');
   contenedor.style.cssText = ESTILO;
-  contenedor.innerHTML = await htmlRankingParaImagen({ tipo, filas, cfg, fecha });
+  contenedor.innerHTML = await htmlRankingParaImagen({ tipo, filas, cfg, fecha, fechaISO });
   document.body.appendChild(contenedor);
   try {
     const canvas = await html2canvas(contenedor, { scale: 2, backgroundColor: '#ffffff', useCORS: true });

@@ -63,7 +63,7 @@ const Reportes = () => (
   </Marco>
 );
 const Ranking = () => (
-  <Marco titulo="Ranking de Operarios" clase="rv-rank">{[['2', 62, '#8E9BA3'], ['1', 86, '#C9932B'], ['3', 46, '#B5703B']].map(([n, h, c], i) => <div key={n} className="rv-col" style={{ ...d(i, .2, .25), '--h': `${h}%`, '--c': c }}><span className="rv-medalla">{n}</span><i></i></div>)}</Marco>
+  <Marco titulo="Ranking de Colaboradores" clase="rv-rank">{[['2', 62, '#8E9BA3'], ['1', 86, '#C9932B'], ['3', 46, '#B5703B']].map(([n, h, c], i) => <div key={n} className="rv-col" style={{ ...d(i, .2, .25), '--h': `${h}%`, '--c': c }}><span className="rv-medalla">{n}</span><i></i></div>)}</Marco>
 );
 const Lineas = () => (
   <Marco titulo="Líneas" clase="rv-lin">
@@ -126,6 +126,12 @@ const Auditoria = () => (
     <small className="rv-nombre">Backup TMControl 12-10-26_6-2-27</small>
   </Marco>
 );
+const Seguridad = () => (
+  <Marco titulo="Seguridad" clase="rv-seg">
+    <div className="rv-escudo"><svg viewBox="0 0 56 56"><circle cx="28" cy="28" r="22" /><circle className="rv-arco" cx="28" cy="28" r="22" /></svg><b>86</b></div>
+    <div className="rv-avisos">{[['n', 'Todas las tablas protegidas'], ['n', '2 administradores'], ['i', '1 cuenta sin usar']].map(([k, t], i) => <div key={t} className={`rv-aviso ${k}`} style={d(i, .5, .35)}><i></i><span>{t}</span></div>)}</div>
+  </Marco>
+);
 const Campana = () => (
   <Marco titulo="Notificaciones" clase="rv-camp">
     <div className="rv-bell"><i className="fa-solid fa-bell"></i><span>3</span></div>
@@ -139,4 +145,4 @@ const Listo = () => (
   </Marco>
 );
 
-export const VISUAL = { bienvenida: Bienvenida, dashboard: Dashboard, rendimientos: Rendimientos, personas: Personas, reportes: Reportes, ranking: Ranking, lineas: Lineas, clasificacion: Clasificacion, devoluciones: Devoluciones, tic: Tic, presentar: Presentar, tableros: Tableros, config: Config, resumenes: Resumenes, auditoria: Auditoria, campana: Campana, listo: Listo };
+export const VISUAL = { bienvenida: Bienvenida, dashboard: Dashboard, rendimientos: Rendimientos, personas: Personas, reportes: Reportes, ranking: Ranking, lineas: Lineas, clasificacion: Clasificacion, devoluciones: Devoluciones, tic: Tic, presentar: Presentar, tableros: Tableros, config: Config, resumenes: Resumenes, auditoria: Auditoria, seguridad: Seguridad, campana: Campana, listo: Listo };

@@ -591,9 +591,25 @@ export async function reemplazarActual(registros) {
     count: 'exact'
   });
   if (error) throw error;
+  await guardarHorasTurno(filas);                 // las horas quedan guardadas aparte
   return {
     insertados: count ?? filas.length
   };
+}
+/** Las horas del Turno Actual se guardan aparte para poder evaluar la evolución del día (se borran solas a las 6 a. m. del día siguiente). Si la tabla aún no existe, no se rompe nada. */
+export async function guardarHorasTurno(filas) {
+  try {
+    if (!filas.length) return;
+    const regs = filas.map(r => ({ fecha: r.fecha, colaborador_id: r.colaborador_id, hora_inicio: r.hora_inicio, hora_fin: r.hora_fin, total_tallos: r.total_tallos ?? 0, tiempo_trabajado_min: r.tiempo_trabajado_min ?? null, rend_tallos: r.rend_tallos ?? 0, guardado_en: new Date().toISOString() }));
+    await supabase.from('turno_actual_horas').upsert(regs, { onConflict: 'fecha,colaborador_id,hora_inicio' });
+  } catch { /* sin la tabla (falta el SQL 34) se sigue con lo que hay en rendimiento_actual */ }
+}
+export async function getHorasTurno() {
+  try { const { data, error } = await supabase.from('turno_actual_horas').select('fecha,colaborador_id,hora_inicio,hora_fin,total_tallos,tiempo_trabajado_min,rend_tallos,personas(nombre)').limit(20000); return error ? [] : data || []; } catch { return []; }
+}
+/** A las 6 a. m. el Turno Actual del día anterior se borra (solo el Turno Actual). Devuelve cuántos registros borró. */
+export async function limpiarTurnoActual() {
+  try { const { data, error } = await supabase.rpc('limpiar_turno_actual'); return error ? 0 : Number(data) || 0; } catch { return 0; }
 }
 export async function getActual({
   fecha

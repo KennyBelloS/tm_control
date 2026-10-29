@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     if (excedeTasa(req, 'crear-usuario', 15)) return res.status(429).json({ error: 'Demasiadas solicitudes. Espera un minuto.' });
 
     const admin = crearClienteAdmin();
-    if (!admin) return res.status(500).json({ error: 'Falta configurar SUPABASE_SERVICE_ROLE_KEY en Vercel.' });
+    if (!admin) { console.error('Falta configurar la llave de servicio (SUPABASE_SERVICE_ROLE_KEY).'); return res.status(500).json({ error: 'Este servicio todavía no está configurado en el servidor. Avísale al administrador del sistema.' }); }
     const auth = await exigirAdministrador(req, admin);
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
 

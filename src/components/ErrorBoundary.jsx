@@ -10,6 +10,7 @@ export default class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     // El detalle queda en la consola del navegador para quien dé soporte; nunca se muestra en pantalla.
     console.error('Error en la pantalla:', error, info?.componentStack?.split('\n').slice(0, 6).join('\n'));
+    try { window.dispatchEvent(new CustomEvent('tm-error-datos', { detail: { texto: String(error?.message || error), origen: 'pantalla' } })); } catch { /* sin ventana */ }
   }
   componentDidUpdate(anterior) {
     // Al cambiar de pantalla se vuelve a intentar sola.

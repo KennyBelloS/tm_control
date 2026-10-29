@@ -1,4 +1,23 @@
+# dependencias y resultados de compilar
 node_modules
 dist
 dev-dist
+.vercel
+
+# variables de entorno y llaves: NUNCA se suben a GitHub (el archivo de ejemplo .env.example sí, porque solo trae marcadores)
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# copias de seguridad y archivos del sistema
+*.tmbackup
+.DS_Store
+Thumbs.db
+npm-debug.log*
+
+    # base de datos: la estructura y el SQL NO se suben (se pegan en Supabase desde tu computador)
+   supabase/
+   *.sql
