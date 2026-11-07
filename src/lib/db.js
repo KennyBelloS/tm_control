@@ -1,5 +1,6 @@
 import { planGuardado } from './personasPdf';
 import { supabase } from './supabaseClient';
+import { fusionarHoras } from './evolucionHoras';
 import { agregarPorPersonaDia } from './agregados';
 import { calcularRendimientoReal, calcularRendimientoBloque, agregarTurnoActualPorPersona, minutosEntreBloque, minutosDescansoAplicable } from './calculos';
 import { codigoMasCorto } from './personasUtil';
@@ -603,6 +604,26 @@ export async function guardarHorasTurno(filas) {
     const regs = filas.map(r => ({ fecha: r.fecha, colaborador_id: r.colaborador_id, hora_inicio: r.hora_inicio, hora_fin: r.hora_fin, total_tallos: r.total_tallos ?? 0, tiempo_trabajado_min: r.tiempo_trabajado_min ?? null, rend_tallos: r.rend_tallos ?? 0, guardado_en: new Date().toISOString() }));
     await supabase.from('turno_actual_horas').upsert(regs, { onConflict: 'fecha,colaborador_id,hora_inicio' });
   } catch { /* sin la tabla (falta el SQL 34) se sigue con lo que hay en rendimiento_actual */ }
+}
+const COLS_HORA = 'fecha,colaborador_id,hora_inicio,hora_fin,total_tallos,tiempo_trabajado_min,rend_tallos';
+const delDiaReciente = filas => { const dia = filas.reduce((m, r) => (String(r.fecha) > m ? String(r.fecha) : m), ''); return filas.filter(r => String(r.fecha) === dia); };
+/** Las horas del turno de HOY de una persona (del reporte actual y de las guardadas), solo del día más reciente. Alimenta «Hoy, hora a hora» del TIC. */
+export async function getHorasPersonaHoy(colaboradorId) {
+  const [a, g] = await Promise.all([
+    supabase.from('rendimiento_actual').select(COLS_HORA).eq('colaborador_id', colaboradorId),
+    supabase.from('turno_actual_horas').select(COLS_HORA).eq('colaborador_id', colaboradorId).then(r => r, () => ({ data: [], error: true }))
+  ]);
+  if (a.error) throw a.error;
+  return delDiaReciente(fusionarHoras(a.data || [], g.error ? [] : g.data || []));
+}
+/** Las horas de hoy de TODAS las personas (con su nombre): para ver quién va bajando. */
+export async function getHorasTodosHoy() {
+  const [a, g] = await Promise.all([
+    supabase.from('rendimiento_actual').select(`${COLS_HORA},personas(nombre)`),
+    supabase.from('turno_actual_horas').select(`${COLS_HORA},personas(nombre)`).limit(20000).then(r => r, () => ({ data: [], error: true }))
+  ]);
+  if (a.error) throw a.error;
+  return delDiaReciente(fusionarHoras(a.data || [], g.error ? [] : g.data || []));
 }
 export async function getHorasTurno() {
   try { const { data, error } = await supabase.from('turno_actual_horas').select('fecha,colaborador_id,hora_inicio,hora_fin,total_tallos,tiempo_trabajado_min,rend_tallos,personas(nombre)').limit(20000); return error ? [] : data || []; } catch { return []; }

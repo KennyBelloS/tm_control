@@ -11,11 +11,13 @@ export const FUNCIONES_NUEVAS = {
   'top5-imagen': '1.6.0',              // Top 5: más con código, menos con nombre
   'lecciones-auto': '1.6.0',           // la pestaña Manual: pasa sola a la siguiente lección
   'horario-duracion': '1.6.0',         // el horario con su duración (y miércoles/sábado de 6 a 12)
-  'evolucion-horas': '1.7.0',          // Rendimientos: evolución por hora de cada persona
   perfil: '1.7.0',                     // Mi perfil con avatar de flores
   seguridad: '1.8.0',                  // el tablero de seguridad (con uso de la app, errores y permisos)
   'uso-app': '1.8.0',                  // quién usa la app (ranking) y el comportamiento por persona
   'permiso-persona': '1.8.0',          // Usuarios: solo ver / puede editar por persona
+  'hora-a-hora-persona': '1.11.0',       // TIC: la evolución del rendimiento de una persona, hora por hora, de hoy
+  simulacro: '1.10.0',                 // Configuración: simulacro de situaciones (solo Administrador)
+  precarga: '1.10.0',                  // sin internet: lo que usas queda listo apenas entras
   'avisos-fuera': '1.9.0',             // avisos importantes fuera de la app, a quien el Administrador active
   'eventos-presentacion': '1.9.0',     // la presentación muestra cuándo una línea supera a otra o el rendimiento cambia de golpe
   rosas: '1.8.0'                       // Mi perfil con avatares de rosas y el festejo con la acción

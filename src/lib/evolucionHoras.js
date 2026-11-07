@@ -64,7 +64,11 @@ export function evaluarEvolucion(bloques = [], metaHora = 470) {
     texto.push(tendencia === 'sube' ? `La tendencia del día es a mejorar: gana unos ${fmt(Math.abs(pendiente))} tallos por hora cada hora.` : tendencia === 'baja' ? `La tendencia del día es a bajar: pierde unos ${fmt(Math.abs(pendiente))} tallos por hora cada hora.` : tendencia === 'estable' ? 'Se mantiene estable durante el día.' : 'Con tres horas o más se puede ver la tendencia del día.');
     texto.push(`Frente a la hora anterior mejoró ${mejoras} ${mejoras === 1 ? 'vez' : 'veces'} y empeoró ${empeoras}.${racha.horas >= 2 ? ` Lleva ${racha.horas} horas seguidas ${racha.tipo === 'mejoro' ? 'mejorando' : 'empeorando'}.` : ''}`);
   }
-  return { horas, promedio, tallos, mejor, peor, tendencia, pendiente, mejoras, empeoras, racha, ultimaVsPromedio: vsPromedio, texto };
+  // Para qué sirve: qué hacer con lo que se ve (sin inventar causas)
+  const consejo = horas.length < 2 ? '' : racha.tipo === 'empeoro' && racha.horas >= 2 ? `Lleva ${racha.horas} horas bajando: conviene acercarse y ver qué cambió (material, mesa, descanso).`
+    : tendencia === 'baja' ? 'Viene bajando durante el día: vale la pena revisar cómo está.'
+    : tendencia === 'sube' || (racha.tipo === 'mejoro' && racha.horas >= 2) ? 'Va mejorando: conviene mantener lo que está funcionando.' : '';
+  return { horas, promedio, tallos, mejor, peor, tendencia, pendiente, mejoras, empeoras, racha, ultimaVsPromedio: vsPromedio, texto, consejo };
 }
 
 /** Todas las personas del Turno Actual, evaluadas. Orden: primero a quienes más conviene mirar (los que empeoran). */
@@ -75,3 +79,18 @@ export function evaluarTodos(filas = [], metaHora = 470) {
   return [...por.values()].map(g => ({ id: g.id, nombre: g.nombre, mesa: g.mesa, ...evaluarEvolucion(g.bloques, metaHora) })).sort((a, b) => peso[a.tendencia] - peso[b.tendencia] || a.nombre.localeCompare(b.nombre, 'es'));
 }
 export const resumenGrupo = lista => ({ sube: lista.filter(x => x.tendencia === 'sube').length, baja: lista.filter(x => x.tendencia === 'baja').length, estable: lista.filter(x => x.tendencia === 'estable').length, pocas: lista.filter(x => x.tendencia === 'pocas').length });
+
+/**
+ * Las medidas de la gráfica «Hoy, hora a hora» (línea del rendimiento por hora con la meta): puntos, tramos coloreados por veredicto, escala y área.
+ * La pantalla solo dibuja lo que esto le da; así se puede probar sin navegador.
+ */
+export function geometriaGrafico(horas = [], meta = 470, { ancho = 640, alto = 280, mi = 46, md = 18, ms = 30, mb = 40 } = {}) {
+  const n = horas.length, maxRend = Math.max(meta * 1.15, ...horas.map(h => h.rend), 1), techo = Math.ceil((maxRend * 1.05) / 100) * 100;                         // un poco de aire sobre el punto más alto
+  const w = ancho - mi - md, h = alto - ms - mb;
+  const x = i => (n <= 1 ? mi + w / 2 : mi + (w * i) / (n - 1)), y = v => ms + h - (Math.max(0, v) / techo) * h;
+  const puntos = horas.map((p, i) => ({ i, x: x(i), y: y(p.rend), rend: p.rend, corta: p.corta, etiqueta: p.etiqueta, css: p.css, veredicto: p.veredicto }));
+  const segmentos = puntos.slice(1).map((p, i) => ({ x1: puntos[i].x, y1: puntos[i].y, x2: p.x, y2: p.y, veredicto: p.veredicto }));
+  const ticks = [0, 1, 2, 3, 4].map(k => ({ v: Math.round((techo * k) / 4), y: y((techo * k) / 4) }));
+  const base = y(0), area = puntos.length ? `M ${puntos[0].x} ${base} ${puntos.map(p => `L ${p.x} ${p.y}`).join(' ')} L ${puntos.at(-1).x} ${base} Z` : '';
+  return { ancho, alto, techo, yMeta: y(meta), base, izq: mi, der: ancho - md, puntos, segmentos, ticks, area };
+}

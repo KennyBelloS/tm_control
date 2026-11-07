@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
+const SimulacroAdmin = lazy(() => import('../components/SimulacroAdmin'));
 import { getConfig, setConfig, getHistorico, getActual, borrarTablaHistorico, borrarTablaActual, getMetaDia, setMetaDia, getDescansosDia, setDescansosDia, quitarDescansosDia } from '../lib/db';
 import { supabaseConfigurado } from '../lib/supabaseClient';
 import { useSesion } from '../lib/useSesion';
@@ -272,6 +273,8 @@ export default function Configuracion() {
             </button>
           </div>
         </section>
+
+        {sesion?.rol === 'administrador' && <Suspense fallback={null}><SimulacroAdmin /></Suspense>}
 
         <section className="panel">
           <div className="panel-header">

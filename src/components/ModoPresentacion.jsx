@@ -12,6 +12,8 @@ import { CapaFestiva, IntroFestiva, CelebracionHito } from './presentacion/Festi
 import { useEfectos } from '../lib/efectos';
 import { hitoAlcanzado, hitoNuevo } from '../lib/hitos';
 import { detectarEventosPresentacion, sinRepetidos } from '../lib/eventosPresentacion';
+import { marcarPresentacion, latido, presentacionSinPantalla } from '../lib/presentacionEstado';
+import { textoHora } from '../lib/horario';
 import EventoPresentacion from './presentacion/EventoPresentacion';
 import { leerHito, guardarHito } from '../lib/hitosAlmacen';
 import { getRankingRango, getUltimaFechaHistorico } from '../lib/db';
@@ -438,7 +440,7 @@ function AjusteVertical({ children, reinicio, crecer = false }) {
   );
 }
 
-export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaHoy, cumplimiento, onCerrar }) {
+export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaHoy, cumplimiento, onCerrar, horaTurno}) {
   const [estilo, setEstilo] = useState('clasico');
   const { ajustes, fiesta } = useEfectos();
   const quieto = ajustes.efectos === 'apagado';
@@ -490,6 +492,10 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
   }, []);
 
   useEffect(() => { entrarPantallaCompleta(); }, []);
+  useEffect(() => {                                       // está en pantalla: se recuerda (para retomarla tras una recarga) y NADA la reinicia
+    marcarPresentacion(true); const t = setInterval(latido, 30000);
+    return () => { clearInterval(t); presentacionSinPantalla(); };
+  }, []);
   useEffect(() => {
     const alCambiar = () => setCompleta(enPantallaCompleta());
     document.addEventListener('fullscreenchange', alCambiar);
@@ -621,6 +627,7 @@ export default function ModoPresentacion({ ranking, metaHora, totalTallos, metaH
             <div>
               <div className="presentacion-marca-nombre">TORREMOLINOS</div>
               <div className="presentacion-marca-sub">{slideActual.nombre} · {indice + 1} de {slides.length} · cambia cada {minutos} min</div>
+              {horaTurno && (slideActual.id === 'podio' || slideActual.id === 'hora') && <div className="presentacion-marca-hora"><i className="fa-solid fa-clock"></i> Turno Actual · datos hasta las <b>{textoHora(horaTurno)}</b></div>}
             </div>
           </div>
           <div className="presentacion-controles">

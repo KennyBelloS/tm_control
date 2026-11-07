@@ -1,6 +1,7 @@
 import { hayConexion } from './conexion';
 import { florValida } from './avatares';
 import { eventosValidos } from './eventosApp';
+import { olvidarConsultas } from './consultasAprendidas';
 import { supabase } from './supabaseClient';
 export const ROLES = ['administrador', 'ingeniero', 'profesional', 'digitador', 'supervisor', 'formador'];
 export const ROL_LABEL = {
@@ -124,14 +125,13 @@ export async function cerrarSesion() {
 const CLAVE_PERFIL = 'tm_perfil_cache';
 const perfilGuardado = () => { try { const p = JSON.parse(localStorage.getItem(CLAVE_PERFIL) || 'null'); return p && Date.now() - p.t < 30 * 864e5 ? p.perfil : null; } catch { return null; } };
 /** Los datos guardados para ver la app sin internet son de UNA persona: se borran al entrar y al salir. */
-export function olvidarDatosLocales() { try { localStorage.removeItem(CLAVE_PERFIL); } catch { /* sin almacenamiento */ } try { caches?.delete?.('datos-api'); } catch { /* sin caché */ } }
+export function olvidarDatosLocales() { olvidarConsultas(); try { localStorage.removeItem(CLAVE_PERFIL); } catch { /* sin almacenamiento */ } try { caches?.delete?.('datos-api'); } catch { /* sin caché */ } }
 const hayTokenLocal = () => { try { return Object.keys(localStorage).some(k => /^sb-.+-auth-token$/.test(k)); } catch { return false; } };
 export async function getPerfilActual() {
-  const {
-    data: {
-      session
-    }
-  } = await supabase.auth.getSession();
+  // Si la renovación de la sesión se atasca (señal mala), a los 6 s se sigue con el último perfil conocido: nunca se deja la pantalla en la de carga.
+  const res = await Promise.race([supabase.auth.getSession(), new Promise(ok => setTimeout(() => ok(null), 6000))]);
+  if (res === null) return hayTokenLocal() ? perfilGuardado() : null;
+  const { data: { session } } = res;
   // Nunca se saca a nadie de la app por un problema de señal: si no hay internet, o si la sesión no se pudo renovar pero sigue guardada en este
   // aparato (señal mala en el celular), se usa el último perfil conocido. Solo se sale si la sesión se cerró de verdad (salir, o el servidor la revocó).
   if (!session) return !hayConexion() || hayTokenLocal() ? perfilGuardado() : null;

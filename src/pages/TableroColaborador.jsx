@@ -14,6 +14,8 @@ import { BarrasHorizontales, COLORES } from '../components/devoluciones/Graficos
 import { cargarTableroColaborador, listarColaboradores, sugeridosColaborador } from '../lib/colaborador';
 import { TIPOS_PERIODO, PESOS_DEFECTO } from '../lib/colaboradorCalculos';
 import { getUltimaFechaHistorico } from '../lib/db';
+import HoyHoraAHora from '../components/HoyHoraAHora';
+import HoyQuienBaja from '../components/HoyQuienBaja';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
 import { avisar } from '../lib/avisos';
 import { celebrarUnaVez } from '../lib/confeti';
@@ -108,6 +110,7 @@ export default function TableroColaborador() {
         {!persona && !error && (
           <div className="colab-inicio">
             <EstadoVacio icono="fa-id-card-clip" titulo="Elige a un colaborador" texto="Busca por código o por nombre. El tablero junta su rendimiento, sus devoluciones, su presentismo y cómo le va frente a su equipo." />
+            <HoyQuienBaja personas={personas} onElegir={elegir} />
             {(recientes.length > 0 || sugeridos.length > 0) && (
               <div className="colab-atajos">
                 {recientes.length > 0 && <div><small>Consultados recientemente</small>{recientes.map(r => <button key={r.id} className="colab-atajo" onClick={() => elegir(r)}><span className="dev-codigo">{r.codigo ?? r.mesa ?? '—'}</span>{r.nombre}</button>)}</div>}
@@ -141,6 +144,8 @@ export default function TableroColaborador() {
             </div>
 
             <KpisColab t={t} />
+
+            <HoyHoraAHora persona={persona} />
 
             <div className="colab-dos colab-dos-grafico">
               <GraficoDias dias={t.dias} metaHora={t.metaHora} promedio={t.resumen.promedioRend} seleccionado={diaSel} onElegir={setDiaSel} />

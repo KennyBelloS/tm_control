@@ -29,7 +29,7 @@ export function instalarRegistro() {
   // Si un toque o tecla tarda más de 1,5 s en MOSTRAR su respuesta (la app estaba ocupada), se anota: así el Administrador ve cómo va en los celulares reales.
   let obs = null;
   try {
-    obs = new PerformanceObserver(l => { for (const e of l.getEntries()) { if (!['click', 'keydown', 'pointerup'].includes(e.name) || !(e.interactionId > 0) || e.duration < UMBRAL_LENTO_MS) continue; registrarError({ texto: `Lento: un toque tardó ${(e.duration / 1000).toFixed(1)} s en mostrar su respuesta`, ref: 'LENTO', origen: 'lento' }); } });
+    obs = new PerformanceObserver(l => { for (const e of l.getEntries()) { if (!['click', 'keydown', 'pointerup'].includes(e.name) || !(e.interactionId > 0) || e.duration < UMBRAL_LENTO_MS) continue; if (window.__tmSimulacroHasta && Date.now() < window.__tmSimulacroHasta) continue; /* el simulacro (animaciones de muestra) no cuenta como lentitud real */ registrarError({ texto: `Lento: un toque tardó ${(e.duration / 1000).toFixed(1)} s en mostrar su respuesta`, ref: 'LENTO', origen: 'lento' }); } });
     obs.observe({ type: 'event', durationThreshold: UMBRAL_LENTO_MS, buffered: true });
   } catch { /* este navegador no mide las interacciones */ }
   return () => { window.removeEventListener('tm-error-datos', alDato); window.removeEventListener('error', alFallo); window.removeEventListener('unhandledrejection', alRechazo); try { obs?.disconnect(); } catch { /* nada */ } };

@@ -19,6 +19,8 @@ import AvanceEsperado from '../components/AvanceEsperado';
 import { useRealtimeRefresco } from '../lib/useRealtimeRefresco';
 import { fechaLocalISO } from '../lib/clasificacionCalculos';
 import IndiceSecciones from '../components/IndiceSecciones';
+import PresentacionSegura from '../components/presentacion/PresentacionSegura';
+import { debeRetomarPresentacion, marcarPresentacion } from '../lib/presentacionEstado';
 import Diferido from '../components/Diferido';
 import SaludoDia from '../components/SaludoDia';
 import { TarjetasEsqueleto } from '../components/Estados';
@@ -52,7 +54,7 @@ export default function Dashboard() {
   const [carruselHoy, setCarruselHoy] = useState([]);
   const [carruselAyer, setCarruselAyer] = useState([]);
   const [fechaHistoricoMostrado, setFechaHistoricoMostrado] = useState(null);
-  const [presentando, setPresentando] = useState(false);
+  const [presentando, setPresentando] = useState(() => debeRetomarPresentacion());          // si la página se recargó con la presentación abierta (una actualización), se retoma sola
 
   const [tickTiempoReal, setTickTiempoReal] = useState(0);
   useRealtimeRefresco(['rendimiento_historico', 'rendimiento_actual', 'metas_diarias', 'configuracion'], () => setTickTiempoReal(t => t + 1));
@@ -107,7 +109,8 @@ export default function Dashboard() {
             cumplimiento: cumplimientoActual,
             promedioPersona: promedioPersonaActual,
             rendimientoPromedio: rendimientoPromedioActual,
-            bloques: turnoActual.length
+            bloques: turnoActual.length,
+            horaTurno: turnoActual.reduce((m, r) => { const x = String(r.hora_fin || '').slice(0, 5); return x > m ? x : m; }, '') || null
           },
           ayer: {
             totalTallos: totalTallosAyer,
@@ -128,7 +131,7 @@ export default function Dashboard() {
   }, [hoy, tickTiempoReal]);
   return <>
       <PageHeader title="Dashboard Ejecutivo" subtitle="Resumen general de producción, en tiempo real desde el Turno Actual.">
-        <button className="btn-secondary" onClick={() => { entrarPantallaCompleta(); setPresentando(true); }}>
+        <button className="btn-secondary" onClick={() => { entrarPantallaCompleta(); marcarPresentacion(true); setPresentando(true); }}>
           <i className="fa-solid fa-expand"></i> Presentar
         </button>
         {puedeEditar(sesion) && <Link to="/rendimientos" className="btn-primary">
@@ -302,14 +305,15 @@ export default function Dashboard() {
           </>}
       </div>
       {presentando && stats && (
-        <ModoPresentacion
+        <PresentacionSegura><ModoPresentacion
           ranking={carruselHoy}
           metaHora={stats.cfg.metaHora}
           totalTallos={stats.actual.totalTallos}
           metaHoy={metaHoy}
           cumplimiento={stats.actual.cumplimiento}
-          onCerrar={() => { salirPantallaCompleta(); setPresentando(false); }}
-        />
+          horaTurno={stats.actual.horaTurno}
+          onCerrar={() => { marcarPresentacion(false); salirPantallaCompleta(); setPresentando(false); }}
+        /></PresentacionSegura>
       )}
     </>;
 }

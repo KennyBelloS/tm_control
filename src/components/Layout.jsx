@@ -15,6 +15,8 @@ import BannerConexion from './BannerConexion';
 import PerfilModal from './PerfilModal';
 import Festejo from './Festejo';
 import { limpiarTurnoActual } from '../lib/db';
+import { agendarPrecarga } from '../lib/precargaDatos';
+import { presentandoAhora } from '../lib/presentacionEstado';
 import { registrarAcceso, instalarRegistro } from '../lib/registroActividad';
 import { avisar } from '../lib/avisos';
 import { precargar, precargarEnSegundoPlano } from '../lib/paginas';
@@ -42,13 +44,14 @@ export default function Layout() {
     registrarAcceso(); const off = instalarRegistro(); const v = () => { if (document.visibilityState === 'visible') registrarAcceso(); };
     document.addEventListener('visibilitychange', v); return () => { off(); document.removeEventListener('visibilitychange', v); };
   }, []);
+  useEffect(() => agendarPrecarga(), []);                                        // sin internet: lo que usas queda listo apenas entras (ver precargaDatos.js)
   useEffect(() => {                                                              // 6:00 a. m.: el Turno Actual del día anterior se borra solo (la base lo hace a hora de Colombia)
     let vivo = true;
     const limpiar = () => limpiarTurnoActual().then(n => { if (vivo && n > 0) { window.dispatchEvent(new Event('tm-conexion-restablecida')); avisar('Se reinició el Turno Actual (6:00 a. m.): se borró lo del día anterior.'); } });
     limpiar(); const t = setInterval(limpiar, 10 * 60 * 1000);
     return () => { vivo = false; clearInterval(t); };
   }, []);                                    // al volver el internet se vuelve a pedir lo que se estaba viendo
-  useEffect(() => { const f = () => setRecarga(r => r + 1); window.addEventListener('tm-conexion-restablecida', f); return () => window.removeEventListener('tm-conexion-restablecida', f); }, []);
+  useEffect(() => { const f = () => { if (presentandoAhora()) return; setRecarga(r => r + 1); }; window.addEventListener('tm-conexion-restablecida', f); return () => window.removeEventListener('tm-conexion-restablecida', f); }, []);
   useRespaldoAutomatico();                       // copia mensual automática (solo si quien abre la app es administrador)
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();

@@ -21,7 +21,7 @@ const esAmigable = t => t.length > 0 && t.length <= 220 && !TECNICO.test(t) && !
 
 const REGLAS = [
   ['red', /failed to fetch|fetchevent|respondwith|no-response|networkerror|load failed|network request failed|err_internet|err_network|tm_sin_red|sin conexi[oó]n|offline|net::/i, 'No hay conexión con el servidor. Revisa tu internet: lo que ya viste sigue disponible.'],
-  ['sin-guardar', /tm_sin_cache/i, 'Sin conexión: esto todavía no se guardó en este equipo. Se verá cuando vuelva el internet.'],
+  ['sin-guardar', /tm_sin_cache/i, 'Sin conexión: esta pantalla aún no tiene datos guardados. Quedan listos solos la próxima vez que entres con internet.'],
   ['lento', /timeout|timed out|aborterror|tm_timeout|abort/i, 'El servidor tardó demasiado en responder. Inténtalo de nuevo en un momento.'],
   ['config', /service_role|cron_secret|falta configurar|no est[aá] configurad|\.env/i, 'Este servicio todavía no está configurado en el servidor. Avísale al administrador del sistema (en Seguridad está cómo terminarlo).'],
   ['sesion', /jwt|token.*(expir|invalid|inv[aá]lid)|not authenticated|no autenticad|pgrst301|invalid claim|refresh.token|session (missing|expired)|sesi[oó]n (inv[aá]lida|vencida)/i, 'Tu sesión se está renovando. Inténtalo de nuevo; si se repite, vuelve a iniciar sesión.'],

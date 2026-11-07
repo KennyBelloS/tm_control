@@ -222,16 +222,27 @@ Toca tu avatar (arriba a la derecha) y elige **Mi perfil**:
 
 Cuando guardas, subes o editas algo florece una **rosa**, caen pétalos y debajo **dice qué pasó** («Reporte subido: 120 registros»). Si algo falla, la rosa se marchita y **dice el error** en palabras claras. No sale con avisos de «copiado», ni dos veces seguidas. Si no te gusta, apágalo en *Efectos y festividades* (tu menú): con **Apagado** no florece nada (queda solo el aviso normal) y con **Suave** salen menos pétalos. Si tu aparato pide «reducir movimiento», tampoco sale.
 
-### Evolución por hora (Turno Actual)
+### Hoy, hora a hora (en el TIC)
 
-En **Rendimientos**, **al final del Turno Actual** (separada del resto y plegable con su flecha), está **Evolución por hora**: a cada persona se le evalúa **cómo ha mejorado o empeorado hora por hora**.
+En **Tablero Integrado del Colaborador (TIC)**, al abrir a una persona, debajo de sus indicadores aparece **«Hoy, hora a hora»**: cómo ha ido su rendimiento durante el turno de hoy.
 
-- Cada hora se compara con la anterior: **Mejoró** o **Empeoró** si cambió 5 % o más, y **Igual** si no. La primera hora no se compara.
-- Al abrir a una persona ves su rendimiento de cada hora con su % de la meta, su **mejor y su peor hora**, y una frase con la **tendencia del día** (va mejorando, va bajando o está estable; necesita 3 horas o más).
-- Primero salen quienes **van bajando**, para mirarlos pronto; los filtros te dejan ver solo estables, solo quienes mejoran o quienes tienen pocas horas. **Desplegar todo** y **Plegar todo** (arriba y abajo de la lista) abren o cierran a todas las personas de una vez.
-- **Las horas quedan guardadas** aunque un reporte nuevo reemplace al anterior (SQL **sección 34**), así la evolución del día no se pierde.
+- **La gráfica:** un punto por cada hora, con su rendimiento (tallos por hora), y la línea de puntos de la **meta**. Cada tramo va en **verde** (mejoró frente a la hora anterior), **azul** (igual) o **rojo** (empeoró); mejora o empeora si cambia **5 % o más**. Los puntos tienen el color del estado de esa hora (Excelente, Cumple, A punto de cumplir, Por mejorar).
+- **Tocar una hora** (por ejemplo, 6 a 7 de la mañana) muestra su detalle: rendimiento, % de la meta, estado, qué pasó frente a la hora anterior, y los tallos y minutos trabajados.
+- **Lo que dice en palabras:** el promedio del día, su mejor y su peor hora, cuántas veces mejoró y empeoró, la **tendencia** del día (necesita 3 horas o más) y, si hace falta, un **consejo**: por ejemplo, «lleva 2 horas bajando: conviene acercarse y ver qué cambió».
+- **Qué se guarda:** solo el día de hoy. Cada hora queda guardada aunque un reporte nuevo reemplace al anterior (SQL de la sección 34) y **a las 6:00 a. m. se borra todo lo del día anterior**, pero nada del Histórico.
+- **Quién va bajando hoy:** en la pantalla de inicio del TIC, antes de elegir a nadie, salen las personas que hoy van bajando hora tras hora; un toque abre su tablero.
+- Se actualiza sola cuando se sube un reporte nuevo.
 
-**A las 6:00 a. m. el Turno Actual se reinicia solo:** se borra todo lo del día anterior —los registros del Turno Actual y sus horas guardadas—, **pero nada del Histórico**. Lo hace la base de datos (a hora de Colombia), una tarea programada a las 6:00 a. m. y la app misma al abrirse. Un día de turno va de 6:00 a. m. a 5:59 a. m. del día siguiente: a medianoche **no** se reinicia. Ojo: si alguien sube un Turno Actual con fecha de un día anterior después de las 6:00 a. m., se borrará.
+### Simulacro de situaciones (solo Administrador)
+
+En **Configuración**, el Administrador tiene un panel para **ver cómo se ve cada situación especial sin tocar ningún dato**. Cada tarjeta tiene un botón **Ver**:
+
+- **Meta del día:** 25, 50, 75 y 100 % (la flor se abre y se felicita al equipo; al 100 % hay confeti).
+- **Líneas y rendimiento:** una línea toma el liderazgo, una línea supera a otra, el rendimiento sube o baja de golpe, la meta del día avanza rápido.
+- **Al guardar o subir algo:** el festejo con su aviso, y cómo se ve un error.
+- **Avisos:** un aviso de muestra en la pantalla de este aparato (pide permiso de notificaciones; no se envía a nadie).
+
+La simulación se abre a pantalla completa con la barra **«SIMULACRO · no cambia ningún dato»**; con **Ver otra vez** la repites y con **Cerrar** (o la tecla Esc) vuelves. Los carteles se generan con la **misma lógica real** de la presentación, alimentada con datos de muestra: lo que ves es lo que verá el público. Si tienes los efectos apagados no florece la rosa del festejo (se enciende en tu menú → Efectos).
 
 ### Avisos importantes: la campana y los avisos fuera de la app
 
@@ -251,6 +262,15 @@ Cuando alguien **sube** información importante, la app lo avisa. Son cinco avis
 - Un mismo aviso no se repite (por ejemplo, el mismo turno a la misma hora), y **quien cargó no recibe su propio aviso**.
 - Si algo del envío falla, la carga **nunca se estorba**: el aviso es «lo mejor posible».
 - Requiere el SQL de la **sección 38** y las llaves `VITE_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel (ver *Instalación y mantenimiento*).
+
+### Presentar: no se cierra sola
+
+La presentación está pensada para los televisores y **no se cierra por ninguna razón propia de la app**:
+- **Un corte de internet no la saca.** Cuando el internet se va y vuelve (el Wi-Fi de un televisor suele hacerlo), la presentación sigue donde estaba.
+- **Si la página se recarga** (por ejemplo, porque la app se actualizó sola con una versión nueva), **se abre sola otra vez**, en la misma pestaña y hasta 12 horas después. Pasadas las 12 horas ya no se retoma, para no imponerle una presentación a quien abre la app otro día.
+- **Si algo falla al dibujarla,** se recupera sola en pocos segundos (y queda anotado en Seguridad → Errores recientes), en vez de cerrarse.
+- **Solo se cierra con el botón «Salir»** (Esc solo sale de la pantalla completa del navegador).
+- Las diapositivas del **Turno Actual** (Podio y Hora a hora) dicen hasta qué hora llegan los datos: «Turno Actual · datos hasta las 10:00 a. m.».
 
 ### Presentar: carteles de eventos
 
@@ -305,6 +325,13 @@ La app sigue abriendo sin internet y te muestra **lo último que viste**; para g
 - Por seguridad, esos datos guardados se borran al iniciar o cerrar sesión.
 
 **En el celular:** como a veces hay señal pero no hay datos, ninguna consulta espera más de 10 segundos; pasado ese tiempo se muestra lo último guardado y aparece «Sin conexión». Tu sesión **no se cierra** por una señal mala: solo se cierra si tú sales o si el Administrador desactiva tu cuenta.
+
+
+**Lo que usas queda listo apenas entras (precarga):** la app aprende qué consulta cada pantalla que abres con internet y, unos segundos después de entrar y solo en un momento libre, vuelve a pedir esas consultas **con las fechas de hoy** y las guarda. Así, si luego se va el internet, la pantalla de hoy abre al instante con sus datos. Reglas:
+- Solo precarga lo que **tú ya usas** (lo aprende la primera vez que abres cada pantalla con internet).
+- No lo hace si la conexión es muy lenta o el celular tiene activado el ahorro de datos, y no más de una vez cada 20 minutos.
+- Se borra al cerrar sesión, como el resto de lo guardado en el aparato.
+- Una pantalla que **nunca** has abierto con internet no tendrá datos guardados: el aviso lo dice con claridad y se arregla sola la próxima vez que entres con internet.
 
 ## Celulares (iPhone y Android)
 
@@ -446,6 +473,21 @@ La campana avisa a cada persona, una sola vez por versión, que hay novedades.
 
 ## Historial de cambios
 
+### Versión 1.11.0 — 30/10/2026 · La presentación no se cierra sola y «Hoy, hora a hora» en el TIC (≈ 2 días)
+
+- **La presentación (televisores) ya no se cierra sola:** antes, cada vez que el internet se cortaba y volvía, la pantalla se reiniciaba y sacaba la presentación. Ahora, mientras se presenta, **nada la reinicia**; si la página se recarga por una actualización de la app, **se abre sola otra vez** (en la misma pestaña, hasta 12 horas); y si algo falla al dibujarla, **se recupera sola** en vez de cerrarse. Solo se cierra con el botón **Salir**.
+- **Hoy, hora a hora, en el TIC:** al abrir a una persona se ve una gráfica con su rendimiento de cada hora de hoy contra la meta, con los tramos en verde (mejoró), azul (igual) o rojo (empeoró). Tocas una hora y ves su detalle; abajo, una explicación en palabras y un consejo («lleva 2 horas bajando: conviene acercarse»).
+- **Hora del Turno Actual en la presentación:** las diapositivas del Turno Actual (Podio y Hora a hora) dicen «Turno Actual · datos hasta las 10:00 a. m.».
+- **Mejora: quién va bajando hoy, a un toque:** en la pantalla de inicio del TIC, antes de elegir a alguien, salen los que hoy van bajando hora tras hora; un toque abre su tablero.
+- **Mejora: Rendimientos quedó más limpio:** la «Evolución por hora» salió de ahí (estorbaba la carga de archivos y el listado) y se movió al TIC, donde se mira a una persona a la vez.
+
+### Versión 1.10.0 — 29/10/2026 · Simulacro para el Administrador y sin internet más listo (≈ 1,5 días)
+
+- **Simulacro de situaciones (solo Administrador, en Configuración):** una galería para ver cómo se ve cada situación especial **sin tocar ningún dato**: llegar al 25, 50, 75 y 100 % de la meta, una línea que toma el liderazgo o supera a otra, el rendimiento que sube o baja de golpe, la meta que avanza rápido, el festejo al guardar, un error y un aviso en la pantalla del celular. Usa la misma lógica de la presentación, con datos de muestra.
+- **Sin internet, lo que usas ya está guardado:** la app aprende qué consulta cada pantalla y, unos segundos después de entrar (con internet y en un momento libre), vuelve a pedirlas con las fechas de hoy para dejarlas guardadas. Así, sin internet, la pantalla de hoy abre al instante con sus datos y ya no sale «todavía no se guardó».
+- **Mejora: mensaje sin internet más claro:** si aun así una pantalla nunca se ha abierto con internet, dice «esta pantalla aún no tiene datos guardados; quedan listos solos la próxima vez que entres con internet».
+- **Mejora: la precarga cuida tu conexión y tu celular:** no corre con conexión lenta ni con el ahorro de datos activado, pide de a dos consultas con pausas (nunca todas de golpe), no más de una vez cada 20 minutos, y se borra al cerrar sesión.
+
 ### Versión 1.9.0 — 29/10/2026 · Avisos fuera de la app, carteles en la presentación y Resúmenes para más roles (≈ 3 días)
 
 - **Avisos importantes fuera de la app:** cuando se sube el turno hora a hora, la clasificación o un histórico, y cuando ya está el último día laboral de la semana o del mes (resumen semanal y mensual listos), llega un aviso al celular **aunque la app esté cerrada**. El Administrador decide, **persona por persona y aviso por aviso**, a quién le llega (Usuarios → «Avisos fuera de la app»); cada persona lo acepta en su aparato desde Mi perfil.
@@ -453,6 +495,7 @@ La campana avisa a cada persona, una sola vez por versión, que hay novedades.
 - **Presentación más visual:** un cartel grande se sobrepone cuando una línea supera a otra o toma el liderazgo, cuando el rendimiento sube o baja de golpe o cuando la meta avanza rápido. La clasificación dice qué hora se está viendo.
 - **Mejora: Resúmenes también para Ingenieros y Supervisores** (el Supervisor los ve y descarga, no edita).
 - **Mejora: sin conexión en el celular:** ya no se muestra el texto técnico del navegador (`FetchEvent… no-response… supabase.co`) ni «Error conectando con Supabase»; sale un mensaje claro.
+- **Si activar los avisos falla, dice por qué:** la persona ve una frase clara (permiso del aparato, servicio sin respuesta, app preparándose…) con un código, y el Administrador ve la **causa exacta** en Seguridad → Errores recientes (por ejemplo, «la llave pública de los avisos no es válida»).
 - **Arreglo:** en Usuarios, el permiso de cada persona («Solo ver / Puede editar») ahora se lee de la base y se ve como está guardado.
 - **SQL nuevo:** sección 38 (avisos). Llaves nuevas en Vercel: `VITE_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
 

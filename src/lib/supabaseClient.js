@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { hayConexion, confirmarFalloRed, alCambiarConexion } from './conexion';
 import { mensajeAmigable } from './mensajesError';
 import { claveCache, guardarCache, leerCache } from './cacheDatos';
+import { registrarConsulta } from './consultasAprendidas';
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 if (!url || !anonKey) {
@@ -59,7 +60,7 @@ async function fetchRed(input, init) {
     if (!hayConexion()) { const c = await leerCache(clave); if (c) return c; }                           // sin internet: al instante, sin esperar
     try {
       const r = await pedir(input, init, hayConexion() ? TIEMPO.lectura : TIEMPO.sinInternet);
-      if (r.ok) { guardarCache(clave, r); return r; }
+      if (r.ok) { guardarCache(clave, r); registrarConsulta(u, init); return r; }
       return await amigarRespuesta(r, u);
     } catch (e) {
       if (e?.name === 'AbortError' && !e.timeout) throw e;                                               // la canceló quien la pidió
@@ -81,4 +82,16 @@ async function fetchRed(input, init) {
 // Las copias de la versión anterior se guardaban solo por dirección (mezclaban "una fila" y "lista"): se borran una vez.
 try { if (typeof localStorage !== 'undefined' && !localStorage.getItem('tm_cache_v2')) { localStorage.setItem('tm_cache_v2', '1'); caches?.delete?.('datos-api'); } } catch { /* sin almacenamiento */ }
 export const supabase = createClient(url || 'https://placeholder.supabase.co', anonKey || 'placeholder', { global: { fetch: fetchRed }, auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+
+/**
+ * SIN INTERNET NO SE ESPERA A RENOVAR LA SESIÓN. Con la sesión vencida y sin red, la librería reintenta renovarla durante ~30 segundos y mientras tanto
+ * bloquea el perfil y todas las consultas (la pantalla se queda en la de carga). Sin internet se usa la sesión guardada al instante; al volver el
+ * internet se renueva sola, como siempre. (Las consultas sin red se contestan con lo guardado: ver fetchRed.)
+ */
+const sesionGuardada = () => { try { const k = Object.keys(localStorage).find(x => /^sb-.+-auth-token$/.test(x)); const s = k ? JSON.parse(localStorage.getItem(k)) : null; return s && s.access_token && s.user ? s : null; } catch { return null; } };
+const getSessionOriginal = supabase.auth.getSession.bind(supabase.auth);
+supabase.auth.getSession = async () => {
+  if (!hayConexion()) { const s = sesionGuardada(); if (s) return { data: { session: s }, error: null }; }
+  return getSessionOriginal();
+};
 export const supabaseConfigurado = Boolean(url && anonKey);
